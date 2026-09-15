@@ -1,4 +1,4 @@
-"""Command-line interface for Metisa Sandbox."""
+"""Command-line interface for the Metisa Sandbox."""
 
 from __future__ import annotations
 
@@ -81,7 +81,6 @@ def _ensure_docker_image(image_name: str, image_tag: str) -> int:
 
 
 def _run_docker_workload(image_name: str, image_tag: str, workload_module: str) -> int:
-    print_info("Docker workload starting...")
     return_code = run_docker_container(image_name, image_tag, workload_module)
     if return_code == 0:
         print_info("Docker workload completed.")

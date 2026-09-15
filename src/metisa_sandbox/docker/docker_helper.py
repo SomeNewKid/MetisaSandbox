@@ -98,9 +98,16 @@ def run_docker_container(image_name: str, image_tag: str, workload_module: str) 
     docker_command_location = _get_docker_command_location()
     image_reference = create_image_reference(image_name, image_tag)
 
-    source_path = Path.cwd() / "src" / workload_module
-    run_directory = _create_run_directory()
-    output_path = run_directory / "output"
+    runner_module_name = "metisa_runner"
+    probes_module_name = "metisa_probes"
+    guest_source_dir = "/sandbox-source"
+    guest_output_dir = "/sandbox-output"
+    host_source_path = Path.cwd() / "src"
+    host_runner_path = host_source_path / runner_module_name
+    host_probes_path = host_source_path / probes_module_name
+    host_workload_path = host_source_path / workload_module
+    host_run_directory = _create_run_directory()
+    host_output_path = host_run_directory / "output"
 
     process = subprocess.Popen(
         [
@@ -108,16 +115,21 @@ def run_docker_container(image_name: str, image_tag: str, workload_module: str) 
             "run",
             "--rm",  # remove after completion
             "--volume",
-            f"{source_path}:/sandbox-source/{workload_module}:ro",
+            f"{host_runner_path}:{guest_source_dir}/{runner_module_name}:ro",
             "--volume",
-            f"{output_path}:/sandbox-output",
+            f"{host_probes_path}:{guest_source_dir}/{probes_module_name}:ro",
+            "--volume",
+            f"{host_workload_path}:{guest_source_dir}/{workload_module}:ro",
+            "--volume",
+            f"{host_output_path}:{guest_output_dir}:rw",
             "--env",
-            "SANDBOX_OUTPUT_DIR=/sandbox-output",
+            f"SANDBOX_OUTPUT_DIR={guest_output_dir}",
             "--workdir",
-            "/sandbox-source",
+            guest_source_dir,
             image_reference,
             "python",
             "-m",
+            runner_module_name,
             workload_module,
         ],
         stdout=subprocess.PIPE,
