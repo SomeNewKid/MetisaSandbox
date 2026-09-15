@@ -1,0 +1,4 @@
+# Dockerfile concept: https://docs.docker.com/build/concepts/dockerfile/
+# Dockerfile reference: https://docs.docker.com/reference/dockerfile/
+
+FROM python:3.12-slim
