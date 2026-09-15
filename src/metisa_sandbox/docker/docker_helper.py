@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import time
+from datetime import datetime
 from pathlib import Path
 
 _DOCKER_DESKTOP_EXE = (
@@ -93,6 +94,54 @@ def start_docker_desktop() -> None:
     )
 
 
+def run_docker_container(image_name: str, image_tag: str, workload_module: str) -> int:
+    docker_command_location = _get_docker_command_location()
+    image_reference = create_image_reference(image_name, image_tag)
+
+    source_path = Path.cwd() / "src" / workload_module
+    run_directory = _create_run_directory()
+    output_path = run_directory / "output"
+
+    process = subprocess.Popen(
+        [
+            docker_command_location,
+            "run",
+            "--rm",  # remove after completion
+            "--volume",
+            f"{source_path}:/sandbox-source/{workload_module}:ro",
+            "--volume",
+            f"{output_path}:/sandbox-output",
+            "--env",
+            "SANDBOX_OUTPUT_DIR=/sandbox-output",
+            "--workdir",
+            "/sandbox-source",
+            image_reference,
+            "python",
+            "-m",
+            workload_module,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=0,
+    )
+
+    output_chunks = []
+
+    if process.stdout is not None:
+        while True:
+            chunk = process.stdout.read(1)
+            if chunk == "":
+                break
+
+            print(chunk, end="", flush=True)
+            output_chunks.append(chunk)
+
+    return_code = process.wait()
+
+    return return_code
+
+
 def create_image_reference(image_name: str, image_tag: str) -> str:
     return f"{image_name}:{image_tag}"
 
@@ -122,3 +171,10 @@ def _docker_engine_available(docker_command_location: str) -> bool:
     )
 
     return result.returncode == 0
+
+
+def _create_run_directory() -> Path:
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    run_directory = Path.cwd() / ".runs" / f"run-{timestamp}"
+    run_directory.mkdir(parents=True, exist_ok=False)
+    return run_directory
