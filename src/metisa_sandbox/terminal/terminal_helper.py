@@ -31,12 +31,8 @@ def print_info(message: str) -> None:
 
 
 def print_warning(message: str) -> None:
-    print(f"{message}")
+    print(f"[WARN] {message}")
 
 
 def print_error(message: str) -> None:
-    prefix = "[ERROR] "
-    if message.lower().startswith("ERROR") or message.lower().startswith("[ERROR]"):
-        prefix = ""
-
-    print(f"{prefix} {message}")
+    print(f"[ERROR] {message}")

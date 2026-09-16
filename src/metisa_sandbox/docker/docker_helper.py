@@ -109,29 +109,50 @@ def run_docker_container(image_name: str, image_tag: str, workload_module: str) 
     host_run_directory = _create_run_directory()
     host_output_path = host_run_directory / "output"
 
+    is_interactive = False
+
+    arguments = [
+        docker_command_location,
+        "run",
+        "--rm",  # remove after completion
+    ]
+
+    if is_interactive:
+        arguments.extend([
+            "--interactive", # keeps stdin open
+            "--tty", # allocates a pseudo-terminal
+        ])
+
+    arguments.extend([
+        "--volume",
+        f"{host_runner_path}:{guest_source_dir}/{runner_module_name}:ro",
+        "--volume",
+        f"{host_probes_path}:{guest_source_dir}/{probes_module_name}:ro",
+        "--volume",
+        f"{host_workload_path}:{guest_source_dir}/{workload_module}:ro",
+        "--volume",
+        f"{host_output_path}:{guest_output_dir}:rw",
+        "--env",
+        f"SANDBOX_OUTPUT_DIR={guest_output_dir}",
+        "--workdir",
+        guest_source_dir,
+        image_reference,
+        "python",
+        "-m",
+        runner_module_name,
+        workload_module,
+    ])
+
+    if is_interactive:
+        process = subprocess.Popen(
+            arguments,
+            text=True,
+        )
+
+        return process.wait()
+
     process = subprocess.Popen(
-        [
-            docker_command_location,
-            "run",
-            "--rm",  # remove after completion
-            "--volume",
-            f"{host_runner_path}:{guest_source_dir}/{runner_module_name}:ro",
-            "--volume",
-            f"{host_probes_path}:{guest_source_dir}/{probes_module_name}:ro",
-            "--volume",
-            f"{host_workload_path}:{guest_source_dir}/{workload_module}:ro",
-            "--volume",
-            f"{host_output_path}:{guest_output_dir}:rw",
-            "--env",
-            f"SANDBOX_OUTPUT_DIR={guest_output_dir}",
-            "--workdir",
-            guest_source_dir,
-            image_reference,
-            "python",
-            "-m",
-            runner_module_name,
-            workload_module,
-        ],
+        arguments,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,

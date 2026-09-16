@@ -3,22 +3,37 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from pathlib import Path
 
 
 def main(argv: list[str] | None = None) -> int:
     """Run the sample agent workload."""
 
-    output_dir = Path(os.environ.get("SANDBOX_OUTPUT_DIR", "."))
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = os.environ.get("SANDBOX_OUTPUT_DIR", "")
+    if not output_dir:
+        output_dir = _create_run_directory()
+    output_directory = Path(output_dir)
+    output_directory.mkdir(parents=True, exist_ok=True)
 
-    answer_path = output_dir / "answer.txt"
+    user_name = "Fred" # input("What is your name? ")
+
+    message = f"Hello {user_name} from the Sample Agent."
+
+    answer_path = output_directory / "answer.txt"
     answer_path.write_text(
-        "Hello from the Sample Agent.",
+        message,
         encoding="utf-8",
     )
 
-    print("Hello from the Sample Agent.")
+    print(message)
     print(f"Wrote answer to {answer_path}")
 
     return 0
+
+
+def _create_run_directory() -> Path:
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    run_directory = Path.cwd() / ".runs" / f"run-{timestamp}"
+    run_directory.mkdir(parents=True, exist_ok=False)
+    return run_directory

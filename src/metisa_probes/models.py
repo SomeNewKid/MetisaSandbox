@@ -10,8 +10,8 @@ from dataclasses import dataclass
 class ProbeContext:
     """Context specific to the AI agent workload."""
 
-    output_volume = "/sandbox-output"
-    source_volume = "/sandbox-source"
+    output_volume: str = "/sandbox-output"
+    source_volume: str = "/sandbox-source"
 
 
 @dataclass(frozen=True)
