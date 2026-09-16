@@ -143,34 +143,51 @@ def run_docker_container(image_name: str, image_tag: str, workload_module: str) 
         workload_module,
     ])
 
+    log_file = _get_log_file(host_run_directory)
+
+    with log_file.open("w", encoding="utf-8") as file:
+        file.write("Running Docker container\n")
+        file.write("Command: ")
+        file.write(" ".join(arguments))
+        file.write("\n")
+        file.write("Image: ")
+        file.write(image_reference)
+        file.write("\n")
+
     if is_interactive:
         process = subprocess.Popen(
             arguments,
             text=True,
         )
 
-        return process.wait()
+        return_code = process.wait()
 
-    process = subprocess.Popen(
-        arguments,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=0,
-    )
+    else:
+        process = subprocess.Popen(
+            arguments,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=0,
+        )
 
-    output_chunks = []
+        output_chunks = []
 
-    if process.stdout is not None:
-        while True:
-            chunk = process.stdout.read(1)
-            if chunk == "":
-                break
+        if process.stdout is not None:
+            while True:
+                chunk = process.stdout.read(1)
+                if chunk == "":
+                    break
 
-            print(chunk, end="", flush=True)
-            output_chunks.append(chunk)
+                print(chunk, end="", flush=True)
+                output_chunks.append(chunk)
 
-    return_code = process.wait()
+        return_code = process.wait()
+
+    with log_file.open("a", encoding="utf-8") as file:
+        file.write("Return code: ")
+        file.write(str(return_code))
+        file.write("\n")
 
     return return_code
 
@@ -211,3 +228,11 @@ def _create_run_directory() -> Path:
     run_directory = Path.cwd() / ".runs" / f"run-{timestamp}"
     run_directory.mkdir(parents=True, exist_ok=False)
     return run_directory
+
+
+def _get_log_file(host_run_directory: Path) -> Path:
+    logs_dir = host_run_directory / ".logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    log_file = logs_dir / "docker.txt"
+
+    return log_file
