@@ -28,7 +28,5 @@ def current_user_is_sandbox_user(probe_context: ProbeContext) -> ProbeResult:
 
 IDENTITY_PROBES = ProbeGroup(
     name="identity",
-    probes=(
-        current_user_is_sandbox_user,
-    ),
+    probes=(current_user_is_sandbox_user,),
 )

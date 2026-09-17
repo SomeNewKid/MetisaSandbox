@@ -4,11 +4,7 @@ from __future__ import annotations
 
 import sys
 
-from metisa_common.specification_helper import (
-    get_image_name,
-    get_image_tag,
-    get_workload_specification_path,
-)
+from metisa_common.specification_helper import get_image_name, get_image_tag
 
 from .docker.docker_helper import (
     build_docker_image,
@@ -33,8 +29,6 @@ def main(argv: list[str] | None = None) -> int:
         example = "sample_agent"
         raise SystemExit(f"Usage: python -m metisa_sandbox {example}")
 
-    specification_path = get_workload_specification_path(workload_module)
-
     image_name = get_image_name()
     image_tag = get_image_tag()
 
@@ -44,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
             return docker_image_exitcode
 
         docker_workload_exitcode = _run_docker_workload(
-            image_name, image_tag, workload_module, specification_path
+            image_name, image_tag, workload_module
         )
         if docker_workload_exitcode != 0:
             return docker_workload_exitcode
@@ -88,14 +82,11 @@ def _ensure_docker_image(image_name: str, image_tag: str) -> int:
 
 
 def _run_docker_workload(
-    image_name: str, 
-    image_tag: str, 
-    workload_module: str, 
-    specification_path: Path
+    image_name: str,
+    image_tag: str,
+    workload_module: str,
 ) -> int:
-    return_code = run_workload_in_sandbox(
-        image_name, image_tag, workload_module, specification_path
-    )
+    return_code = run_workload_in_sandbox(image_name, image_tag, workload_module)
     if return_code == 0:
         print_info("Docker workload completed.")
     else:

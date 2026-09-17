@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from metisa_common.models import SpecificationValidationError
+from metisa_common.models import Capability, SpecificationValidationError
 from metisa_common.specification_helper import parse_specification
 
 
@@ -157,7 +157,7 @@ def test_valid_capabilities() -> None:
     """
     specification = parse_specification(toml)
     assert len(specification.capabilities) == 1
-    assert specification.capabilities[0] == "network"
+    assert Capability.NETWORK in specification.capabilities
 
 
 def test_specification_with_unknown_key() -> None:

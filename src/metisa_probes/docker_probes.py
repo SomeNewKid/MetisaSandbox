@@ -11,8 +11,8 @@ from .models import ProbeContext, ProbeGroup, ProbeResult
 def docker_socket_is_absent(probe_context: ProbeContext) -> ProbeResult:
     """
     Ensure Docker socket is absent.
-    
-    Mounting the Docker socket would effectively 
+
+    Mounting the Docker socket would effectively
     let the workload control the host Docker daemon.
     """
     probe_name = "docker__docker_socket_is_absent"

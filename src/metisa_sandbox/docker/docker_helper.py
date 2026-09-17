@@ -11,8 +11,13 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from metisa_common.models import Capability
-from metisa_common.specification_helper import load_specification
+from metisa_common.models import Capability, MetisaSpecification
+from metisa_common.specification_helper import (
+    get_workload_specification_path,
+    load_specification,
+)
+
+from .models import SandboxContext
 
 _DOCKER_DESKTOP_EXE = (
     Path(os.environ.get("ProgramFiles", "C:\\Program Files"))
@@ -98,35 +103,78 @@ def start_docker_desktop() -> None:
 
 
 def run_workload_in_sandbox(
-    image_name: str, 
-    image_tag: str, 
-    workload_module: str, 
-    specification_path: Path
+    image_name: str, image_tag: str, workload_module: str
 ) -> int:
-    if not specification_path.is_file():
-        raise ValueError(f"Module '{workload_module}' does not contain metisa.toml.")
-    specification = load_specification(specification_path)
-    
-    docker_command_location = _get_docker_command_location()
-    image_reference = create_image_reference(image_name, image_tag)
+    specification = _load_workload_specification(workload_module)
+
+    sandbox_context = _create_sandbox_context(image_name, image_tag)
+
+    _create_docker_network(specification, sandbox_context)
+
+    staged_source_path = _create_source_directory(sandbox_context, workload_module)
+
+    arguments = _create_docker_run_arguments(
+        specification,
+        sandbox_context,
+        staged_source_path,
+        image_name,
+        image_tag,
+        workload_module,
+    )
+
+    log_file = _create_log_file(sandbox_context, arguments)
+
+    return_code = _execute_sandbox_run(
+        arguments, specification, sandbox_context, staged_source_path
+    )
+
+    _append_log_file(log_file, f"Return code: {return_code}")
+
+    return return_code
+
+
+def create_image_reference(image_name: str, image_tag: str) -> str:
+    return f"{image_name}:{image_tag}"
+
+
+def _load_workload_specification(workload_module: str):
+    specification_path = get_workload_specification_path(workload_module)
+    return load_specification(specification_path)
+
+
+def _create_sandbox_context(image_name: str, image_tag: str) -> SandboxContext:
     run_identifier = _create_run_identifier()
     network_name = f"sandbox-{run_identifier}"
-
-    _create_docker_network(network_name, docker_command_location)
-
-    common_module_name = "metisa_common"
-    runner_module_name = "metisa_runner"
-    probes_module_name = "metisa_probes"
-    guest_source_dir = "/sandbox-source"
-    guest_output_dir = "/sandbox-output"
-    guest_work_dir = "/sandbox-work"
     host_source_path = Path.cwd() / "src"
     host_run_directory = _create_run_directory(run_identifier)
     output_dir_name = "output"
     host_output_path = _create_output_directory(host_run_directory, output_dir_name)
 
-    is_interactive = Capability.INTERACTIVE in specification.capabilities
+    return SandboxContext(
+        image_name=image_name,
+        image_tag=image_tag,
+        identifier=run_identifier,
+        network_name=network_name,
+        host_run_path=host_run_directory,
+        host_source_path=host_source_path,
+        host_output_path=host_output_path,
+    )
 
+
+def _create_docker_run_arguments(
+    specification: MetisaSpecification,
+    sandbox_context: SandboxContext,
+    staged_source_path: Path,
+    image_name: str,
+    image_tag: str,
+    workload_module: str,
+) -> list[str]:
+
+    docker_command_location = _get_docker_command_location()
+
+    image_reference = create_image_reference(image_name, image_tag)
+
+    is_interactive = Capability.INTERACTIVE in specification.capabilities
     arguments = [
         docker_command_location,
         "run",
@@ -134,62 +182,55 @@ def run_workload_in_sandbox(
         "--read-only",
     ]
 
-    arguments.extend([
-        "--network",
-        network_name,
-        "--network-alias",
-        "metisa-workload",
-    ])
-
-    if is_interactive:
-        arguments.extend([
-            "--interactive", # keeps stdin open
-            "--tty", # allocates a pseudo-terminal
-        ])
-
-    staged_source_path = _create_source_directory(host_run_directory)
-    _copy_directories_into_staged(
-        host_source_path,
-        staged_source_path,
+    arguments.extend(
         [
-            common_module_name,
-            runner_module_name,
-            probes_module_name,
-            workload_module
+            "--network",
+            sandbox_context.network_name,
+            "--network-alias",
+            "metisa-workload",
         ]
     )
 
-    arguments.extend([
-        "--volume",
-        f"{staged_source_path}:{guest_source_dir}:ro",
-        "--volume",
-        f"{host_output_path}:{guest_output_dir}:rw",
-        "--tmpfs",
-        guest_work_dir,
-        "--env",
-        f"SANDBOX_OUTPUT_DIR={guest_output_dir}",
-        "--workdir",
-        guest_source_dir,
-        image_reference,
-        "python",
-        "-m",
-        runner_module_name,
-        workload_module,
-    ])
+    if is_interactive:
+        arguments.extend(
+            [
+                "--interactive",  # keeps stdin open
+                "--tty",  # allocates a pseudo-terminal
+            ]
+        )
 
-    log_file = _get_log_file(host_run_directory)
+    arguments.extend(
+        [
+            "--volume",
+            f"{staged_source_path}:{sandbox_context.guest_source_dir}:ro",
+            "--volume",
+            f"{sandbox_context.host_output_path}:{sandbox_context.guest_output_dir}:rw",
+            "--tmpfs",
+            sandbox_context.guest_work_dir,
+            "--env",
+            f"SANDBOX_OUTPUT_DIR={sandbox_context.guest_output_dir}",
+            "--workdir",
+            sandbox_context.guest_source_dir,
+            image_reference,
+            "python",
+            "-m",
+            sandbox_context.runner_module_name,
+            workload_module,
+        ]
+    )
 
-    return_code = 999 # should be replaced when workload is run
+    return arguments
 
-    with log_file.open("w", encoding="utf-8") as file:
-        file.write("Running Docker container\n")
-        file.write("Command: ")
-        file.write(" ".join(arguments))
-        file.write("\n")
-        file.write("Image: ")
-        file.write(image_reference)
-        file.write("\n")
 
+def _execute_sandbox_run(
+    arguments: list[str],
+    specification: MetisaSpecification,
+    sandbox_context: SandboxContext,
+    staged_source_path: Path,
+) -> int:
+    return_code = 999  # should be replaced when workload is run
+
+    is_interactive = Capability.INTERACTIVE in specification.capabilities
     try:
         if is_interactive:
             process = subprocess.Popen(
@@ -222,36 +263,46 @@ def run_workload_in_sandbox(
             return_code = process.wait()
 
     finally:
-
-        with log_file.open("a", encoding="utf-8") as file:
-            file.write("Return code: ")
-            file.write(str(return_code))
-            file.write("\n")
-
-        _remove_docker_network(network_name, docker_command_location)
+        _remove_docker_network(sandbox_context)
 
         _clean_up_run_directory(
-            host_run_directory, 
-            staged_source_path, 
-            output_dir_name
+            sandbox_context.host_run_path,
+            staged_source_path,
+            sandbox_context.host_output_path,
         )
 
     return return_code
 
 
-def create_image_reference(image_name: str, image_tag: str) -> str:
-    return f"{image_name}:{image_tag}"
+def _create_docker_network(
+    specification: MetisaSpecification, sandbox_context: SandboxContext
+) -> None:
+    docker_command_location = _get_docker_command_location()
 
+    # Make temporary use of specification argument
+    is_networked = Capability.NETWORK in specification.capabilities
+    print(f"[TEMP] is_networked: {is_networked}")
 
-def _create_docker_network(network_name: str, docker_command_location: str) -> None:
-    result = subprocess.run(
+    arguments = [
+        docker_command_location,
+        "network",
+        "create",
+    ]
+
+    arguments.extend(
         [
-            docker_command_location,
-            "network",
-            "create",
             "--internal",
-            network_name,
-        ],
+        ]
+    )
+
+    arguments.extend(
+        [
+            sandbox_context.network_name,
+        ]
+    )
+
+    result = subprocess.run(
+        args=arguments,
         capture_output=True,
         text=True,
         check=False,
@@ -262,14 +313,18 @@ def _create_docker_network(network_name: str, docker_command_location: str) -> N
         raise RuntimeError(f"Could not create Docker network\n{output}")
 
 
-def _remove_docker_network(network_name: str, docker_command_location: str) -> None:
+def _remove_docker_network(sandbox_context: SandboxContext) -> None:
+    docker_command_location = _get_docker_command_location()
+
+    arguments = [
+        docker_command_location,
+        "network",
+        "rm",
+        sandbox_context.network_name,
+    ]
+
     result = subprocess.run(
-        [
-            docker_command_location,
-            "network",
-            "rm",
-            network_name,
-        ],
+        args=arguments,
         capture_output=True,
         text=True,
         check=False,
@@ -307,9 +362,22 @@ def _docker_engine_available(docker_command_location: str) -> bool:
     return result.returncode == 0
 
 
-def _create_source_directory(host_run_directory: Path) -> Path:
-    source_dir = host_run_directory / "source"
+def _create_source_directory(
+    sandbox_context: SandboxContext, workload_module: str
+) -> Path:
+    source_dir = sandbox_context.host_run_path / "source"
     source_dir.mkdir(parents=True, exist_ok=False)
+
+    _copy_directories_into_staged(
+        sandbox_context.host_source_path,
+        source_dir,
+        [
+            sandbox_context.common_module_name,
+            sandbox_context.runner_module_name,
+            sandbox_context.probes_module_name,
+            workload_module,
+        ],
+    )
 
     return source_dir
 
@@ -331,18 +399,31 @@ def _create_output_directory(host_run_directory: Path, output_dir_name: str) -> 
     return output_directory
 
 
-def _get_log_file(host_run_directory: Path) -> Path:
-    logs_dir = host_run_directory / ".logs"
+def _create_log_file(sandbox_context: SandboxContext, arguments: list[str]) -> Path:
+    logs_dir = sandbox_context.host_run_path / ".logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     log_file = logs_dir / "docker.txt"
+
+    with log_file.open("w", encoding="utf-8") as file:
+        file.write("Running Docker container\n")
+        file.write("Command: ")
+        file.write(" ".join(arguments))
+        file.write("\n")
+        file.write("Image: ")
+        file.write(sandbox_context.image_reference)
+        file.write("\n")
 
     return log_file
 
 
+def _append_log_file(log_file: Path, message: str) -> None:
+    with log_file.open("a", encoding="utf-8") as file:
+        file.write(message)
+        file.write("\n")
+
+
 def _copy_directories_into_staged(
-    source_directory: Path,
-    target_directory: Path,
-    child_directories: list[str]
+    source_directory: Path, target_directory: Path, child_directories: list[str]
 ) -> None:
     for child_directory in child_directories:
         from_dir = source_directory / child_directory
@@ -351,11 +432,11 @@ def _copy_directories_into_staged(
 
 
 def _clean_up_run_directory(
-    host_run_directory: Path, 
-    staged_source_path: Path, 
-    output_dir_name: str,
+    host_run_directory: Path,
+    staged_source_path: Path,
+    output_directory: Path,
 ) -> None:
-    output_logs_dir = host_run_directory / output_dir_name / ".logs"
+    output_logs_dir = output_directory / ".logs"
     if output_logs_dir.exists():
         run_logs_dir = host_run_directory / ".logs"
         run_logs_dir.mkdir(parents=True, exist_ok=True)

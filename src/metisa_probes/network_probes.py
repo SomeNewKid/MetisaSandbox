@@ -27,17 +27,12 @@ def docker_network_alias_resolved(probe_context: ProbeContext) -> ProbeResult:
         )
     except socket.gaierror as error:
         message = (
-            "Could not result Docker network alias "
-            f"{_WORKLOAD_NETWORK_ALIAS}: {error}"
+            f"Could not result Docker network alias {_WORKLOAD_NETWORK_ALIAS}: {error}"
         )
         return ProbeResult.failure(probe_name, message)
 
     addresses = sorted(
-        {
-            str(address[4][0])
-            for address in address_info
-            if address[4][0] != "127.0.0.1"
-        }
+        {str(address[4][0]) for address in address_info if address[4][0] != "127.0.0.1"}
     )
 
     if not addresses:
@@ -48,10 +43,7 @@ def docker_network_alias_resolved(probe_context: ProbeContext) -> ProbeResult:
         return ProbeResult.failure(probe_name, message)
 
     resolution = ", ".join(addresses)
-    message = (
-        f"Docker network alias {_WORKLOAD_NETWORK_ALIAS} "
-        f"resolved to {resolution}"
-    )
+    message = f"Docker network alias {_WORKLOAD_NETWORK_ALIAS} resolved to {resolution}"
     return ProbeResult.success(probe_name, message)
 
 
@@ -92,8 +84,7 @@ def external_http_is_blocked(
         return ProbeResult.success(probe_name, message)
 
     message = (
-        f"External HTTP request reached {target_url} "
-        f"and returned HTTP {status_code}."
+        f"External HTTP request reached {target_url} and returned HTTP {status_code}."
     )
     return ProbeResult.failure(probe_name, message)
 
@@ -112,9 +103,7 @@ def external_https_is_blocked(probe_context: ProbeContext) -> ProbeResult:
 
     try:
         with urllib.request.urlopen(
-            request,
-            timeout=timeout_seconds,
-            context=tls_context
+            request, timeout=timeout_seconds, context=tls_context
         ) as response:
             status_code = response.status
     except urllib.error.HTTPError as error:
@@ -133,11 +122,9 @@ def external_https_is_blocked(probe_context: ProbeContext) -> ProbeResult:
         return ProbeResult.success(probe_name, message)
 
     message = (
-        f"External HTTPS request reached {target_url} "
-        f"and returned HTTP {status_code}."
+        f"External HTTPS request reached {target_url} and returned HTTP {status_code}."
     )
     return ProbeResult.failure(probe_name, message)
-    
 
 
 NETWORK_PROBES = ProbeGroup(
@@ -146,5 +133,5 @@ NETWORK_PROBES = ProbeGroup(
         docker_network_alias_resolved,
         external_http_is_blocked,
         external_https_is_blocked,
-    )
+    ),
 )

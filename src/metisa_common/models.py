@@ -13,7 +13,6 @@ class Capability(StrEnum):
     INTERACTIVE = "interactive"
     NETWORK = "network"
     MCP_CLIENT = "mcp_client"
-    OPENAI_AGENTS = "openai_agents"
     JINA_READER = "jina_reader"
     CODE_EXECUTION = "code_execution"
     HAPROXY = "haproxy"

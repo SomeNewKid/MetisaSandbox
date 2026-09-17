@@ -56,9 +56,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_probe_group(
-    probe_group: ProbeGroup, 
-    probe_context: ProbeContext, 
-    log_path: Path
+    probe_group: ProbeGroup, probe_context: ProbeContext, log_path: Path
 ) -> bool:
     success = True
 

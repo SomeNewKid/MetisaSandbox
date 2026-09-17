@@ -65,18 +65,22 @@ def parse_specification(toml_content: str) -> MetisaSpecification:
 
 
 def _create_metisa_specification(toml: dict[str, object]) -> MetisaSpecification:
-    VALID_KEYS = frozenset({
-        "schema_version",
-        "workload_name",
-        "capabilities",
-    })
+    VALID_KEYS = frozenset(
+        {
+            "schema_version",
+            "workload_name",
+            "capabilities",
+        }
+    )
 
-    VALID_TABLES = frozenset({
-        "squid_proxy",
-        "haproxy",
-        "ollama_sidecar",
-        "mcp_sidecar",
-    })
+    VALID_TABLES = frozenset(
+        {
+            "squid_proxy",
+            "haproxy",
+            "ollama_sidecar",
+            "mcp_sidecar",
+        }
+    )
 
     _validate_known_keys(toml, "TOML specification", VALID_KEYS | VALID_TABLES)
     _validate_known_tables(toml, "TOML specification", VALID_TABLES)
@@ -95,7 +99,7 @@ def _create_metisa_specification(toml: dict[str, object]) -> MetisaSpecification
         haproxy=haproxy,
         squid_proxy=squid_proxy,
         ollama_sidecar=ollama_sidecar,
-        mcp_sidecar=mcp_sidecar
+        mcp_sidecar=mcp_sidecar,
     )
 
 
@@ -105,15 +109,15 @@ def _get_schema_version(toml: dict[str, object]) -> int:
     if schema_version is None:
         error = "TOML specification requires a schema_version integer."
         raise SpecificationValidationError(error)
-    
+
     if not isinstance(schema_version, int):
         error = "TOML specification schema_version must be an integer."
         raise SpecificationValidationError(error)
-    
-    if isinstance(schema_version, bool): # a boolean passes the previous check
+
+    if isinstance(schema_version, bool):  # a boolean passes the previous check
         error = "TOML specification schema_version must be an integer."
         raise SpecificationValidationError(error)
-    
+
     return schema_version
 
 
@@ -123,7 +127,7 @@ def _get_workload_name(toml: dict[str, object]) -> str:
     if workload_name is None:
         error = "TOML specification requires a workload_name string."
         raise SpecificationValidationError(error)
-    
+
     if not isinstance(workload_name, str):
         error = "TOML specification workload_name must be a string."
         raise SpecificationValidationError(error)
@@ -132,7 +136,7 @@ def _get_workload_name(toml: dict[str, object]) -> str:
     if len(workload_name) == 0:
         error = "TOML specification workload_name must be a non-empty string."
         raise SpecificationValidationError(error)
-    
+
     return workload_name
 
 
@@ -156,9 +160,7 @@ def _get_capabilities(toml: dict[str, object]) -> frozenset[Capability]:
     return frozenset(capabilities)
 
 
-def _get_haproxy_specfication(
-    toml: dict[str, object]
-) -> HaproxySpecification | None:
+def _get_haproxy_specfication(toml: dict[str, object]) -> HaproxySpecification | None:
     haproxy = toml.get("haproxy")
     if not haproxy:
         return None
@@ -168,9 +170,11 @@ def _get_haproxy_specfication(
             "TOML specification haproxy must be a table."
         )
 
-    HAPROXY_KEYS = frozenset({
-        "ports",
-    })
+    HAPROXY_KEYS = frozenset(
+        {
+            "ports",
+        }
+    )
 
     _validate_known_keys(haproxy, "haproxy", HAPROXY_KEYS)
 
@@ -186,7 +190,7 @@ def _get_haproxy_specfication(
 
 
 def _get_squid_proxy_specification(
-    toml: dict[str, object]
+    toml: dict[str, object],
 ) -> SquidProxySpecification | None:
     squid_proxy = toml.get("squid_proxy")
     if not squid_proxy:
@@ -197,33 +201,32 @@ def _get_squid_proxy_specification(
             "TOML specification squid_proxy must be a table."
         )
 
-    SQUID_PROXY_KEYS = frozenset({
-        "allowed_domains",
-        "allowed_ip_addresses",
-    })
+    SQUID_PROXY_KEYS = frozenset(
+        {
+            "allowed_domains",
+            "allowed_ip_addresses",
+        }
+    )
 
     _validate_known_keys(squid_proxy, "squid_proxy", SQUID_PROXY_KEYS)
-    
+
     allowed_domains = _get_str_tuple(
-        squid_proxy.get("allowed_domains"),
-        "Squid Proxy allowed domains"
+        squid_proxy.get("allowed_domains"), "Squid Proxy allowed domains"
     )
 
     allowed_ip_addresses = _get_str_tuple(
-        squid_proxy.get("allowed_ip_addresses"),
-        "Squid Proxy allowed IP addresses"
+        squid_proxy.get("allowed_ip_addresses"), "Squid Proxy allowed IP addresses"
     )
 
     return SquidProxySpecification(
-        allowed_domains=allowed_domains,
-        allowed_ip_addresses=allowed_ip_addresses
+        allowed_domains=allowed_domains, allowed_ip_addresses=allowed_ip_addresses
     )
 
 
 def _get_ollama_sidecar_specification(
-    toml: dict[str, object]
+    toml: dict[str, object],
 ) -> OllamaSidecarSpecification | None:
-    
+
     ollama_sidecar = toml.get("ollama_sidecar")
     if not ollama_sidecar:
         return None
@@ -233,9 +236,11 @@ def _get_ollama_sidecar_specification(
             "TOML specification ollama_sidecar must be a table."
         )
 
-    OLLAMA_KEYS = frozenset({
-        "models",
-    })
+    OLLAMA_KEYS = frozenset(
+        {
+            "models",
+        }
+    )
 
     _validate_known_keys(ollama_sidecar, "ollama_sidecar", OLLAMA_KEYS)
 
@@ -245,7 +250,7 @@ def _get_ollama_sidecar_specification(
 
 
 def _get_mcp_sidecar_specification(
-    toml: dict[str, object]
+    toml: dict[str, object],
 ) -> McpSidecarSpecification | None:
     mcp_sidecar = toml.get("mcp_sidecar")
     if not mcp_sidecar:
@@ -256,27 +261,22 @@ def _get_mcp_sidecar_specification(
             "TOML specification mcp_sidecar must be a table."
         )
 
-    MCP_SIDECAR_KEYS = frozenset({
-        "tools",
-        "resources",
-    })
+    MCP_SIDECAR_KEYS = frozenset(
+        {
+            "tools",
+            "resources",
+        }
+    )
 
     _validate_known_keys(mcp_sidecar, "mcp_sidecar", MCP_SIDECAR_KEYS)
-    
-    tools = _get_str_tuple(
-        mcp_sidecar.get("tools"),
-        "MCP Sidecar allowed domains"
-    )
+
+    tools = _get_str_tuple(mcp_sidecar.get("tools"), "MCP Sidecar allowed domains")
 
     resources = _get_str_tuple(
-        mcp_sidecar.get("resources"),
-        "MCP Sidecar allowed IP addresses"
+        mcp_sidecar.get("resources"), "MCP Sidecar allowed IP addresses"
     )
 
-    return McpSidecarSpecification(
-        tools=tools,
-        resources=resources
-    )
+    return McpSidecarSpecification(tools=tools, resources=resources)
 
 
 def _validate_known_keys(
@@ -290,8 +290,7 @@ def _validate_known_keys(
 
     formatted_keys = ", ".join(sorted(unknown_keys))
     raise SpecificationValidationError(
-        f"TOML specification {table_name} contains unknown keys: "
-        f"{formatted_keys}."
+        f"TOML specification {table_name} contains unknown keys: {formatted_keys}."
     )
 
 
@@ -313,7 +312,7 @@ def _validate_known_tables(
 def _get_str_tuple(collection: object | None, section_name: str) -> tuple[str]:
     if not collection:
         return tuple([])
-    
+
     if not isinstance(collection, list):
         error = f"{section_name} must be iterable."
         raise SpecificationValidationError(error)
@@ -339,7 +338,7 @@ def _get_str_tuple(collection: object | None, section_name: str) -> tuple[str]:
 def _get_int_tuple(collection: object | None, section_name: str) -> tuple[int]:
     if not collection:
         return tuple([])
-    
+
     if not isinstance(collection, list):
         error = f"{section_name} must be iterable."
         raise SpecificationValidationError(error)

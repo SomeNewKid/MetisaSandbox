@@ -60,10 +60,10 @@ def sandbox_source_module_file_is_readable(probe_context: ProbeContext) -> Probe
         if sniff not in content:
             failure_message = f"File at {probe_file} did not contain '{sniff}'"
             return ProbeResult.failure(probe_name, failure_message)
-        
+
         success_message = f"File at {probe_file} did contain '{sniff}'"
         return ProbeResult.success(probe_name, success_message)
-        
+
     except OSError as error:
         return ProbeResult.failure(probe_name, str(error))
 
@@ -114,7 +114,7 @@ def sandbox_work_location_is_writable(probe_context: ProbeContext) -> ProbeResul
         probe_file.unlink()
     except OSError as error:
         return ProbeResult.failure(probe_name, str(error))
-    
+
     if content != probe_name:
         return ProbeResult.failure(probe_name, f"Unexpected content at {probe_file}.")
 
