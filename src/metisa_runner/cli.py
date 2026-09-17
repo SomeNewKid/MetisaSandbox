@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from metisa_common.specification_helper import get_workload_specification_path
+
 _PROBES_MODULE = "metisa_probes"
 _SANDBOX_OUTPUT_DIR_ENV = "SANDBOX_OUTPUT_DIR"
 
@@ -20,9 +22,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     workload_module = args[0]
+    specification_path = get_workload_specification_path(workload_module)
 
     print("Docker probes starting...", end="\n", flush=True)
-    probes_exit_code = _run_python_module(_PROBES_MODULE)
+    probes_exit_code = _run_probes_module(_PROBES_MODULE, specification_path)
     if probes_exit_code != 0:
         print("Sandbox probes failed.  Workload will not be run.", file=sys.stderr)
         return probes_exit_code
@@ -33,9 +36,9 @@ def main(argv: list[str] | None = None) -> int:
     return workload_exit_code
 
 
-def _run_python_module(module_name: str) -> int:
+def _run_probes_module(module_name: str, specification_path: Path) -> int:
     result = subprocess.run(
-        [sys.executable, "-m", module_name],
+        [sys.executable, "-m", module_name, str(specification_path)],
         check=False,
     )
 

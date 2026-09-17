@@ -11,6 +11,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from metisa_common.models import Capability
+from metisa_common.specification_helper import load_specification
+
 _DOCKER_DESKTOP_EXE = (
     Path(os.environ.get("ProgramFiles", "C:\\Program Files"))
     / "Docker"
@@ -95,8 +98,15 @@ def start_docker_desktop() -> None:
 
 
 def run_workload_in_sandbox(
-    image_name: str, image_tag: str, workload_module: str
+    image_name: str, 
+    image_tag: str, 
+    workload_module: str, 
+    specification_path: Path
 ) -> int:
+    if not specification_path.is_file():
+        raise ValueError(f"Module '{workload_module}' does not contain metisa.toml.")
+    specification = load_specification(specification_path)
+    
     docker_command_location = _get_docker_command_location()
     image_reference = create_image_reference(image_name, image_tag)
     run_identifier = _create_run_identifier()
@@ -104,6 +114,7 @@ def run_workload_in_sandbox(
 
     _create_docker_network(network_name, docker_command_location)
 
+    common_module_name = "metisa_common"
     runner_module_name = "metisa_runner"
     probes_module_name = "metisa_probes"
     guest_source_dir = "/sandbox-source"
@@ -114,12 +125,12 @@ def run_workload_in_sandbox(
     output_dir_name = "output"
     host_output_path = _create_output_directory(host_run_directory, output_dir_name)
 
-    is_interactive = False
+    is_interactive = Capability.INTERACTIVE in specification.capabilities
 
     arguments = [
         docker_command_location,
         "run",
-        "--rm",  # remove after completion
+        "--rm",  # remove after workload completes
         "--read-only",
     ]
 
@@ -141,6 +152,7 @@ def run_workload_in_sandbox(
         host_source_path,
         staged_source_path,
         [
+            common_module_name,
             runner_module_name,
             probes_module_name,
             workload_module

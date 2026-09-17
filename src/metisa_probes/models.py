@@ -5,10 +5,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from metisa_common.models import MetisaSpecification
+
 
 @dataclass(frozen=True)
 class ProbeContext:
     """Context specific to the AI agent workload."""
+
+    specification: MetisaSpecification
 
     output_volume: str = "/sandbox-output"
     source_volume: str = "/sandbox-source"

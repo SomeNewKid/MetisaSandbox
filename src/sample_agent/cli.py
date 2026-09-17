@@ -39,6 +39,6 @@ def main(argv: list[str] | None = None) -> int:
 
 def _create_run_directory() -> Path:
     timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    run_directory = Path.cwd() / ".runs" / f"run-{timestamp}"
+    run_directory = Path.cwd() / ".runs" / f"run-{timestamp}" / "output"
     run_directory.mkdir(parents=True, exist_ok=False)
     return run_directory
