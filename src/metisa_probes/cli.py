@@ -7,7 +7,9 @@ from pathlib import Path
 
 from .docker_probes import DOCKER_PROBES
 from .filesystem_probes import FILESYSTEM_PROBES
+from .identity_probes import IDENTITY_PROBES
 from .models import ProbeContext, ProbeGroup, ProbeResult
+from .network_probes import NETWORK_PROBES
 
 
 def main() -> int:
@@ -19,6 +21,8 @@ def main() -> int:
     probe_groups = (
         DOCKER_PROBES,
         FILESYSTEM_PROBES,
+        IDENTITY_PROBES,
+        NETWORK_PROBES,
     )
 
     for probe_group in probe_groups:

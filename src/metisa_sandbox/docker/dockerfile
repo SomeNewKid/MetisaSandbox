@@ -2,3 +2,8 @@
 # Dockerfile reference: https://docs.docker.com/reference/dockerfile/
 
 FROM python:3.12-slim
+
+RUN groupadd --gid 10001 sandbox \
+    && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin sandbox
+
+USER sandbox

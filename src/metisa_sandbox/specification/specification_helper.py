@@ -10,4 +10,4 @@ def get_image_name() -> str:
 
 
 def get_image_tag() -> str:
-    return "phase-1"
+    return "phase-2"

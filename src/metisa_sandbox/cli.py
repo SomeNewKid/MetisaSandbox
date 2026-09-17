@@ -8,7 +8,7 @@ from .docker.docker_helper import (
     build_docker_image,
     docker_engine_started,
     docker_image_exists,
-    run_docker_container,
+    run_workload_in_sandbox,
     start_docker_desktop,
 )
 from .specification.specification_helper import get_image_name, get_image_tag
@@ -81,7 +81,7 @@ def _ensure_docker_image(image_name: str, image_tag: str) -> int:
 
 
 def _run_docker_workload(image_name: str, image_tag: str, workload_module: str) -> int:
-    return_code = run_docker_container(image_name, image_tag, workload_module)
+    return_code = run_workload_in_sandbox(image_name, image_tag, workload_module)
     if return_code == 0:
         print_info("Docker workload completed.")
     else:

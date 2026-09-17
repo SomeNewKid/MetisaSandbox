@@ -94,20 +94,25 @@ def start_docker_desktop() -> None:
     )
 
 
-def run_docker_container(image_name: str, image_tag: str, workload_module: str) -> int:
+def run_workload_in_sandbox(
+    image_name: str, image_tag: str, workload_module: str
+) -> int:
     docker_command_location = _get_docker_command_location()
     image_reference = create_image_reference(image_name, image_tag)
+    run_identifier = _create_run_identifier()
+    network_name = f"sandbox-{run_identifier}"
+
+    _create_docker_network(network_name, docker_command_location)
 
     runner_module_name = "metisa_runner"
     probes_module_name = "metisa_probes"
     guest_source_dir = "/sandbox-source"
     guest_output_dir = "/sandbox-output"
+    guest_work_dir = "/sandbox-work"
     host_source_path = Path.cwd() / "src"
-    host_runner_path = host_source_path / runner_module_name
-    host_probes_path = host_source_path / probes_module_name
-    host_workload_path = host_source_path / workload_module
-    host_run_directory = _create_run_directory()
-    host_output_path = host_run_directory / "output"
+    host_run_directory = _create_run_directory(run_identifier)
+    output_dir_name = "output"
+    host_output_path = _create_output_directory(host_run_directory, output_dir_name)
 
     is_interactive = False
 
@@ -115,7 +120,15 @@ def run_docker_container(image_name: str, image_tag: str, workload_module: str) 
         docker_command_location,
         "run",
         "--rm",  # remove after completion
+        "--read-only",
     ]
+
+    arguments.extend([
+        "--network",
+        network_name,
+        "--network-alias",
+        "metisa-workload",
+    ])
 
     if is_interactive:
         arguments.extend([
@@ -123,15 +136,24 @@ def run_docker_container(image_name: str, image_tag: str, workload_module: str) 
             "--tty", # allocates a pseudo-terminal
         ])
 
+    staged_source_path = _create_source_directory(host_run_directory)
+    _copy_directories_into_staged(
+        host_source_path,
+        staged_source_path,
+        [
+            runner_module_name,
+            probes_module_name,
+            workload_module
+        ]
+    )
+
     arguments.extend([
         "--volume",
-        f"{host_runner_path}:{guest_source_dir}/{runner_module_name}:ro",
-        "--volume",
-        f"{host_probes_path}:{guest_source_dir}/{probes_module_name}:ro",
-        "--volume",
-        f"{host_workload_path}:{guest_source_dir}/{workload_module}:ro",
+        f"{staged_source_path}:{guest_source_dir}:ro",
         "--volume",
         f"{host_output_path}:{guest_output_dir}:rw",
+        "--tmpfs",
+        guest_work_dir,
         "--env",
         f"SANDBOX_OUTPUT_DIR={guest_output_dir}",
         "--workdir",
@@ -145,6 +167,8 @@ def run_docker_container(image_name: str, image_tag: str, workload_module: str) 
 
     log_file = _get_log_file(host_run_directory)
 
+    return_code = 999 # should be replaced when workload is run
+
     with log_file.open("w", encoding="utf-8") as file:
         file.write("Running Docker container\n")
         file.write("Command: ")
@@ -154,46 +178,94 @@ def run_docker_container(image_name: str, image_tag: str, workload_module: str) 
         file.write(image_reference)
         file.write("\n")
 
-    if is_interactive:
-        process = subprocess.Popen(
-            arguments,
-            text=True,
+    try:
+        if is_interactive:
+            process = subprocess.Popen(
+                arguments,
+                text=True,
+            )
+
+            return_code = process.wait()
+
+        else:
+            process = subprocess.Popen(
+                arguments,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=0,
+            )
+
+            output_chunks = []
+
+            if process.stdout is not None:
+                while True:
+                    chunk = process.stdout.read(1)
+                    if chunk == "":
+                        break
+
+                    print(chunk, end="", flush=True)
+                    output_chunks.append(chunk)
+
+            return_code = process.wait()
+
+    finally:
+
+        with log_file.open("a", encoding="utf-8") as file:
+            file.write("Return code: ")
+            file.write(str(return_code))
+            file.write("\n")
+
+        _remove_docker_network(network_name, docker_command_location)
+
+        _clean_up_run_directory(
+            host_run_directory, 
+            staged_source_path, 
+            output_dir_name
         )
-
-        return_code = process.wait()
-
-    else:
-        process = subprocess.Popen(
-            arguments,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=0,
-        )
-
-        output_chunks = []
-
-        if process.stdout is not None:
-            while True:
-                chunk = process.stdout.read(1)
-                if chunk == "":
-                    break
-
-                print(chunk, end="", flush=True)
-                output_chunks.append(chunk)
-
-        return_code = process.wait()
-
-    with log_file.open("a", encoding="utf-8") as file:
-        file.write("Return code: ")
-        file.write(str(return_code))
-        file.write("\n")
 
     return return_code
 
 
 def create_image_reference(image_name: str, image_tag: str) -> str:
     return f"{image_name}:{image_tag}"
+
+
+def _create_docker_network(network_name: str, docker_command_location: str) -> None:
+    result = subprocess.run(
+        [
+            docker_command_location,
+            "network",
+            "create",
+            "--internal",
+            network_name,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    if result.returncode != 0:
+        output = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"Could not create Docker network\n{output}")
+
+
+def _remove_docker_network(network_name: str, docker_command_location: str) -> None:
+    result = subprocess.run(
+        [
+            docker_command_location,
+            "network",
+            "rm",
+            network_name,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    if result.returncode != 0:
+        output = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"Could not remove Docker network\n{output}")
 
 
 def _get_docker_command_location() -> str:
@@ -223,11 +295,28 @@ def _docker_engine_available(docker_command_location: str) -> bool:
     return result.returncode == 0
 
 
-def _create_run_directory() -> Path:
+def _create_source_directory(host_run_directory: Path) -> Path:
+    source_dir = host_run_directory / "source"
+    source_dir.mkdir(parents=True, exist_ok=False)
+
+    return source_dir
+
+
+def _create_run_identifier() -> str:
     timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    run_directory = Path.cwd() / ".runs" / f"run-{timestamp}"
+    return f"run-{timestamp}"
+
+
+def _create_run_directory(run_identifier: str) -> Path:
+    run_directory = Path.cwd() / ".runs" / run_identifier
     run_directory.mkdir(parents=True, exist_ok=False)
     return run_directory
+
+
+def _create_output_directory(host_run_directory: Path, output_dir_name: str) -> Path:
+    output_directory = host_run_directory / output_dir_name
+    output_directory.mkdir(parents=True, exist_ok=False)
+    return output_directory
 
 
 def _get_log_file(host_run_directory: Path) -> Path:
@@ -236,3 +325,31 @@ def _get_log_file(host_run_directory: Path) -> Path:
     log_file = logs_dir / "docker.txt"
 
     return log_file
+
+
+def _copy_directories_into_staged(
+    source_directory: Path,
+    target_directory: Path,
+    child_directories: list[str]
+) -> None:
+    for child_directory in child_directories:
+        from_dir = source_directory / child_directory
+        to_dir = target_directory / child_directory
+        shutil.copytree(from_dir, to_dir)
+
+
+def _clean_up_run_directory(
+    host_run_directory: Path, 
+    staged_source_path: Path, 
+    output_dir_name: str,
+) -> None:
+    output_logs_dir = host_run_directory / output_dir_name / ".logs"
+    if output_logs_dir.exists():
+        run_logs_dir = host_run_directory / ".logs"
+        run_logs_dir.mkdir(parents=True, exist_ok=True)
+        for item in output_logs_dir.iterdir():
+            shutil.move(item, run_logs_dir)
+        output_logs_dir.rmdir()
+
+    if staged_source_path.exists():
+        shutil.rmtree(staged_source_path, ignore_errors=False)

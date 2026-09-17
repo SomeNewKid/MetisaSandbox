@@ -12,6 +12,7 @@ class ProbeContext:
 
     output_volume: str = "/sandbox-output"
     source_volume: str = "/sandbox-source"
+    work_dir: str = "/sandbox-work"
 
 
 @dataclass(frozen=True)

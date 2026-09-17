@@ -6,6 +6,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+IS_INTERACTIVE = False
+
 
 def main(argv: list[str] | None = None) -> int:
     """Run the sample agent workload."""
@@ -16,7 +18,10 @@ def main(argv: list[str] | None = None) -> int:
     output_directory = Path(output_dir)
     output_directory.mkdir(parents=True, exist_ok=True)
 
-    user_name = "Fred" # input("What is your name? ")
+    if IS_INTERACTIVE:
+        user_name = input("What is your name? ")
+    else:
+        user_name = "Fred"
 
     message = f"Hello {user_name} from the Sample Agent."
 
