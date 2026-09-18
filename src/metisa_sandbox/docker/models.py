@@ -22,7 +22,3 @@ class SandboxContext:
     guest_source_dir: str = "/sandbox-source"
     guest_output_dir: str = "/sandbox-output"
     guest_work_dir: str = "/sandbox-work"
-
-    @property
-    def image_reference(self) -> str:
-        return f"{self.image_name}:{self.image_tag}"

@@ -6,12 +6,16 @@ import sys
 
 from metisa_common.specification_helper import get_image_name, get_image_tag
 
-from .docker.docker_helper import (
-    build_docker_image,
+from .docker.docker_engine import (
     docker_engine_started,
-    docker_image_exists,
-    run_workload_in_sandbox,
     start_docker_desktop,
+)
+from .docker.docker_image import (
+    build_docker_image,
+    docker_image_exists,
+)
+from .docker.docker_sandbox import (
+    run_workload_in_sandbox,
 )
 from .terminal.terminal_helper import (
     get_first_argument,
