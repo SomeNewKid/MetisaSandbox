@@ -78,7 +78,6 @@ def append_log_file(log_file: Path, messages: list[str]) -> None:
 def clean_up_run_directory(
     host_run_directory: Path,
     output_directory: Path,
-    staged_source_path: Path | None,
 ) -> None:
     output_logs_dir = output_directory / ".logs"
     if output_logs_dir.exists():
@@ -88,7 +87,9 @@ def clean_up_run_directory(
             shutil.move(item, run_logs_dir)
         output_logs_dir.rmdir()
 
-    if staged_source_path is not None and staged_source_path.exists():
+
+def clean_up_staged_source(staged_source_path: Path) -> None:
+    if staged_source_path.exists():
         shutil.rmtree(staged_source_path, ignore_errors=False)
 
 

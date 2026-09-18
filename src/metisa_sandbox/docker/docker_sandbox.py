@@ -19,6 +19,7 @@ from .models import SandboxContext
 from .run_workspace import (
     append_log_file,
     clean_up_run_directory,
+    clean_up_staged_source,
     create_log_file,
     create_sandbox_context,
     create_staged_source_directory,
@@ -29,14 +30,17 @@ def run_workload_in_sandbox(
     image_name: str, image_tag: str, workload_module: str
 ) -> int:
     specification = _load_workload_specification(workload_module)
-    sandbox_context = create_sandbox_context(image_name, image_tag)
-    log_file = create_log_file(sandbox_context)
 
+    sandbox_context: SandboxContext | None = None
+    log_file: Path | None = None
     staged_source_path: Path | None = None
     network_created = False
     return_code: int | None = None
 
     try:
+        sandbox_context = create_sandbox_context(image_name, image_tag)
+        log_file = create_log_file(sandbox_context)
+
         staged_source_path = create_staged_source_directory(
             sandbox_context, workload_module
         )
@@ -57,23 +61,28 @@ def run_workload_in_sandbox(
         return return_code
 
     except Exception as error:
-        append_log_file(log_file, [f"Error: {error}"])
+        if log_file is not None:
+            append_log_file(log_file, [f"Error: {error}"])
         raise
 
     finally:
-        if return_code is not None:
-            append_log_file(log_file, [f"Return code: {return_code}"])
-
         try:
-            if network_created:
+            if network_created and sandbox_context is not None:
                 _remove_docker_network(sandbox_context)
 
         finally:
-            clean_up_run_directory(
-                sandbox_context.host_run_path,
-                sandbox_context.host_output_path,
-                staged_source_path,
-            )
+            if sandbox_context is not None:
+                clean_up_run_directory(
+                    sandbox_context.host_run_path,
+                    sandbox_context.host_output_path,
+                )
+
+            if staged_source_path is not None:
+                clean_up_staged_source(staged_source_path)
+
+            if log_file is not None and return_code is not None:
+                append_log_file(log_file, [f"Return code: {return_code}"])
+
 
 
 def _create_image_reference(sandbox_context: SandboxContext) -> str:

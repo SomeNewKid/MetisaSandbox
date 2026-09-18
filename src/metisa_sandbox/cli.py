@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         if docker_workload_exitcode != 0:
             return docker_workload_exitcode
-    except RuntimeError as error:
+    except Exception as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
