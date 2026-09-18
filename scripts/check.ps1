@@ -18,5 +18,6 @@ function Invoke-PythonModule {
 
 Invoke-PythonModule ruff format .
 Invoke-PythonModule ruff check .
+Invoke-PythonModule ruff check src --select D
 Invoke-PythonModule pyright
 Invoke-PythonModule pytest

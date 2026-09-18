@@ -1,6 +1,4 @@
-"""
-Provides utility methods for Docker availability and Docker Desktop management.
-"""
+"""Provides utility methods for Docker availability and Docker Desktop management."""
 
 from __future__ import annotations
 
@@ -18,8 +16,10 @@ _DOCKER_DESKTOP_EXE = (
 )
 
 
-def docker_engine_started(timeout_seconds: int = 0) -> bool:
-
+def docker_engine_started(
+    timeout_seconds: int = 0,
+) -> bool:
+    """Check if the Docker Engine has started within the given timeout."""
     docker_command_location = get_docker_command_location()
 
     if timeout_seconds < 1:
@@ -36,6 +36,7 @@ def docker_engine_started(timeout_seconds: int = 0) -> bool:
 
 
 def start_docker_desktop() -> None:
+    """Start Docker Desktop if it is installed."""
     if not _DOCKER_DESKTOP_EXE.exists():
         raise RuntimeError(
             f"Docker Desktop could not be found at {_DOCKER_DESKTOP_EXE}."
@@ -49,14 +50,17 @@ def start_docker_desktop() -> None:
 
 
 def get_docker_command_location() -> str:
+    """Get the location of the Docker command."""
     docker_path = shutil.which("docker")
     if not docker_path:
         raise RuntimeError("Docker command is not available.")
     return docker_path
 
 
-def _docker_engine_available(docker_command_location: str) -> bool:
-
+def _docker_engine_available(
+    docker_command_location: str,
+) -> bool:
+    """Check if the Docker Engine is available using the specified Docker command."""
     result = subprocess.run(
         [docker_command_location, "info"],
         capture_output=True,

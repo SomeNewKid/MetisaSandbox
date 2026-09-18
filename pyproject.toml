@@ -41,3 +41,6 @@ select = [
     "B",
     "UP",
 ]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"

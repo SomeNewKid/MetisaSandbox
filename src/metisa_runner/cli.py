@@ -13,9 +13,10 @@ _PROBES_MODULE = "metisa_probes"
 _SANDBOX_OUTPUT_DIR_ENV = "SANDBOX_OUTPUT_DIR"
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+) -> int:
     """Run the Metisa probes module and then the workload module."""
-
     args = sys.argv[1:] if argv is None else argv
     if not args:
         print("Error: no workload module argument.", file=sys.stderr)
@@ -36,7 +37,10 @@ def main(argv: list[str] | None = None) -> int:
     return workload_exit_code
 
 
-def _run_probes_module(module_name: str, specification_path: Path) -> int:
+def _run_probes_module(
+    module_name: str,
+    specification_path: Path,
+) -> int:
     result = subprocess.run(
         [sys.executable, "-m", module_name, str(specification_path)],
         check=False,
@@ -45,7 +49,9 @@ def _run_probes_module(module_name: str, specification_path: Path) -> int:
     return result.returncode
 
 
-def _run_workload_module(module_name: str) -> int:
+def _run_workload_module(
+    module_name: str,
+) -> int:
     log_path = _get_workload_log_path()
 
     process = subprocess.Popen(

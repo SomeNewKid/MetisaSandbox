@@ -1,9 +1,9 @@
-"""
-Provides utility methods for working with specifications.
-"""
+"""Provides utility methods for working with specifications."""
 
 from __future__ import annotations
 
+import hashlib
+import json
 import tomllib
 from importlib.util import find_spec
 from pathlib import Path
@@ -18,17 +18,35 @@ from .models import (
     SquidProxySpecification,
 )
 
+_IMAGE_FORMAT_VERSION = 1
+
 
 def get_image_name() -> str:
+    """Get the name of the Docker image for the Metisa sandbox."""
     return "metisa-sandbox"
 
 
-def get_image_tag() -> str:
-    return "phase-2"
+def get_image_tag(specification: MetisaSpecification) -> str:
+    """Get a deterministic Docker image tag for the required capabilities."""
+    ordered_capabilities = sorted(
+        capability.value for capability in specification.capabilities
+    )
+
+    serialized_capabilities = json.dumps(
+        ordered_capabilities, ensure_ascii=True, separators=(",", ":")
+    )
+
+    capabilities_hash = hashlib.sha256(
+        serialized_capabilities.encode("utf-8")
+    ).hexdigest()
+
+    return f"{_IMAGE_FORMAT_VERSION}-{capabilities_hash}"
 
 
-def get_workload_specification_path(workload_module: str) -> Path:
-    """Gets the path to the metisa.toml file in the specified workload_module."""
+def get_workload_specification_path(
+    workload_module: str,
+) -> Path:
+    """Get the path to the metisa.toml file in the specified workload_module."""
     module_spec = find_spec(workload_module)
     if module_spec is None:
         raise ValueError(f"Workload module '{workload_module}' was not found.")
@@ -48,7 +66,9 @@ def get_workload_specification_path(workload_module: str) -> Path:
     return specification_path
 
 
-def load_specification(file_path: Path) -> MetisaSpecification:
+def load_specification(
+    file_path: Path,
+) -> MetisaSpecification:
     """Load and validate the TOML specification file."""
     if not file_path.exists():
         raise ValueError("TOML specification file does not exist.")
@@ -56,7 +76,9 @@ def load_specification(file_path: Path) -> MetisaSpecification:
     return parse_specification(toml_content)
 
 
-def parse_specification(toml_content: str) -> MetisaSpecification:
+def parse_specification(
+    toml_content: str,
+) -> MetisaSpecification:
     """Parse and validate the TOML specification file."""
     if not toml_content:
         raise ValueError("TOML specification file was empty")
@@ -64,11 +86,12 @@ def parse_specification(toml_content: str) -> MetisaSpecification:
     return _create_metisa_specification(toml)
 
 
-def _create_metisa_specification(toml: dict[str, object]) -> MetisaSpecification:
+def _create_metisa_specification(
+    toml: dict[str, object],
+) -> MetisaSpecification:
     VALID_KEYS = frozenset(
         {
-            "schema_version",
-            "workload_name",
+            "agent_name",
             "capabilities",
         }
     )
@@ -85,16 +108,14 @@ def _create_metisa_specification(toml: dict[str, object]) -> MetisaSpecification
     _validate_known_keys(toml, "TOML specification", VALID_KEYS | VALID_TABLES)
     _validate_known_tables(toml, "TOML specification", VALID_TABLES)
 
-    schema_version = _get_schema_version(toml)
-    workload_name = _get_workload_name(toml)
+    agent_name = _get_agent_name(toml)
     capabilities = _get_capabilities(toml)
     haproxy = _get_haproxy_specfication(toml)
     squid_proxy = _get_squid_proxy_specification(toml)
     ollama_sidecar = _get_ollama_sidecar_specification(toml)
     mcp_sidecar = _get_mcp_sidecar_specification(toml)
     return MetisaSpecification(
-        schema_version=schema_version,
-        workload_name=workload_name,
+        agent_name=agent_name,
         capabilities=capabilities,
         haproxy=haproxy,
         squid_proxy=squid_proxy,
@@ -103,44 +124,30 @@ def _create_metisa_specification(toml: dict[str, object]) -> MetisaSpecification
     )
 
 
-def _get_schema_version(toml: dict[str, object]) -> int:
-    schema_version = toml.get("schema_version")
+def _get_agent_name(
+    toml: dict[str, object],
+) -> str:
+    agent_name = toml.get("agent_name")
 
-    if schema_version is None:
-        error = "TOML specification requires a schema_version integer."
+    if agent_name is None:
+        error = "TOML specification requires a agent_name string."
         raise SpecificationValidationError(error)
 
-    if not isinstance(schema_version, int):
-        error = "TOML specification schema_version must be an integer."
+    if not isinstance(agent_name, str):
+        error = "TOML specification agent_name must be a string."
         raise SpecificationValidationError(error)
 
-    if isinstance(schema_version, bool):  # a boolean passes the previous check
-        error = "TOML specification schema_version must be an integer."
+    agent_name = agent_name.strip()
+    if len(agent_name) == 0:
+        error = "TOML specification agent_name must be a non-empty string."
         raise SpecificationValidationError(error)
 
-    return schema_version
+    return agent_name
 
 
-def _get_workload_name(toml: dict[str, object]) -> str:
-    workload_name = toml.get("workload_name")
-
-    if workload_name is None:
-        error = "TOML specification requires a workload_name string."
-        raise SpecificationValidationError(error)
-
-    if not isinstance(workload_name, str):
-        error = "TOML specification workload_name must be a string."
-        raise SpecificationValidationError(error)
-
-    workload_name = workload_name.strip()
-    if len(workload_name) == 0:
-        error = "TOML specification workload_name must be a non-empty string."
-        raise SpecificationValidationError(error)
-
-    return workload_name
-
-
-def _get_capabilities(toml: dict[str, object]) -> frozenset[Capability]:
+def _get_capabilities(
+    toml: dict[str, object],
+) -> frozenset[Capability]:
     raw_capabilites = _get_str_tuple(
         toml.get("capabilities"), "TOML specification capabilities"
     )
@@ -160,7 +167,9 @@ def _get_capabilities(toml: dict[str, object]) -> frozenset[Capability]:
     return frozenset(capabilities)
 
 
-def _get_haproxy_specfication(toml: dict[str, object]) -> HaproxySpecification | None:
+def _get_haproxy_specfication(
+    toml: dict[str, object],
+) -> HaproxySpecification | None:
     haproxy = toml.get("haproxy")
     if not haproxy:
         return None
@@ -309,7 +318,10 @@ def _validate_known_tables(
             )
 
 
-def _get_str_tuple(collection: object | None, section_name: str) -> tuple[str]:
+def _get_str_tuple(
+    collection: object | None,
+    section_name: str,
+) -> tuple[str]:
     if not collection:
         return tuple([])
 
@@ -335,7 +347,10 @@ def _get_str_tuple(collection: object | None, section_name: str) -> tuple[str]:
     return tuple(trimmed_values)
 
 
-def _get_int_tuple(collection: object | None, section_name: str) -> tuple[int]:
+def _get_int_tuple(
+    collection: object | None,
+    section_name: str,
+) -> tuple[int]:
     if not collection:
         return tuple([])
 

@@ -1,6 +1,4 @@
-"""
-Provides utility methods for working with Docker.
-"""
+"""Provides utility methods for working with Docker."""
 
 from __future__ import annotations
 
@@ -8,13 +6,8 @@ import subprocess
 from pathlib import Path
 
 from metisa_common.models import Capability, MetisaSpecification
-from metisa_common.specification_helper import (
-    get_workload_specification_path,
-    load_specification,
-)
 
 from .docker_engine import get_docker_command_location
-from .docker_image import create_image_reference
 from .models import SandboxContext
 from .run_workspace import (
     append_log_file,
@@ -27,9 +20,12 @@ from .run_workspace import (
 
 
 def run_workload_in_sandbox(
-    image_name: str, image_tag: str, workload_module: str
+    specification: MetisaSpecification,
+    image_reference: str,
+    workload_module: str,
 ) -> int:
-    specification = _load_workload_specification(workload_module)
+    """Run the specified workload in a Docker sandbox."""
+    is_network_required = Capability.NETWORK in specification.capabilities
 
     sandbox_context: SandboxContext | None = None
     log_file: Path | None = None
@@ -38,7 +34,7 @@ def run_workload_in_sandbox(
     return_code: int | None = None
 
     try:
-        sandbox_context = create_sandbox_context(image_name, image_tag)
+        sandbox_context = create_sandbox_context(image_reference)
         log_file = create_log_file(sandbox_context)
 
         staged_source_path = create_staged_source_directory(
@@ -48,14 +44,18 @@ def run_workload_in_sandbox(
         arguments = _create_docker_run_arguments(
             specification,
             sandbox_context,
+            image_reference,
             staged_source_path,
             workload_module,
+            is_network_required,
         )
 
         append_log_file(log_file, [f"Arguments: {' '.join(arguments)}"])
 
-        _create_docker_network(specification, sandbox_context)
-        network_created = True
+        if is_network_required:
+            _create_docker_network(specification, sandbox_context)
+            network_created = True
+
         return_code = _execute_sandbox_run(arguments, specification)
 
         return return_code
@@ -84,42 +84,63 @@ def run_workload_in_sandbox(
                 append_log_file(log_file, [f"Return code: {return_code}"])
 
 
-
-def _create_image_reference(sandbox_context: SandboxContext) -> str:
-    return create_image_reference(sandbox_context.image_name, sandbox_context.image_tag)
-
-
-def _load_workload_specification(workload_module: str):
-    specification_path = get_workload_specification_path(workload_module)
-    return load_specification(specification_path)
-
-
 def _create_docker_run_arguments(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
+    image_reference: str,
     staged_source_path: Path,
     workload_module: str,
+    is_network_required: bool,
 ) -> list[str]:
 
     docker_command_location = get_docker_command_location()
-    image_reference = _create_image_reference(sandbox_context)
 
     is_interactive = Capability.INTERACTIVE in specification.capabilities
     arguments = [
         docker_command_location,
         "run",
-        "--rm",  # remove after workload completes
-        "--read-only",
     ]
 
+    # Run as the sandbox user
+    uid = 10001 # sandbox user
+    gid = 10001 # sandbox group
+    arguments.extend([
+        "--user",
+        f"{uid}:{gid}"
+    ])
+
+    # Remove the container after its workload completes
     arguments.extend(
         [
-            "--network",
-            sandbox_context.network_name,
-            "--network-alias",
-            "metisa-workload",
+            "--rm",
         ]
     )
+
+    # Mount the container's root filesystem as strictly read-only
+    # Couple with in memory temporary writes (--tmpfs)
+    # or with read-write mounted volumes (-volume /host/path:/volume:rw).
+    arguments.extend(
+        [
+            "--read-only",
+        ]
+    )
+
+    if is_network_required:
+        arguments.extend(
+            [
+                "--network",
+                sandbox_context.network_name,
+                "--network-alias",
+                "metisa-workload",
+            ]
+        )
+    else:
+        arguments.extend(
+            [
+                "--network",
+                "none",
+            ]
+        )
 
     if is_interactive:
         arguments.extend(
@@ -142,7 +163,7 @@ def _create_docker_run_arguments(
             "--workdir",
             sandbox_context.guest_source_dir,
             image_reference,
-            "python",
+            f"{sandbox_context.guest_python_venv}/bin/python",
             "-m",
             sandbox_context.runner_module_name,
             workload_module,
@@ -186,7 +207,8 @@ def _execute_sandbox_run(
 
 
 def _create_docker_network(
-    specification: MetisaSpecification, sandbox_context: SandboxContext
+    specification: MetisaSpecification,
+    sandbox_context: SandboxContext,
 ) -> None:
     docker_command_location = get_docker_command_location()
 
@@ -224,7 +246,9 @@ def _create_docker_network(
         raise RuntimeError(f"Could not create Docker network\n{output}")
 
 
-def _remove_docker_network(sandbox_context: SandboxContext) -> None:
+def _remove_docker_network(
+    sandbox_context: SandboxContext,
+) -> None:
     docker_command_location = get_docker_command_location()
 
     arguments = [

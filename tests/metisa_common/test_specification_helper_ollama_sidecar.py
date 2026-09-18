@@ -8,8 +8,7 @@ from metisa_common.specification_helper import parse_specification
 
 def test_ollama_sidecar_missing_details() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [ollama_sidecar]
@@ -20,8 +19,7 @@ def test_ollama_sidecar_missing_details() -> None:
 
 def test_ollama_sidecar_unknown_key() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [ollama_sidecar]
@@ -33,8 +31,7 @@ def test_ollama_sidecar_unknown_key() -> None:
 
 def test_ollama_sidecar_empty_models() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [ollama_sidecar]
@@ -47,8 +44,7 @@ def test_ollama_sidecar_empty_models() -> None:
 
 def test_ollama_sidecar_populated_models() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [ollama_sidecar]
@@ -64,8 +60,7 @@ def test_ollama_sidecar_populated_models() -> None:
 
 def test_ollama_sidecar_invalid_types_in_models() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [ollama_sidecar]
@@ -79,8 +74,7 @@ def test_ollama_sidecar_invalid_types_in_models() -> None:
 
 def test_ollama_sidecar_invalid_value_in_models() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [ollama_sidecar]

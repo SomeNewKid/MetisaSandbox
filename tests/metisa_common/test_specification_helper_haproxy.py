@@ -8,8 +8,7 @@ from metisa_common.specification_helper import parse_specification
 
 def test_haproxy_missing_details() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [haproxy]
@@ -20,8 +19,7 @@ def test_haproxy_missing_details() -> None:
 
 def test_haproxy_unknown_key() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [haproxy]
@@ -33,8 +31,7 @@ def test_haproxy_unknown_key() -> None:
 
 def test_haproxy_empty_ports() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [haproxy]
@@ -47,8 +44,7 @@ def test_haproxy_empty_ports() -> None:
 
 def test_haproxy_populated_ports() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [haproxy]
@@ -64,8 +60,7 @@ def test_haproxy_populated_ports() -> None:
 
 def test_haproxy_invalid_types_in_ports() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [haproxy]
@@ -79,8 +74,7 @@ def test_haproxy_invalid_types_in_ports() -> None:
 
 def test_haproxy_invalid_value_in_ports() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [haproxy]

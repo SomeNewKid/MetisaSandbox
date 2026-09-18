@@ -28,13 +28,21 @@ class ProbeResult:
     message: str
 
     @classmethod
-    def success(cls, name: str, message: str) -> ProbeResult:
-        """Create a passing probe result"""
+    def success(
+        cls,
+        name: str,
+        message: str,
+    ) -> ProbeResult:
+        """Create a passing probe result."""
         return cls(name=name, passed=True, message=message)
 
     @classmethod
-    def failure(cls, name: str, message: str) -> ProbeResult:
-        """Create a failing probe result"""
+    def failure(
+        cls,
+        name: str,
+        message: str,
+    ) -> ProbeResult:
+        """Create a failing probe result."""
         return cls(name=name, passed=False, message=message)
 
 

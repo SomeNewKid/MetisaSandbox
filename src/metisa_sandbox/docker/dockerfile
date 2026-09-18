@@ -1,9 +1,121 @@
 # Dockerfile concept: https://docs.docker.com/build/concepts/dockerfile/
 # Dockerfile reference: https://docs.docker.com/reference/dockerfile/
 
-FROM python:3.12-slim
+# ---------------------------------------------------------------------------
 
+# This image may end up with installation-only components
+# such as `pip`, compilers, headers, wheels, metadata, and caches
+FROM python:3.12-slim AS builder
+
+# Create the Python virtual environment
+#   /opt is a Linux filesystem convention for optional, 
+#   self-contained software installed outside the 
+#   operating system’s normal package-managed directories.
+RUN python -m venv /opt/metisa-venv
+
+# Install capability-specific packages before removing `pip`.
+# RUN /opt/metisa-venv/bin/python -m pip install \
+#     --requirement /tmp/requirements.lock
+
+# Remove installation distributions from the virtual environment.
+RUN /opt/metisa-venv/bin/python -m pip uninstall \
+       --yes \
+       setuptools \
+       wheel \
+    && /opt/metisa-venv/bin/python -m pip uninstall \
+       --yes \
+       pip
+
+# ---------------------------------------------------------------------------
+
+# This image purposely copies only the needed components,
+# omitting installation-only components in the `builder`.
+FROM python:3.12-slim AS runtime
+
+# Copy the Python virtual environment
+COPY --from=builder /opt/metisa-venv /opt/metisa-venv
+
+# Remove installation distributions supplied by base image.
+RUN python -m pip uninstall \
+       --yes \
+       setuptools \
+       wheel \
+    && python -m pip uninstall \
+       --yes \
+       pip
+
+# `ensurepip` belongs to the standard library 
+# and is not removed by uninstalling `pip`.
+RUN rm -rf /usr/local/lib/python3.12/ensurepip
+
+# Remove Debian package-management commands and metadata.
+RUN rm -f \
+       /usr/bin/apt \
+       /usr/bin/apt-get \
+       /usr/bin/dpkg \
+       /usr/bin/dpkg-query \
+    && rm -rf \
+       /var/lib/apt \
+       /var/cache/apt \
+       /var/lib/dpkg \
+       /var/log/apt
+
+# Remove restricted administrative, namespace, persistence,
+# remote-access, and desktop-automation commands.
+RUN set -eu; \
+    for command in \
+        bash \
+        busctl \
+        dbus-send \
+        findmnt \
+        git \
+        gpg \
+        gpg-connect-agent \
+        gpgconf \
+        journalctl \
+        loginctl \
+        mount \
+        nice \
+        nohup \
+        nsenter \
+        perl \
+        renice \
+        scp \
+        sftp \
+        setsid \
+        ssh \
+        ssh-add \
+        su \
+        systemd-run \
+        systemctl \
+        umount \
+        unshare \
+        service \
+        gdbus \
+        qdbus \
+        wmctrl \
+        xdotool \
+    ; do \
+        for directory in \
+            /bin \
+            /sbin \
+            /usr/bin \
+            /usr/sbin \
+            /usr/local/bin \
+            /usr/local/sbin \
+        ; do \
+            rm -f "${directory}/${command}"; \
+        done; \
+    done
+
+# Create non-root sandbox group and user
 RUN groupadd --gid 10001 sandbox \
-    && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin sandbox
+    && useradd \
+     --uid 10001 \
+     --gid 10001 \
+     --create-home \
+     --shell /usr/sbin/nologin \
+     sandbox
 
+# Set the default Linux identity for processes executed in the image.
 USER sandbox

@@ -1,6 +1,4 @@
-"""
-Provides the models to represent the Metisa TOML specification.
-"""
+"""Provides the models to represent the Metisa TOML specification."""
 
 from __future__ import annotations
 
@@ -10,6 +8,8 @@ from enum import StrEnum, unique
 
 @unique
 class Capability(StrEnum):
+    """Represents the declared capabilities of a Metisa workload."""
+
     INTERACTIVE = "interactive"
     NETWORK = "network"
     MCP_CLIENT = "mcp_client"
@@ -18,6 +18,7 @@ class Capability(StrEnum):
     HAPROXY = "haproxy"
     OLLAMA = "ollama"
     PLAYWRIGHT_CHROMIUM = "playwright_chromium"
+    OPENAI = "openai"
 
 
 class SpecificationValidationError(ValueError):
@@ -26,8 +27,9 @@ class SpecificationValidationError(ValueError):
 
 @dataclass(frozen=True)
 class MetisaSpecification:
-    schema_version: int
-    workload_name: str
+    """Represents the full Metisa specification."""
+
+    agent_name: str
     capabilities: frozenset[Capability]
     haproxy: HaproxySpecification | None
     squid_proxy: SquidProxySpecification | None
@@ -37,21 +39,29 @@ class MetisaSpecification:
 
 @dataclass(frozen=True)
 class HaproxySpecification:
+    """Represents the HAProxy section of the Metisa specification."""
+
     ports: tuple[int, ...]
 
 
 @dataclass(frozen=True)
 class SquidProxySpecification:
+    """Represents the Squid Proxy section of the Metisa specification."""
+
     allowed_domains: tuple[str, ...]
     allowed_ip_addresses: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class OllamaSidecarSpecification:
+    """Represents the Ollama Sidecar section of the Metisa specification."""
+
     models: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class McpSidecarSpecification:
+    """Represents the MCP Sidecar section of the Metisa specification."""
+
     tools: tuple[str, ...]
     resources: tuple[str, ...]

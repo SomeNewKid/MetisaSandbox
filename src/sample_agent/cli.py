@@ -9,9 +9,10 @@ from pathlib import Path
 IS_INTERACTIVE = False
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+) -> int:
     """Run the sample agent workload."""
-
     output_dir = os.environ.get("SANDBOX_OUTPUT_DIR", "")
     if not output_dir:
         output_dir = _create_run_directory()

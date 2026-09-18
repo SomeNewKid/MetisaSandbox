@@ -8,8 +8,7 @@ from metisa_common.specification_helper import parse_specification
 
 def test_squid_proxy_missing_details() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [squid_proxy]
@@ -20,8 +19,7 @@ def test_squid_proxy_missing_details() -> None:
 
 def test_squid_proxy_with_unknown_key() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [squid_proxy]
@@ -33,8 +31,7 @@ def test_squid_proxy_with_unknown_key() -> None:
 
 def test_squid_proxy_missing_allowed_domains() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [squid_proxy]
@@ -48,8 +45,7 @@ def test_squid_proxy_missing_allowed_domains() -> None:
 
 def test_squid_proxy_empty_allowed_domains() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [squid_proxy]
@@ -63,8 +59,7 @@ def test_squid_proxy_empty_allowed_domains() -> None:
 
 def test_squid_proxy_populated_allowed_domains() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [squid_proxy]
@@ -82,8 +77,7 @@ def test_squid_proxy_populated_allowed_domains() -> None:
 
 def test_squid_proxy_invalid_types_in_allowed_domains() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [squid_proxy]
@@ -97,8 +91,7 @@ def test_squid_proxy_invalid_types_in_allowed_domains() -> None:
 
 def test_squid_proxy_empty_value_in_allowed_domains() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [squid_proxy]
@@ -112,8 +105,7 @@ def test_squid_proxy_empty_value_in_allowed_domains() -> None:
 
 def test_squid_proxy_missing_allowed_ip_addresses() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [squid_proxy]
@@ -127,8 +119,7 @@ def test_squid_proxy_missing_allowed_ip_addresses() -> None:
 
 def test_squid_proxy_empty_allowed_ip_addresses() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [squid_proxy]
@@ -142,8 +133,7 @@ def test_squid_proxy_empty_allowed_ip_addresses() -> None:
 
 def test_squid_proxy_populated_allowed_ip_addresses() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [squid_proxy]
@@ -160,8 +150,7 @@ def test_squid_proxy_populated_allowed_ip_addresses() -> None:
 
 def test_squid_proxy_invalid_types_in_allowed_ip_addresses() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [squid_proxy]
@@ -175,8 +164,7 @@ def test_squid_proxy_invalid_types_in_allowed_ip_addresses() -> None:
 
 def test_squid_proxy_empty_value_in_allowed_ip_addresses() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [squid_proxy]

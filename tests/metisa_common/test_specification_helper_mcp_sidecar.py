@@ -8,8 +8,7 @@ from metisa_common.specification_helper import parse_specification
 
 def test_mcp_sidecar_missing_details() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]
@@ -20,8 +19,7 @@ def test_mcp_sidecar_missing_details() -> None:
 
 def test_mcp_sidecar_with_unknown_key() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]
@@ -33,8 +31,7 @@ def test_mcp_sidecar_with_unknown_key() -> None:
 
 def test_mcp_sidecar_missing_tools() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]
@@ -48,8 +45,7 @@ def test_mcp_sidecar_missing_tools() -> None:
 
 def test_mcp_sidecar_empty_tools() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]
@@ -63,8 +59,7 @@ def test_mcp_sidecar_empty_tools() -> None:
 
 def test_mcp_sidecar_populated_tools() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]
@@ -82,8 +77,7 @@ def test_mcp_sidecar_populated_tools() -> None:
 
 def test_mcp_sidecar_invalid_types_in_tools() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]
@@ -97,8 +91,7 @@ def test_mcp_sidecar_invalid_types_in_tools() -> None:
 
 def test_mcp_sidecar_empty_value_in_tools() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]
@@ -112,8 +105,7 @@ def test_mcp_sidecar_empty_value_in_tools() -> None:
 
 def test_mcp_sidecar_missing_resources() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]
@@ -127,8 +119,7 @@ def test_mcp_sidecar_missing_resources() -> None:
 
 def test_mcp_sidecar_empty_resources() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]
@@ -142,8 +133,7 @@ def test_mcp_sidecar_empty_resources() -> None:
 
 def test_mcp_sidecar_populated_resources() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]
@@ -160,8 +150,7 @@ def test_mcp_sidecar_populated_resources() -> None:
 
 def test_mcp_sidecar_invalid_types_in_resources() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]
@@ -175,8 +164,7 @@ def test_mcp_sidecar_invalid_types_in_resources() -> None:
 
 def test_mcp_sidecar_empty_value_in_resources() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]
@@ -190,8 +178,7 @@ def test_mcp_sidecar_empty_value_in_resources() -> None:
 
 def test_mcp_sidecar_whitespace_value_in_resources() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [mcp_sidecar]

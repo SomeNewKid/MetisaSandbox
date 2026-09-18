@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import sys
 
-from metisa_common.specification_helper import get_image_name, get_image_tag
+from metisa_common.models import MetisaSpecification
+from metisa_common.specification_helper import (
+    get_image_name,
+    get_image_tag,
+    get_workload_specification_path,
+    load_specification,
+)
 
 from .docker.docker_engine import (
     docker_engine_started,
@@ -12,6 +18,7 @@ from .docker.docker_engine import (
 )
 from .docker.docker_image import (
     build_docker_image,
+    create_image_reference,
     docker_image_exists,
 )
 from .docker.docker_sandbox import (
@@ -26,23 +33,29 @@ from .terminal.terminal_helper import (
 )
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+) -> int:
     """Run the command-line interface."""
     workload_module = get_first_argument(argv)
     if not workload_module:
         example = "sample_agent"
         raise SystemExit(f"Usage: python -m metisa_sandbox {example}")
 
+    specification_path = get_workload_specification_path(workload_module)
+    specification = load_specification(specification_path)
+
     image_name = get_image_name()
-    image_tag = get_image_tag()
+    image_tag = get_image_tag(specification)
+    image_reference = create_image_reference(image_name, image_tag)
 
     try:
-        docker_image_exitcode = _ensure_docker_image(image_name, image_tag)
+        docker_image_exitcode = _ensure_docker_image(image_reference)
         if docker_image_exitcode != 0:
             return docker_image_exitcode
 
         docker_workload_exitcode = _run_docker_workload(
-            image_name, image_tag, workload_module
+            specification, image_reference, workload_module
         )
         if docker_workload_exitcode != 0:
             return docker_workload_exitcode
@@ -53,7 +66,9 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _ensure_docker_image(image_name: str, image_tag: str) -> int:
+def _ensure_docker_image(
+    image_reference: str,
+) -> int:
     if docker_engine_started():
         print_info("Docker Engine is reachable.")
     else:
@@ -70,12 +85,12 @@ def _ensure_docker_image(image_name: str, image_tag: str) -> int:
             print_warning("Docker Engine not started.")
             return 1
 
-    if docker_image_exists(image_name, image_tag):
+    if docker_image_exists(image_reference):
         print_info("Docker image already exists.")
         return 0
 
     print_info("Building Docker image...")
-    image_built = build_docker_image(image_name, image_tag)
+    image_built = build_docker_image(image_reference)
 
     if not image_built:
         print_error("Failed to build Docker image.")
@@ -86,11 +101,13 @@ def _ensure_docker_image(image_name: str, image_tag: str) -> int:
 
 
 def _run_docker_workload(
-    image_name: str,
-    image_tag: str,
+    specification: MetisaSpecification,
+    image_reference: str,
     workload_module: str,
 ) -> int:
-    return_code = run_workload_in_sandbox(image_name, image_tag, workload_module)
+    return_code = run_workload_in_sandbox(
+        specification, image_reference, workload_module
+    )
     if return_code == 0:
         print_info("Docker workload completed.")
     else:

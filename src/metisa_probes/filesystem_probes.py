@@ -7,7 +7,9 @@ from pathlib import Path
 from .models import ProbeContext, ProbeGroup, ProbeResult
 
 
-def sandbox_output_volume_is_writable(probe_context: ProbeContext) -> ProbeResult:
+def sandbox_output_volume_is_writable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
     """Verify the configured output volume is writable."""
     probe_name = "filesystem__sandbox_output_volume_is_writable"
     output_volume = Path(probe_context.output_volume)
@@ -24,7 +26,9 @@ def sandbox_output_volume_is_writable(probe_context: ProbeContext) -> ProbeResul
     return ProbeResult.success(probe_name, f"File created at {probe_file}")
 
 
-def sandbox_source_volume_is_not_writable(probe_context: ProbeContext) -> ProbeResult:
+def sandbox_source_volume_is_not_writable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
     """Verify the configured source volume is not writable."""
     probe_name = "filesystem__sandbox_source_volume_is_not_writable"
     source_volume = Path(probe_context.source_volume)
@@ -42,7 +46,9 @@ def sandbox_source_volume_is_not_writable(probe_context: ProbeContext) -> ProbeR
     return ProbeResult.failure(probe_name, failure_message)
 
 
-def sandbox_source_module_file_is_readable(probe_context: ProbeContext) -> ProbeResult:
+def sandbox_source_module_file_is_readable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
     """Verify the configured source module files are readable."""
     probe_name = "filesystem__sandbox_source_module_file_is_readable"
     source_volume = Path(probe_context.source_volume)
@@ -68,7 +74,9 @@ def sandbox_source_module_file_is_readable(probe_context: ProbeContext) -> Probe
         return ProbeResult.failure(probe_name, str(error))
 
 
-def sandbox_source_module_is_not_writable(probe_context: ProbeContext) -> ProbeResult:
+def sandbox_source_module_is_not_writable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
     """Verify the configured source module is not writable."""
     probe_name = "filesystem__sandbox_source_module_is_not_writable"
     source_volume = Path(probe_context.source_volume)
@@ -86,7 +94,9 @@ def sandbox_source_module_is_not_writable(probe_context: ProbeContext) -> ProbeR
     return ProbeResult.failure(probe_name, failure_message)
 
 
-def sandbox_work_location_is_available(probe_context: ProbeContext) -> ProbeResult:
+def sandbox_work_location_is_available(
+    probe_context: ProbeContext,
+) -> ProbeResult:
     """Verify the configured work location is writable."""
     probe_name = "filesystem__sandbox_work_location_is_available"
     work_dir_volume = Path(probe_context.work_dir)
@@ -98,7 +108,9 @@ def sandbox_work_location_is_available(probe_context: ProbeContext) -> ProbeResu
         return ProbeResult.failure(probe_name, failure_message)
 
 
-def sandbox_work_location_is_writable(probe_context: ProbeContext) -> ProbeResult:
+def sandbox_work_location_is_writable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
     """Verify the configured work location is writable."""
     probe_name = "filesystem__sandbox_work_location_is_writable"
     work_dir_volume = Path(probe_context.work_dir)
@@ -121,7 +133,9 @@ def sandbox_work_location_is_writable(probe_context: ProbeContext) -> ProbeResul
     return ProbeResult.success(probe_name, f"File created at {probe_file}")
 
 
-def etc_directory_is_not_writable(probe_context: ProbeContext) -> ProbeResult:
+def etc_directory_is_not_writable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
     """Verify the /etc directory is not writable."""
     probe_name = "filesystem__etc_directory_is_not_writable"
     probe_file = Path("/etc") / ".probe-write-test"
@@ -138,7 +152,9 @@ def etc_directory_is_not_writable(probe_context: ProbeContext) -> ProbeResult:
     return ProbeResult.failure(probe_name, failure_message)
 
 
-def usr_local_bin_directory_is_not_writable(probe_context: ProbeContext) -> ProbeResult:
+def usr_local_bin_directory_is_not_writable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
     """Verify the /usr/local/bin directory is not writable."""
     probe_name = "filesystem__usr_local_bin_directory_is_not_writable"
     probe_file = Path("/usr/local/bin") / ".probe-write-test"

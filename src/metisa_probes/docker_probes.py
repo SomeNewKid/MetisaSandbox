@@ -8,7 +8,9 @@ from pathlib import Path
 from .models import ProbeContext, ProbeGroup, ProbeResult
 
 
-def docker_socket_is_absent(probe_context: ProbeContext) -> ProbeResult:
+def docker_socket_is_absent(
+    probe_context: ProbeContext,
+) -> ProbeResult:
     """
     Ensure Docker socket is absent.
 
@@ -23,10 +25,10 @@ def docker_socket_is_absent(probe_context: ProbeContext) -> ProbeResult:
         return ProbeResult.success(probe_name, f"File does not exist at {socket_file}")
 
 
-def docker_host_paths_are_absent(probe_context: ProbeContext) -> ProbeResult:
-    """
-    Ensure Docker host paths are absent
-    """
+def docker_host_paths_are_absent(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure Docker host paths are absent."""
     probe_name = "docker__docker_host_paths_are_absent"
 
     host_dir = Path("/host")
@@ -41,10 +43,10 @@ def docker_host_paths_are_absent(probe_context: ProbeContext) -> ProbeResult:
     return ProbeResult.success(probe_name, message)
 
 
-def docker_container_runtime_is_detected(probe_context: ProbeContext) -> ProbeResult:
-    """
-    Verifies the probes are running inside a container runtime.
-    """
+def docker_container_runtime_is_detected(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify the probes are running inside a container runtime."""
     probe_name = "docker__docker_container_runtime_is_detected"
 
     evidence = []
@@ -75,14 +77,18 @@ def docker_container_runtime_is_detected(probe_context: ProbeContext) -> ProbeRe
     return ProbeResult.failure(probe_name, failure_message)
 
 
-def _read_text_if_available(path: Path) -> str:
+def _read_text_if_available(
+    path: Path,
+) -> str:
     try:
         return path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return ""
 
 
-def _contains_container_runtime_marker(text: str) -> bool:
+def _contains_container_runtime_marker(
+    text: str,
+) -> bool:
     markers = (
         "docker",
         "containerd",
@@ -93,7 +99,9 @@ def _contains_container_runtime_marker(text: str) -> bool:
     return any(marker in text_lowered for marker in markers)
 
 
-def _looks_like_container_hostname(hostname: str) -> bool:
+def _looks_like_container_hostname(
+    hostname: str,
+) -> bool:
     if len(hostname) != 12:
         return False
 

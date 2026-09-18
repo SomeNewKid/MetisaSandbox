@@ -12,9 +12,8 @@ def test_empty_toml_file() -> None:
         _ = parse_specification(toml)
 
 
-def test_missing_schema_version() -> None:
+def test_missing_agent_name() -> None:
     toml = """
-        workload_name="sample_agent"
         capabilities = [
             "network",
         ]
@@ -23,28 +22,9 @@ def test_missing_schema_version() -> None:
         _ = parse_specification(toml)
 
 
-def test_invalid_schema_version_if_string() -> None:
+def test_invalid_type_agent_name() -> None:
     toml = """
-        schema_version = "1"
-        workload_name="sample_agent"
-    """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
-
-
-def test_invalid_schema_version_if_bool() -> None:
-    # a bool will pass an `isinstance(value, int)` check
-    toml = """
-        schema_version = true
-        workload_name="sample_agent"
-    """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
-
-
-def test_missing_workload_name() -> None:
-    toml = """
-        schema_version = 1
+        agent_name = 123
         capabilities = [
             "network",
         ]
@@ -53,10 +33,9 @@ def test_missing_workload_name() -> None:
         _ = parse_specification(toml)
 
 
-def test_invalid_type_workload_name() -> None:
+def test_empty_agent_name() -> None:
     toml = """
-        schema_version = 1
-        workload_name = 123
+        agent_name = ""
         capabilities = [
             "network",
         ]
@@ -65,22 +44,9 @@ def test_invalid_type_workload_name() -> None:
         _ = parse_specification(toml)
 
 
-def test_empty_workload_name() -> None:
+def test_whitespace_agent_name() -> None:
     toml = """
-        schema_version = 1
-        workload_name = ""
-        capabilities = [
-            "network",
-        ]
-    """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
-
-
-def test_whitespace_workload_name() -> None:
-    toml = """
-        schema_version = 1
-        workload_name = "  "
+        agent_name = "  "
         capabilities = [
             "network",
         ]
@@ -91,28 +57,23 @@ def test_whitespace_workload_name() -> None:
 
 def test_minimal_toml_file() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
     """
     specification = parse_specification(toml)
-    assert specification.schema_version == 1
-    assert specification.workload_name == "sample_agent"
+    assert specification.agent_name == "sample_agent"
 
 
 def test_minimal_toml_file_with_whitespaced_value() -> None:
     toml = """
-        schema_version = 1
-        workload_name="  sample_agent  "
+        agent_name="  sample_agent  "
     """
     specification = parse_specification(toml)
-    assert specification.schema_version == 1
-    assert specification.workload_name == "sample_agent"
+    assert specification.agent_name == "sample_agent"
 
 
 def test_not_iterable_capabilities() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = "network"
     """
     with pytest.raises(SpecificationValidationError):
@@ -121,8 +82,7 @@ def test_not_iterable_capabilities() -> None:
 
 def test_empty_capabilities() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
     """
     specification = parse_specification(toml)
@@ -131,8 +91,7 @@ def test_empty_capabilities() -> None:
 
 def test_capabilities_with_an_invalid_type() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = [123]
     """
     with pytest.raises(SpecificationValidationError):
@@ -141,8 +100,7 @@ def test_capabilities_with_an_invalid_type() -> None:
 
 def test_capabilities_with_unsupported_value() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = ["unsupported_capability"]
     """
     with pytest.raises(SpecificationValidationError):
@@ -151,8 +109,7 @@ def test_capabilities_with_unsupported_value() -> None:
 
 def test_valid_capabilities() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = ["network"]
     """
     specification = parse_specification(toml)
@@ -162,8 +119,7 @@ def test_valid_capabilities() -> None:
 
 def test_specification_with_unknown_key() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
         unknown = "value"
     """
@@ -173,8 +129,7 @@ def test_specification_with_unknown_key() -> None:
 
 def test_specification_with_unknown_table() -> None:
     toml = """
-        schema_version = 1
-        workload_name="sample_agent"
+        agent_name="sample_agent"
         capabilities = []
 
         [unknown_table]

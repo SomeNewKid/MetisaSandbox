@@ -8,9 +8,10 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class SandboxContext:
-    image_name: str
-    image_tag: str
-    identifier: str
+    """Contextual information for a Docker sandbox."""
+
+    image_reference: str
+    run_identifier: str
     network_name: str
     host_run_path: Path
     host_source_path: Path
@@ -22,3 +23,4 @@ class SandboxContext:
     guest_source_dir: str = "/sandbox-source"
     guest_output_dir: str = "/sandbox-output"
     guest_work_dir: str = "/sandbox-work"
+    guest_python_venv: str = "/opt/metisa-venv"

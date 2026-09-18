@@ -7,16 +7,23 @@ import ssl
 import urllib.error
 import urllib.request
 
+from metisa_common.models import Capability
+
 from .models import ProbeContext, ProbeGroup, ProbeResult
 
 _WORKLOAD_NETWORK_ALIAS = "metisa-workload"
 
 
-def docker_network_alias_resolved(probe_context: ProbeContext) -> ProbeResult:
-    """
-    Ensure the workload's Docker network alias resolves.
-    """
+def docker_network_alias_resolved(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure the workload's Docker network alias resolves."""
     probe_name = "network__docker_network_alias_resolved"
+    specification = probe_context.specification
+
+    if Capability.NETWORK not in specification.capabilities:
+        skipping = "Networking is not enabled. Skipping probe."
+        return ProbeResult.success(probe_name, skipping)
 
     try:
         address_info = socket.getaddrinfo(
@@ -47,12 +54,48 @@ def docker_network_alias_resolved(probe_context: ProbeContext) -> ProbeResult:
     return ProbeResult.success(probe_name, message)
 
 
+def only_loopback_network_interface_exists(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure a network-disabled workload has only the loopback interface."""
+    probe_name = "network__only_loopback_network_interface_exists"
+    specification = probe_context.specification
+
+    if Capability.NETWORK in specification.capabilities:
+        message = "Networking is enabled. Skipping probe."
+        return ProbeResult.success(probe_name, message)
+
+    try:
+        interface_names = {
+            interface_name for _, interface_name in socket.if_nameindex()
+        }
+    except OSError as error:
+        message = (
+            f"Could not enumerate network interfaces: {type(error).__name__}: {error}"
+        )
+        return ProbeResult.failure(probe_name, message)
+
+    unexpected_interfaces = sorted(interface_names - {"lo"})
+
+    if unexpected_interfaces:
+        interfaces = ", ".join(unexpected_interfaces)
+        message = f"Unexpected network interfaces found: {interfaces}"
+        return ProbeResult.failure(probe_name, message)
+
+    if "lo" not in interface_names:
+        message = "The loopback network interface was not found."
+        return ProbeResult.failure(probe_name, message)
+
+    return ProbeResult.success(
+        probe_name,
+        "Only the loopback network interface exists.",
+    )
+
+
 def external_http_is_blocked(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """
-    Ensure outbound unsecured HTTP access is unavailable.
-    """
+    """Ensure outbound unsecured HTTP access is unavailable."""
     probe_name = "docker__external_http_is_blocked"
     target_url = "http://example.com"
     timeout_seconds = 5
@@ -89,8 +132,10 @@ def external_http_is_blocked(
     return ProbeResult.failure(probe_name, message)
 
 
-def external_https_is_blocked(probe_context: ProbeContext) -> ProbeResult:
-    """Ensure output HTTPS access is unavailable."""
+def external_https_is_blocked(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure outbound HTTPS access is unavailable."""
     probe_name = "network__external_https_is_blocked"
     target_url = "https://example.com"
     timeout_seconds = 15
@@ -131,6 +176,7 @@ NETWORK_PROBES = ProbeGroup(
     name="network",
     probes=(
         docker_network_alias_resolved,
+        only_loopback_network_interface_exists,
         external_http_is_blocked,
         external_https_is_blocked,
     ),

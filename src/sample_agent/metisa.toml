@@ -1,2 +1,3 @@
-schema_version = 1
-workload_name = "sample_agent"
+agent_name = "sample_agent"
+capabilities = [
+]

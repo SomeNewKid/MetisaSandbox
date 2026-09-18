@@ -13,11 +13,15 @@ from .filesystem_probes import FILESYSTEM_PROBES
 from .identity_probes import IDENTITY_PROBES
 from .models import ProbeContext, ProbeGroup, ProbeResult
 from .network_probes import NETWORK_PROBES
+from .python_probes import PYTHON_PROBES
+from .system_command_probes import SYSTEM_COMMAND_PROBES
+from .system_package_probes import SYSTEM_PACKAGE_PROBES
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+) -> int:
     """Run the Metisa probes."""
-
     args = sys.argv[1:] if argv is None else argv
     if not args:
         print("Error: no metisa.toml argument.", file=sys.stderr)
@@ -44,6 +48,9 @@ def main(argv: list[str] | None = None) -> int:
         FILESYSTEM_PROBES,
         IDENTITY_PROBES,
         NETWORK_PROBES,
+        PYTHON_PROBES,
+        SYSTEM_COMMAND_PROBES,
+        SYSTEM_PACKAGE_PROBES,
     )
 
     for probe_group in probe_groups:
@@ -56,7 +63,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_probe_group(
-    probe_group: ProbeGroup, probe_context: ProbeContext, log_path: Path
+    probe_group: ProbeGroup,
+    probe_context: ProbeContext,
+    log_path: Path,
 ) -> bool:
     success = True
 
@@ -72,7 +81,9 @@ def _run_probe_group(
     return success
 
 
-def _get_log_path(probe_context: ProbeContext) -> Path:
+def _get_log_path(
+    probe_context: ProbeContext,
+) -> Path:
     output_volume = Path(probe_context.output_volume)
     log_directory = output_volume / ".logs"
     log_directory.mkdir(parents=True, exist_ok=True)
@@ -80,7 +91,10 @@ def _get_log_path(probe_context: ProbeContext) -> Path:
     return log_directory / "metisa_probes.jsonl"
 
 
-def _write_probe_log_entry(log_path: Path, probe_result: ProbeResult) -> None:
+def _write_probe_log_entry(
+    log_path: Path,
+    probe_result: ProbeResult,
+) -> None:
     log_entry = {
         "name": probe_result.name,
         "passed": probe_result.passed,
