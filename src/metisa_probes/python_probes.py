@@ -6,6 +6,7 @@ import importlib.metadata
 import importlib.util
 import shutil
 import sys
+import sysconfig
 from pathlib import Path
 
 from .models import ProbeContext, ProbeGroup, ProbeResult
@@ -49,6 +50,37 @@ def metisa_python_virtual_environment_is_active(
         f"Python is running from virtual environment "
         f"{actual_prefix} using {executable}."
     )
+    return ProbeResult.success(probe_name, message)
+
+
+def sitecustomize_module_is_active(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify the intended sitecustomize module was loaded."""
+    probe_name = "python__sitecustomize_module_is_active"
+    purelib_path = Path(sysconfig.get_path("purelib"))
+    expected_path = purelib_path / "sitecustomize.py"
+
+    if not expected_path.is_file():
+        message = f"sitecustomize module is not present at {expected_path}."
+        return ProbeResult.failure(probe_name, message)
+
+    sitecustomize_module = sys.modules.get("sitecustomize")
+    if sitecustomize_module is None:
+        message = "sitecustomize was not loaded during Python startup."
+        return ProbeResult.failure(probe_name, message)
+
+    module_file = getattr(sitecustomize_module, "__file__", None)
+    if module_file is None:
+        message = "Loaded sitecustomize module has no file location."
+        return ProbeResult.failure(probe_name, message)
+
+    actual_path = Path(module_file).resolve()
+    if actual_path != expected_path.resolve():
+        message = f"Expected sitecustomize from {expected_path}, got {actual_path}."
+        return ProbeResult.failure(probe_name, message)
+
+    message = f"sitecustomize was loaded from {actual_path}."
     return ProbeResult.success(probe_name, message)
 
 
@@ -139,6 +171,7 @@ PYTHON_PROBES = ProbeGroup(
     name="python",
     probes=(
         metisa_python_virtual_environment_is_active,
+        sitecustomize_module_is_active,
         pip_entry_point_is_absent,
         pip3_entry_point_is_absent,
         pip_module_is_absent,

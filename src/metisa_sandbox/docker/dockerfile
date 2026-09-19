@@ -17,6 +17,12 @@ RUN python -m venv /opt/metisa-venv
 # RUN /opt/metisa-venv/bin/python -m pip install \
 #     --requirement /tmp/requirements.lock
 
+# Copy the custom sitecustomize module into the virtual environment,
+# within its site-packages directory.
+# Python runtime discovers it automatically during startup.
+COPY sitecustomize.py \
+     /opt/metisa-venv/lib/python3.12/site-packages/sitecustomize.py
+
 # Remove installation distributions from the virtual environment.
 RUN /opt/metisa-venv/bin/python -m pip uninstall \
        --yes \

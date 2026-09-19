@@ -1,3 +1,4 @@
 agent_name = "sample_agent"
 capabilities = [
+    # "network"
 ]

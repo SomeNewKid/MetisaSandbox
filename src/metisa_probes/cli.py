@@ -8,12 +8,17 @@ from pathlib import Path
 
 from metisa_common.specification_helper import load_specification
 
+from .browser_probes import BROWSER_PROBES
+from .diagnostic_probes import DIAGNOSTIC_PROBES
 from .docker_probes import DOCKER_PROBES
 from .filesystem_probes import FILESYSTEM_PROBES
 from .identity_probes import IDENTITY_PROBES
+from .linux_capability_probes import LINUX_CAPABILITY_PROBES
 from .models import ProbeContext, ProbeGroup, ProbeResult
 from .network_probes import NETWORK_PROBES
+from .privilege_probes import PRIVILEGE_PROBES
 from .python_probes import PYTHON_PROBES
+from .resource_probes import RESOURCE_PROBES
 from .system_command_probes import SYSTEM_COMMAND_PROBES
 from .system_package_probes import SYSTEM_PACKAGE_PROBES
 
@@ -44,11 +49,18 @@ def main(
     log_path = _get_log_path(probe_context)
 
     probe_groups = (
+        # Diagnostic probes first
+        DIAGNOSTIC_PROBES,
+        # Actual probes
+        BROWSER_PROBES,
         DOCKER_PROBES,
         FILESYSTEM_PROBES,
         IDENTITY_PROBES,
+        LINUX_CAPABILITY_PROBES,
         NETWORK_PROBES,
         PYTHON_PROBES,
+        PRIVILEGE_PROBES,
+        RESOURCE_PROBES,
         SYSTEM_COMMAND_PROBES,
         SYSTEM_PACKAGE_PROBES,
     )

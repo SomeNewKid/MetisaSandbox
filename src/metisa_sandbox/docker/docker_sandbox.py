@@ -96,18 +96,12 @@ def _create_docker_run_arguments(
     docker_command_location = get_docker_command_location()
 
     is_interactive = Capability.INTERACTIVE in specification.capabilities
+
+    # Initialize the list of Docker run arguments.
     arguments = [
         docker_command_location,
         "run",
     ]
-
-    # Run as the sandbox user
-    uid = 10001 # sandbox user
-    gid = 10001 # sandbox group
-    arguments.extend([
-        "--user",
-        f"{uid}:{gid}"
-    ])
 
     # Remove the container after its workload completes
     arguments.extend(
@@ -125,6 +119,42 @@ def _create_docker_run_arguments(
         ]
     )
 
+    # Linux control groups, or cgroups, organize processes and
+    # enforce resource accounting and limits such as:
+    # - Memory usage
+    # - CPU allocation
+    # - Process counts
+    # - I/O limits
+    # Docker already places each container into one or more cgroups.
+    # A cgroup namespace controls how much of that cgroup hierarchy a process can see.
+    arguments.extend(
+        [
+            "--cgroupns",
+            "private",
+        ]
+    )
+
+    # Run as the sandbox user
+    uid = 10001  # sandbox user
+    gid = 10001  # sandbox group
+    arguments.extend(
+        ["--user", f"{uid}:{gid}"],
+    )
+
+    # Executing another program cannot grant the process privileges
+    # it did not already have.  It prevents privilege escalation through:
+    # Set-user-ID,
+    # Set-group-ID,
+    # Executables with Linux file capabilities.
+    arguments.extend(
+        [
+            "--security-opt",
+            "no-new-privileges=true",
+        ]
+    )
+
+    # Configure the network settings for the container
+    # based on whether a network is required.
     if is_network_required:
         arguments.extend(
             [
@@ -142,6 +172,8 @@ def _create_docker_run_arguments(
             ]
         )
 
+    # Allocate a pseudo-terminal if the sandbox is interactive.
+    # Allows Python `input` to get user input from the terminal.
     if is_interactive:
         arguments.extend(
             [
@@ -150,19 +182,73 @@ def _create_docker_run_arguments(
             ]
         )
 
+    # Drop all Linux capabilities for the container.
+    # https://man7.org/linux/man-pages/man7/capabilities.7.html
+    # Docker already excludes more dangerous capabilities such as
+    # SYS_ADMIN, NET_ADMIN, SYS_PTRACE, and SYS_MODULE by default.
+    arguments.extend(["--cap-drop", "ALL"])
+
+    # Mount the necessary volumes.
     arguments.extend(
         [
             "--volume",
             f"{staged_source_path}:{sandbox_context.guest_source_dir}:ro",
             "--volume",
             f"{sandbox_context.host_output_path}:{sandbox_context.guest_output_dir}:rw",
+        ]
+    )
+
+    # Mount a temporary (in memory) filesystem for the container's working directory.
+    arguments.extend(
+        [
             "--tmpfs",
             sandbox_context.guest_work_dir,
+        ]
+    )
+
+    # Set environment variables for the container.
+    arguments.extend(
+        [
             "--env",
             f"SANDBOX_OUTPUT_DIR={sandbox_context.guest_output_dir}",
+        ]
+    )
+
+    # Set the working directory for the container.
+    arguments.extend(
+        [
             "--workdir",
             sandbox_context.guest_source_dir,
+        ]
+    )
+
+    # Without --init, the command supplied after the image
+    # becomes PID 1 inside the container.
+    # PID 1 has special responsibilities on Linux.
+    # In particular, it inherits orphaned descendant processes and
+    # must collect, or “reap,” processes that have exited.
+    # Ordinary applications are not always designed to perform that role correctly.
+    # With --init, Docker inserts its small docker-init process as PID 1.
+    arguments.extend(
+        [
+            "--init",  # correctly reaps exited and orphaned processes.
+            "--pids-limit",  # Bounds how many processes the container may have at once
+            "64",  # limit the number of PIDs to 100
+        ]
+    )
+
+    # ---------------- The following switches must be last ----------------
+
+    # The image from which to construct the container.
+    arguments.extend(
+        [
             image_reference,
+        ]
+    )
+
+    # The command to execute within the container.
+    arguments.extend(
+        [
             f"{sandbox_context.guest_python_venv}/bin/python",
             "-m",
             sandbox_context.runner_module_name,
@@ -211,10 +297,6 @@ def _create_docker_network(
     sandbox_context: SandboxContext,
 ) -> None:
     docker_command_location = get_docker_command_location()
-
-    # Make temporary use of specification argument
-    is_networked = Capability.NETWORK in specification.capabilities
-    print(f"[TEMP] is_networked: {is_networked}")
 
     arguments = [
         docker_command_location,

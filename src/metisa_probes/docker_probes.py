@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import socket
+import stat
 from pathlib import Path
 
 from .models import ProbeContext, ProbeGroup, ProbeResult
@@ -77,6 +79,169 @@ def docker_container_runtime_is_detected(
     return ProbeResult.failure(probe_name, failure_message)
 
 
+def cgroup_namespace_is_private(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify cgroup paths are rooted in the container's namespace."""
+    probe_name = "docker__cgroup_namespace_is_private"
+    cgroup_path = Path("/proc/self/cgroup")
+
+    try:
+        cgroup_text = cgroup_path.read_text(encoding="utf-8")
+    except OSError as error:
+        message = f"Could not read {cgroup_path}: {type(error).__name__}: {error}"
+        return ProbeResult.failure(probe_name, message)
+
+    cgroup_lines = [line for line in cgroup_text.splitlines() if line]
+    if not cgroup_lines:
+        message = f"No cgroup entries were found in {cgroup_path}."
+        return ProbeResult.failure(probe_name, message)
+
+    visible_paths: set[str] = set()
+
+    for line in cgroup_lines:
+        fields = line.split(":", maxsplit=2)
+        if len(fields) != 3:
+            message = f"Malformed cgroup entry in {cgroup_path}: {line!r}."
+            return ProbeResult.failure(probe_name, message)
+
+        visible_paths.add(fields[2])
+
+    unexpected_paths = sorted(path for path in visible_paths if path != "/")
+    if unexpected_paths:
+        paths = ", ".join(unexpected_paths)
+        message = f"Cgroup paths are visible outside the namespace root: {paths}."
+        return ProbeResult.failure(probe_name, message)
+
+    message = "All visible cgroup paths are rooted at /."
+    return ProbeResult.success(probe_name, message)
+
+
+def init_process_is_enabled(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify Docker's init process is running as PID 1."""
+    probe_name = "docker__init_process_is_enabled"
+    process_name_path = Path("/proc/1/comm")
+
+    try:
+        process_name = process_name_path.read_text(encoding="utf-8").strip()
+    except OSError as error:
+        message = f"Could not read {process_name_path}: {type(error).__name__}: {error}"
+        return ProbeResult.failure(probe_name, message)
+
+    if process_name != "docker-init":
+        message = f"Expected PID 1 to be docker-init, got {process_name!r}."
+        return ProbeResult.failure(probe_name, message)
+
+    message = "Docker init process is running as PID 1."
+    return ProbeResult.success(probe_name, message)
+
+
+def host_socket_mounts_are_absent(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify no Unix sockets are mounted into the container."""
+    probe_name = "docker__host_socket_mounts_are_absent"
+    mountinfo_path = Path("/proc/self/mountinfo")
+
+    try:
+        mountinfo = mountinfo_path.read_text(encoding="utf-8")
+    except OSError as error:
+        message = f"Could not read {mountinfo_path}: {type(error).__name__}: {error}"
+        return ProbeResult.failure(probe_name, message)
+
+    socket_mounts: list[Path] = []
+
+    for line in mountinfo.splitlines():
+        mount_fields = line.partition(" - ")[0].split()
+        if len(mount_fields) < 5:
+            message = f"Malformed mount entry in {mountinfo_path}: {line!r}."
+            return ProbeResult.failure(probe_name, message)
+
+        mount_point = Path(_decode_mountinfo_path(mount_fields[4]))
+
+        try:
+            mount_mode = mount_point.stat().st_mode
+        except OSError as error:
+            message = (
+                f"Could not inspect mount point {mount_point}: "
+                f"{type(error).__name__}: {error}"
+            )
+            return ProbeResult.failure(probe_name, message)
+
+        if stat.S_ISSOCK(mount_mode):
+            socket_mounts.append(mount_point)
+
+    if socket_mounts:
+        paths = ", ".join(str(path) for path in sorted(socket_mounts))
+        message = f"Unix sockets are mounted at: {paths}."
+        return ProbeResult.failure(probe_name, message)
+
+    message = "No Unix sockets are mounted into the container."
+    return ProbeResult.success(probe_name, message)
+
+
+def ssh_agent_is_unavailable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify no SSH-agent endpoint is configured."""
+    probe_name = "docker__ssh_agent_is_unavailable"
+    environment_variable = "SSH_AUTH_SOCK"
+
+    if environment_variable in os.environ:
+        configured_value = os.environ[environment_variable]
+        message = (
+            f"SSH-agent environment variable {environment_variable} is configured "
+            f"as {configured_value!r}."
+        )
+        return ProbeResult.failure(probe_name, message)
+
+    message = f"SSH-agent environment variable {environment_variable} is absent."
+    return ProbeResult.success(probe_name, message)
+
+
+def gpg_agent_is_unavailable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify no GPG-agent endpoint is configured or active."""
+    probe_name = "docker__gpg_agent_is_unavailable"
+    environment_variable = "GPG_AGENT_INFO"
+
+    if environment_variable in os.environ:
+        configured_value = os.environ[environment_variable]
+        message = (
+            f"GPG-agent environment variable {environment_variable} is configured "
+            f"as {configured_value!r}."
+        )
+        return ProbeResult.failure(probe_name, message)
+
+    unix_socket_path = Path("/proc/net/unix")
+
+    try:
+        unix_sockets = unix_socket_path.read_text(encoding="utf-8")
+    except OSError as error:
+        message = f"Could not read {unix_socket_path}: {type(error).__name__}: {error}"
+        return ProbeResult.failure(probe_name, message)
+
+    gpg_agent_sockets = sorted(
+        {
+            fields[-1]
+            for line in unix_sockets.splitlines()
+            if "S.gpg-agent" in line
+            if (fields := line.split())
+        }
+    )
+
+    if gpg_agent_sockets:
+        paths = ", ".join(gpg_agent_sockets)
+        message = f"GPG-agent Unix sockets are active at: {paths}."
+        return ProbeResult.failure(probe_name, message)
+
+    message = "No GPG-agent endpoint is configured or active."
+    return ProbeResult.success(probe_name, message)
+
+
 def _read_text_if_available(
     path: Path,
 ) -> str:
@@ -109,11 +274,25 @@ def _looks_like_container_hostname(
     return all(character in "0123456789abcdef" for character in hostname_lowered)
 
 
+def _decode_mountinfo_path(encoded_path: str) -> str:
+    return (
+        encoded_path.replace("\\040", " ")
+        .replace("\\011", "\t")
+        .replace("\\012", "\n")
+        .replace("\\134", "\\")
+    )
+
+
 DOCKER_PROBES = ProbeGroup(
     name="docker",
     probes=(
         docker_socket_is_absent,
         docker_host_paths_are_absent,
         docker_container_runtime_is_detected,
+        cgroup_namespace_is_private,
+        init_process_is_enabled,
+        host_socket_mounts_are_absent,
+        ssh_agent_is_unavailable,
+        gpg_agent_is_unavailable,
     ),
 )
