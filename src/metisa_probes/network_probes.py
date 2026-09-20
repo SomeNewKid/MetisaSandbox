@@ -298,6 +298,37 @@ def empty_host_bind_is_blocked(
     )
 
 
+def unprivileged_port_start_is_1024(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify ports below 1024 require a privileged process."""
+    probe_name = "network__unprivileged_port_start_is_1024"
+    expected_port = 1024
+    sysctl_path = Path("/proc/sys/net/ipv4/ip_unprivileged_port_start")
+
+    try:
+        raw_port = sysctl_path.read_text(encoding="utf-8").strip()
+    except OSError as error:
+        message = f"Could not read {sysctl_path}: {type(error).__name__}: {error}"
+        return ProbeResult.failure(probe_name, message)
+
+    try:
+        actual_port = int(raw_port)
+    except ValueError:
+        message = f"Invalid unprivileged port start {raw_port!r} at {sysctl_path}."
+        return ProbeResult.failure(probe_name, message)
+
+    if actual_port != expected_port:
+        message = (
+            f"Expected unprivileged ports to start at {expected_port}, "
+            f"got {actual_port}."
+        )
+        return ProbeResult.failure(probe_name, message)
+
+    message = f"Unprivileged ports start at {actual_port}."
+    return ProbeResult.success(probe_name, message)
+
+
 def ipv4_link_local_connections_are_blocked(
     probe_context: ProbeContext,
 ) -> ProbeResult:
@@ -541,6 +572,7 @@ NETWORK_PROBES = ProbeGroup(
         ipv4_all_interfaces_bind_is_blocked,
         ipv6_all_interfaces_bind_is_blocked,
         empty_host_bind_is_blocked,
+        unprivileged_port_start_is_1024,
         ipv4_link_local_connections_are_blocked,
         ipv6_link_local_connections_are_blocked,
         aws_ipv6_metadata_connection_is_blocked,

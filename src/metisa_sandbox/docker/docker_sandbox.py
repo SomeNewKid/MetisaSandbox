@@ -198,11 +198,13 @@ def _create_docker_run_arguments(
         ]
     )
 
-    # Mount a temporary (in memory) filesystem for the container's working directory.
+    # Mount temporary (in memory) filesystems.
     arguments.extend(
         [
             "--tmpfs",
-            sandbox_context.guest_work_dir,
+            f"{sandbox_context.guest_work_dir}:rw,size=1m,nosuid,nodev,noexec",
+            "--tmpfs",
+            "/tmp:rw,size=16m,nosuid,nodev,noexec",
         ]
     )
 
@@ -233,7 +235,60 @@ def _create_docker_run_arguments(
         [
             "--init",  # correctly reaps exited and orphaned processes.
             "--pids-limit",  # Bounds how many processes the container may have at once
-            "64",  # limit the number of PIDs to 100
+            "64",
+        ]
+    )
+
+    # Set CPU limits for the container.
+    arguments.extend(
+        [
+            "--cpus",
+            "1",
+        ]
+    )
+
+    # Set memory limits for the container.
+    arguments.extend(
+        [
+            "--memory",
+            "128m",
+            "--memory-swap",  # no additional swap beyond the memory limit
+            "128m",
+        ]
+    )
+
+    # Set the open file descriptor limits for the container.
+    # A file descriptor is a small non-negative integer that
+    # a Unix process uses as a handle to an open operating-system resource.
+    # Limiting descriptors protects against accidental or hostile resource exhaustion.
+    arguments.extend(
+        [
+            "--ulimit",
+            "nofile=256:256",
+        ]
+    )
+
+    # Set the per-user process limits for the container.
+    arguments.extend(
+        [
+            "--ulimit",
+            "nproc=64:64",
+        ]
+    )
+
+    # Set the file size limits for the container.
+    arguments.extend(
+        [
+            "--ulimit",
+            "fsize=1048576:1048576",
+        ]
+    )
+
+    # Require privileges when binding ports below 1024.
+    arguments.extend(
+        [
+            "--sysctl",
+            "net.ipv4.ip_unprivileged_port_start=1024",
         ]
     )
 
