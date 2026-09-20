@@ -6,11 +6,11 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 from metisa_common.specification_helper import get_workload_specification_path
 
 _PROBES_MODULE = "metisa_probes"
-_SANDBOX_OUTPUT_DIR_ENV = "SANDBOX_OUTPUT_DIR"
 
 
 def main(
@@ -26,15 +26,20 @@ def main(
     specification_path = get_workload_specification_path(workload_module)
 
     print("Docker probes starting...", end="\n", flush=True)
+    os.environ["METISA_RUNTIME_ROLE"] = "probes"
     probes_exit_code = _run_probes_module(_PROBES_MODULE, specification_path)
     if probes_exit_code != 0:
         print("Sandbox probes failed.  Workload will not be run.", file=sys.stderr)
         return probes_exit_code
 
     print("Docker workload starting...", end="\n", flush=True)
-    workload_exit_code = _run_workload_module(workload_module)
+    os.environ["METISA_RUNTIME_ROLE"] = "workload"
 
-    return workload_exit_code
+    try:
+        _execute_workload(workload_module)
+    except OSError as error:
+        print(f"Failed to execute workload: {error}", file=sys.stderr)
+        return 1
 
 
 def _run_probes_module(
@@ -49,39 +54,9 @@ def _run_probes_module(
     return result.returncode
 
 
-def _run_workload_module(
+def _execute_workload(
     module_name: str,
-) -> int:
-    log_path = _get_workload_log_path()
+) -> NoReturn:
+    arguments = [sys.executable, "-m", module_name]
 
-    process = subprocess.Popen(
-        [sys.executable, "-m", module_name],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=0,
-    )
-
-    with log_path.open("a", encoding="utf-8") as log_file:
-        if process.stdout is not None:
-            while True:
-                chunk = process.stdout.read(1)
-                if chunk == "":
-                    break
-
-                print(chunk, end="", flush=True)
-                log_file.write(chunk)
-                log_file.flush()
-
-    return process.wait()
-
-
-def _get_workload_log_path() -> Path:
-    output_dir = os.environ.get(_SANDBOX_OUTPUT_DIR_ENV)
-    if not output_dir:
-        raise RuntimeError(f"{_SANDBOX_OUTPUT_DIR_ENV} is not set.")
-
-    log_dir = Path(output_dir) / ".logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-
-    return log_dir / "workload.txt"
+    os.execv(sys.executable, arguments)

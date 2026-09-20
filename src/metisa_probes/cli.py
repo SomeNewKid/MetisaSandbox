@@ -12,11 +12,13 @@ from .browser_probes import BROWSER_PROBES
 from .diagnostic_probes import DIAGNOSTIC_PROBES
 from .docker_probes import DOCKER_PROBES
 from .filesystem_probes import FILESYSTEM_PROBES
+from .hardware_probes import HARDWARE_PROBES
 from .identity_probes import IDENTITY_PROBES
 from .linux_capability_probes import LINUX_CAPABILITY_PROBES
 from .models import ProbeContext, ProbeGroup, ProbeResult
 from .network_probes import NETWORK_PROBES
 from .privilege_probes import PRIVILEGE_PROBES
+from .process_probes import PROCESS_PROBES
 from .python_probes import PYTHON_PROBES
 from .resource_probes import RESOURCE_PROBES
 from .system_command_probes import SYSTEM_COMMAND_PROBES
@@ -49,17 +51,17 @@ def main(
     log_path = _get_log_path(probe_context)
 
     probe_groups = (
-        # Diagnostic probes first
-        DIAGNOSTIC_PROBES,
-        # Actual probes
         BROWSER_PROBES,
+        DIAGNOSTIC_PROBES,
         DOCKER_PROBES,
         FILESYSTEM_PROBES,
+        HARDWARE_PROBES,
         IDENTITY_PROBES,
         LINUX_CAPABILITY_PROBES,
         NETWORK_PROBES,
         PYTHON_PROBES,
         PRIVILEGE_PROBES,
+        PROCESS_PROBES,
         RESOURCE_PROBES,
         SYSTEM_COMMAND_PROBES,
         SYSTEM_PACKAGE_PROBES,
@@ -82,7 +84,15 @@ def _run_probe_group(
     success = True
 
     for probe in probe_group.probes:
-        result = probe(probe_context)
+        try:
+            result = probe(probe_context)
+        except Exception as error:
+            probe_name = f"{probe_group.name}__{probe.__name__}"
+            message = (
+                f"Probe raised an unexpected exception: {type(error).__name__}: {error}"
+            )
+            result = ProbeResult.failure(probe_name, message)
+
         _write_probe_log_entry(log_path, result)
         status = "PASS" if result.passed else "FAIL"
         print(f"[{status}] {result.name}: {result.message}")

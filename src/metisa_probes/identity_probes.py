@@ -1,7 +1,9 @@
 """Probes related to the user identity."""
 
-import subprocess
+import os
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 from .models import ProbeContext, ProbeGroup, ProbeResult
 
@@ -10,25 +12,59 @@ def current_user_is_sandbox_user(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the probes are running as the sandbox user."""
+    del probe_context
+
     probe_name = "identity__current_user_is_sandbox_user"
+    passwd_path = Path("/etc/passwd")
 
-    result = subprocess.run(
-        ["id", "--user", "--name"],
-        capture_output=True,
-        text=True,
-        check=False,
+    get_effective_user_id_candidate = vars(os).get("geteuid")
+    if not callable(get_effective_user_id_candidate):
+        message = "The operating system does not provide os.geteuid()."
+        return ProbeResult.failure(probe_name, message)
+
+    get_effective_user_id = cast(
+        Callable[[], int],
+        get_effective_user_id_candidate,
     )
+    effective_user_id = get_effective_user_id()
 
-    if result.returncode != 0:
-        message = result.stderr.strip() or result.stdout.strip()
+    try:
+        passwd_contents = passwd_path.read_text(encoding="utf-8")
+    except OSError as error:
+        message = f"Could not read {passwd_path}: {type(error).__name__}: {error}"
         return ProbeResult.failure(probe_name, message)
 
-    user_name = result.stdout.strip()
-    if user_name != "sandbox":
-        message = f"Expected user sandbox, got {user_name}."
+    sandbox_user_ids: list[int] = []
+
+    for line in passwd_contents.splitlines():
+        fields = line.split(":")
+        if len(fields) != 7 or fields[0] != "sandbox":
+            continue
+
+        try:
+            sandbox_user_ids.append(int(fields[2]))
+        except ValueError:
+            message = f"The sandbox account has an invalid UID: {fields[2]!r}."
+            return ProbeResult.failure(probe_name, message)
+
+    if not sandbox_user_ids:
+        message = "The sandbox account was not found in /etc/passwd."
         return ProbeResult.failure(probe_name, message)
 
-    return ProbeResult.success(probe_name, "Current user is sandbox.")
+    if len(sandbox_user_ids) > 1:
+        message = "Multiple sandbox account entries were found in /etc/passwd."
+        return ProbeResult.failure(probe_name, message)
+
+    sandbox_user_id = sandbox_user_ids[0]
+    if effective_user_id != sandbox_user_id:
+        message = (
+            f"Expected effective UID {sandbox_user_id} for sandbox, "
+            f"got {effective_user_id}."
+        )
+        return ProbeResult.failure(probe_name, message)
+
+    message = f"Effective UID {effective_user_id} belongs to sandbox."
+    return ProbeResult.success(probe_name, message)
 
 
 def sandbox_user_login_shell_is_nologin(

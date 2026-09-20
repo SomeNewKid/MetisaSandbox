@@ -213,6 +213,8 @@ def _create_docker_run_arguments(
         [
             "--env",
             f"SANDBOX_OUTPUT_DIR={sandbox_context.guest_output_dir}",
+            "--env",
+            "METISA_RUNTIME_ROLE=landlock",
         ]
     )
 
@@ -306,7 +308,7 @@ def _create_docker_run_arguments(
         [
             f"{sandbox_context.guest_python_venv}/bin/python",
             "-m",
-            sandbox_context.runner_module_name,
+            sandbox_context.landlock_module_name,
             workload_module,
         ]
     )

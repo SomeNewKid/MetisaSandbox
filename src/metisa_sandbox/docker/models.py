@@ -18,6 +18,7 @@ class SandboxContext:
     host_output_path: Path
 
     common_module_name: str = "metisa_common"
+    landlock_module_name: str = "metisa_landlock"
     runner_module_name: str = "metisa_runner"
     probes_module_name: str = "metisa_probes"
     guest_source_dir: str = "/sandbox-source"

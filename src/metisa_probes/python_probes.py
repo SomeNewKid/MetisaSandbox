@@ -2,14 +2,34 @@
 
 from __future__ import annotations
 
+import importlib
+import importlib.machinery
 import importlib.metadata
 import importlib.util
 import shutil
+import subprocess
 import sys
 import sysconfig
+import uuid
 from pathlib import Path
 
 from .models import ProbeContext, ProbeGroup, ProbeResult
+from .probe_helpers import permit_process_spawn
+
+_DENIED_MODULE_NAMES = (
+    "_ctypes",
+    "ctypes",
+    "ensurepip",
+    "pip",
+    "setuptools",
+    "wheel",
+)
+_DENIED_CODE_ROOTS = (
+    Path("/sandbox-output"),
+    Path("/sandbox-work"),
+    Path("/tmp"),
+)
+_PROBE_MODULE_SOURCE = "PROBE_EXECUTED = True\n"
 
 
 def metisa_python_virtual_environment_is_active(
@@ -81,6 +101,195 @@ def sitecustomize_module_is_active(
         return ProbeResult.failure(probe_name, message)
 
     message = f"sitecustomize was loaded from {actual_path}."
+    return ProbeResult.success(probe_name, message)
+
+
+def denied_python_modules_cannot_be_imported(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify denied Python modules cannot be imported."""
+    del probe_context
+
+    probe_name = "python__denied_python_modules_cannot_be_imported"
+    imported_modules: list[str] = []
+    unexpected_errors: list[str] = []
+
+    for module_name in _DENIED_MODULE_NAMES:
+        try:
+            importlib.import_module(module_name)
+        except ModuleNotFoundError:
+            continue
+        except Exception as error:
+            unexpected_errors.append(f"{module_name}: {type(error).__name__}: {error}")
+        else:
+            imported_modules.append(module_name)
+
+    if imported_modules:
+        module_list = ", ".join(imported_modules)
+        message = f"Denied Python modules were importable: {module_list}."
+        return ProbeResult.failure(probe_name, message)
+
+    if unexpected_errors:
+        error_list = "; ".join(unexpected_errors)
+        message = f"Denied-module checks produced unexpected errors: {error_list}."
+        return ProbeResult.failure(probe_name, message)
+
+    message = "Denied Python modules cannot be imported."
+    return ProbeResult.success(probe_name, message)
+
+
+def ordinary_imports_from_writable_locations_are_denied(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify ordinary imports cannot load code from writable locations."""
+    del probe_context
+
+    probe_name = "python__ordinary_imports_from_writable_locations_are_denied"
+    imported_paths: list[Path] = []
+    unexpected_errors: list[str] = []
+
+    for root in _DENIED_CODE_ROOTS:
+        module_name, module_path = _create_probe_module(root, "ordinary_import")
+        original_sys_path = sys.path.copy()
+
+        try:
+            sys.path.insert(0, str(root))
+            importlib.invalidate_caches()
+
+            try:
+                importlib.import_module(module_name)
+            except ModuleNotFoundError:
+                continue
+            except Exception as error:
+                unexpected_errors.append(
+                    f"{module_path}: {type(error).__name__}: {error}"
+                )
+            else:
+                imported_paths.append(module_path)
+        finally:
+            sys.path[:] = original_sys_path
+            sys.modules.pop(module_name, None)
+            importlib.invalidate_caches()
+            module_path.unlink(missing_ok=True)
+
+    if imported_paths:
+        paths = ", ".join(str(path) for path in imported_paths)
+        message = f"Python imported code from writable locations: {paths}."
+        return ProbeResult.failure(probe_name, message)
+
+    if unexpected_errors:
+        errors = "; ".join(unexpected_errors)
+        message = f"Writable-location import checks failed unexpectedly: {errors}."
+        return ProbeResult.failure(probe_name, message)
+
+    message = "Ordinary imports from writable locations are denied."
+    return ProbeResult.success(probe_name, message)
+
+
+def file_location_imports_from_writable_locations_are_denied(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify file-location imports cannot load code from writable locations."""
+    del probe_context
+
+    probe_name = "python__file_location_imports_from_writable_locations_are_denied"
+    imported_paths: list[Path] = []
+    unexpected_errors: list[str] = []
+
+    for root in _DENIED_CODE_ROOTS:
+        module_name, module_path = _create_probe_module(root, "file_import")
+
+        try:
+            try:
+                module_specification = importlib.util.spec_from_file_location(
+                    module_name,
+                    module_path,
+                )
+                if module_specification is None or module_specification.loader is None:
+                    message = "Python did not create an executable module specification"
+                    raise RuntimeError(message)
+
+                module = importlib.util.module_from_spec(module_specification)
+                module_specification.loader.exec_module(module)
+            except ModuleNotFoundError:
+                continue
+            except Exception as error:
+                unexpected_errors.append(
+                    f"{module_path}: {type(error).__name__}: {error}"
+                )
+            else:
+                imported_paths.append(module_path)
+        finally:
+            sys.modules.pop(module_name, None)
+            module_path.unlink(missing_ok=True)
+
+    if imported_paths:
+        paths = ", ".join(str(path) for path in imported_paths)
+        message = f"Python loaded code from writable locations: {paths}."
+        return ProbeResult.failure(probe_name, message)
+
+    if unexpected_errors:
+        errors = "; ".join(unexpected_errors)
+        message = f"Writable-location file import checks failed unexpectedly: {errors}."
+        return ProbeResult.failure(probe_name, message)
+
+    message = "File-location imports from writable locations are denied."
+    return ProbeResult.success(probe_name, message)
+
+
+def scripts_from_writable_locations_cannot_be_started(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify new Python interpreters reject scripts in writable locations."""
+    del probe_context
+
+    probe_name = "python__scripts_from_writable_locations_cannot_be_started"
+    executable_paths: list[Path] = []
+    unexpected_results: list[str] = []
+
+    for root in _DENIED_CODE_ROOTS:
+        _, script_path = _create_probe_module(root, "script")
+
+        try:
+            try:
+                with permit_process_spawn():
+                    completed_process = subprocess.run(
+                        [sys.executable, str(script_path)],
+                        stdin=subprocess.DEVNULL,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                        check=False,
+                    )
+            except (OSError, subprocess.SubprocessError) as error:
+                unexpected_results.append(
+                    f"{script_path}: {type(error).__name__}: {error}"
+                )
+                continue
+
+            if completed_process.returncode == 0:
+                executable_paths.append(script_path)
+                continue
+
+            if completed_process.returncode != 126:
+                unexpected_results.append(
+                    f"{script_path}: unexpected exit status "
+                    f"{completed_process.returncode}"
+                )
+        finally:
+            script_path.unlink(missing_ok=True)
+
+    if executable_paths:
+        paths = ", ".join(str(path) for path in executable_paths)
+        message = f"Python executed scripts from writable locations: {paths}."
+        return ProbeResult.failure(probe_name, message)
+
+    if unexpected_results:
+        results = "; ".join(unexpected_results)
+        message = f"Writable-location script checks failed unexpectedly: {results}."
+        return ProbeResult.failure(probe_name, message)
+
+    message = "Python scripts in writable locations cannot be started."
     return ProbeResult.success(probe_name, message)
 
 
@@ -172,6 +381,10 @@ PYTHON_PROBES = ProbeGroup(
     probes=(
         metisa_python_virtual_environment_is_active,
         sitecustomize_module_is_active,
+        denied_python_modules_cannot_be_imported,
+        ordinary_imports_from_writable_locations_are_denied,
+        file_location_imports_from_writable_locations_are_denied,
+        scripts_from_writable_locations_cannot_be_started,
         pip_entry_point_is_absent,
         pip3_entry_point_is_absent,
         pip_module_is_absent,
@@ -210,18 +423,25 @@ def _module_is_absent(module_name: str) -> ProbeResult:
     probe_name = f"python__{module_name}_module_is_absent"
 
     try:
-        module_specification = importlib.util.find_spec(module_name)
+        module_specification = importlib.machinery.PathFinder.find_spec(module_name)
     except (ImportError, AttributeError, ValueError) as error:
         message = (
-            f"Could not determine whether module {module_name} is available: "
+            f"Could not determine whether module {module_name} is installed: "
             f"{type(error).__name__}: {error}"
         )
         return ProbeResult.failure(probe_name, message)
 
     if module_specification is not None:
         location = module_specification.origin or "unknown location"
-        message = f"Module {module_name} found at {location}."
+        message = f"Module {module_name} is installed at {location}."
         return ProbeResult.failure(probe_name, message)
 
-    message = f"Module {module_name} is unavailable."
+    message = f"Module {module_name} is not installed."
     return ProbeResult.success(probe_name, message)
+
+
+def _create_probe_module(root: Path, purpose: str) -> tuple[str, Path]:
+    module_name = f"metisa_probe_{purpose}_{uuid.uuid4().hex}"
+    module_path = root / f"{module_name}.py"
+    module_path.write_text(_PROBE_MODULE_SOURCE, encoding="utf-8")
+    return module_name, module_path

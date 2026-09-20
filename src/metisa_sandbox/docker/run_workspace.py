@@ -64,6 +64,7 @@ def create_staged_source_directory(
         sandbox_context.host_source_path,
         staged_source_path,
         [
+            sandbox_context.landlock_module_name,
             sandbox_context.common_module_name,
             sandbox_context.runner_module_name,
             sandbox_context.probes_module_name,
