@@ -52,11 +52,7 @@ def _get_python_search_paths() -> set[Path]:
         search_paths.update(library_root.glob("python*/site-packages"))
         search_paths.update(library_root.glob("python*/dist-packages"))
 
-    return {
-        search_path
-        for search_path in search_paths
-        if search_path.is_dir()
-    }
+    return {search_path for search_path in search_paths if search_path.is_dir()}
 
 
 def _get_removal_patterns() -> tuple[str, ...]:

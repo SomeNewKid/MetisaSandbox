@@ -16,6 +16,7 @@ from .container.identity_probes import IDENTITY_PROBES
 from .container.network_probes import NETWORK_PROBES
 from .container.system_command_probes import SYSTEM_COMMAND_PROBES
 from .container.system_package_probes import SYSTEM_PACKAGE_PROBES
+from .kernel.landlock_probes import LANDLOCK_PROBES
 from .kernel.linux_capability_probes import LINUX_CAPABILITY_PROBES
 from .kernel.network_probes import KERNEL_NETWORK_PROBES
 from .kernel.privilege_probes import PRIVILEGE_PROBES
@@ -62,6 +63,7 @@ def main(
         NETWORK_PROBES,
         SYSTEM_COMMAND_PROBES,
         SYSTEM_PACKAGE_PROBES,
+        LANDLOCK_PROBES,
         LINUX_CAPABILITY_PROBES,
         KERNEL_NETWORK_PROBES,
         PRIVILEGE_PROBES,

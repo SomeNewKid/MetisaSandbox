@@ -123,6 +123,12 @@ COPY --chmod=0444 sitecustomize.py \
 COPY --chmod=0444 sitecustomize.py \
      /usr/local/lib/python3.12/site-packages/sitecustomize.py
 
+# Create readable canaries used to verify Landlock's deny-by-default policy.
+RUN mkdir --mode=0555 /metisa-denied \
+    && printf '%s\n' 'Landlock read canary.' \
+       > /metisa-denied/readable.txt \
+    && chmod 0444 /metisa-denied/readable.txt
+
 # Create non-root sandbox group and user
 RUN groupadd --gid 10001 sandbox \
     && useradd \

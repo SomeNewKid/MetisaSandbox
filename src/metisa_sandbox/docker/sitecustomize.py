@@ -32,7 +32,7 @@ _VALID_RUNTIME_ROLES = frozenset(
         "probes",
         "workload",
     }
-) 
+)
 
 _RUNTIME_ROLE = os.environ.pop("METISA_RUNTIME_ROLE", "")
 
@@ -135,11 +135,11 @@ def _terminate_startup(message: str) -> NoReturn:
             output.encode("utf-8", errors="replace"),
         )
     finally:
-        # ensures termination even if standard error is unavailable 
-        # or writing to it fails. 
-        # os._exit() deliberately skips ordinary exception handling, 
-        # flushing, and cleanup; 
-        # that is appropriate here because the interpreter has 
+        # ensures termination even if standard error is unavailable
+        # or writing to it fails.
+        # os._exit() deliberately skips ordinary exception handling,
+        # flushing, and cleanup;
+        # that is appropriate here because the interpreter has
         # not completed trusted initialization and must not continue.
         os._exit(_STARTUP_CONFIGURATION_ERROR)
 
@@ -171,11 +171,14 @@ def _deny_potentially_dangerous_module_imports() -> None:
         def find_spec(self, fullname, path=None, target=None):  # type: ignore[no-untyped-def]
             module_name = fullname.partition(".")[0]
 
-            if module_name in _DENIED_IMPORT_MODULES:
-                message = f"{fullname!r} is denied by sandbox profile."
-                raise ModuleNotFoundError(message)
+            if module_name not in _DENIED_IMPORT_MODULES:
+                return None
 
-            return None
+            if _is_landlock_bootstrap_import(module_name):
+                return None
+
+            message = f"{fullname!r} is denied by sandbox profile."
+            raise ModuleNotFoundError(message)
 
     sys.meta_path.insert(0, _DeniedModuleFinder())
 
@@ -593,6 +596,29 @@ def _is_allowed_command(args: object, allowed_markers: frozenset[str]) -> bool:
     normalized_text = text.replace("\\", "/")
 
     return any(normalized_text.startswith(marker) for marker in allowed_markers)
+
+
+def _is_landlock_bootstrap_import(module_name: str) -> bool:
+    if _RUNTIME_ROLE != "landlock":
+        return False
+
+    if module_name not in {"ctypes", "_ctypes"}:
+        return False
+
+    try:
+        frame = sys._getframe(1)
+    except ValueError:
+        return False
+
+    while frame is not None:
+        caller_module = frame.f_globals.get("__name__")
+
+        if caller_module == "metisa_landlock.landlock":
+            return True
+
+        frame = frame.f_back
+
+    return False
 
 
 _validate_role()

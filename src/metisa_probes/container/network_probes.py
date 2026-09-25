@@ -108,7 +108,9 @@ def docker_dns_resolver_is_only_listening_tcp_endpoint(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Ensure only Docker DNS listens when workload networking is enabled."""
-    probe_name = "container__network__docker_dns_resolver_is_only_listening_tcp_endpoint"
+    probe_name = (
+        "container__network__docker_dns_resolver_is_only_listening_tcp_endpoint"
+    )
     socket_table_paths = (
         Path("/proc/net/tcp"),
         Path("/proc/net/tcp6"),

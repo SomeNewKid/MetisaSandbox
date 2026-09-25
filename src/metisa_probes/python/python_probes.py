@@ -210,7 +210,9 @@ def file_location_imports_from_writable_locations_are_denied(
     """Verify file-location imports cannot load code from writable locations."""
     del probe_context
 
-    probe_name = "python__python__file_location_imports_from_writable_locations_are_denied"
+    probe_name = (
+        "python__python__file_location_imports_from_writable_locations_are_denied"
+    )
     imported_paths: list[Path] = []
     unexpected_errors: list[str] = []
 

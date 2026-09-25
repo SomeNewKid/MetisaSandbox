@@ -65,10 +65,11 @@ def _execute_workload(
     module_name: str,
 ) -> NoReturn:
     arguments = [
-        sys.executable, 
+        sys.executable,
         "-I",  # Run the Python interpreter in isolated mode
         "-B",  # Don't write .pyc files on import
-        "-m", 
-        module_name]
+        "-m",
+        module_name,
+    ]
 
     os.execv(sys.executable, arguments)
