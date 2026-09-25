@@ -44,10 +44,6 @@ RUN python -m pip uninstall \
        --yes \
        pip
 
-# `ensurepip` belongs to the standard library 
-# and is not removed by uninstalling `pip`.
-RUN rm -rf /usr/local/lib/python3.12/ensurepip
-
 # Remove Debian package-management commands and metadata.
 RUN rm -f \
        /usr/bin/apt \
@@ -107,20 +103,25 @@ RUN set -eu; \
             rm -f "${directory}/${command}"; \
         done; \
     done
-
+    
+# Remove Python packages 
+RUN --mount=type=bind,source=remove_python_packaging.py,target=/tmp/remove_python_packaging.py,readonly \
+    python /tmp/remove_python_packaging.py
 
 # Copy the metisa-source.pth file into the virtual environment's site-packages directory.
 # Allow for discovery of the Metisa source code within the virtual environment.
 COPY --chmod=0444 metisa-source.pth \
      /opt/metisa-venv/lib/python3.12/site-packages/metisa-source.pth
 
-
 # Copy the custom sitecustomize module into the virtual environment,
 # within its site-packages directory.
 # Python runtime discovers it automatically during startup.
 # (This must occur after the trusted build-time operations have finished.)
-COPY sitecustomize.py \
+COPY --chmod=0444 sitecustomize.py \
      /opt/metisa-venv/lib/python3.12/site-packages/sitecustomize.py
+
+COPY --chmod=0444 sitecustomize.py \
+     /usr/local/lib/python3.12/site-packages/sitecustomize.py
 
 # Create non-root sandbox group and user
 RUN groupadd --gid 10001 sandbox \

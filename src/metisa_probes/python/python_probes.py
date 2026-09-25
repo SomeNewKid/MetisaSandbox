@@ -25,6 +25,23 @@ _DENIED_MODULE_NAMES = (
     "setuptools",
     "wheel",
 )
+_PACKAGING_MODULE_NAMES = (
+    "_distutils_hack",
+    "ensurepip",
+    "pip",
+    "pkg_resources",
+    "setuptools",
+    "wheel",
+)
+_PACKAGING_DISTRIBUTION_NAMES = (
+    "pip",
+    "setuptools",
+    "wheel",
+)
+_PYTHON_LIBRARY_ROOTS = (
+    Path("/usr/local/lib"),
+    Path("/usr/lib"),
+)
 _DENIED_CODE_ROOTS = (
     Path("/sandbox-output"),
     Path("/sandbox-work"),
@@ -386,6 +403,28 @@ def package_management_metadata_is_absent(
     return ProbeResult.success(probe_name, message)
 
 
+def python_packaging_artifacts_are_absent(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify Python packaging modules and metadata are physically absent."""
+    del probe_context
+
+    probe_name = "python__python__python_packaging_artifacts_are_absent"
+    discovered_artifacts: set[Path] = set()
+
+    for search_path in _get_python_package_search_paths():
+        for pattern in _get_python_packaging_artifact_patterns():
+            discovered_artifacts.update(search_path.glob(pattern))
+
+    if discovered_artifacts:
+        paths = ", ".join(str(path) for path in sorted(discovered_artifacts))
+        message = f"Python packaging artifacts remain: {paths}."
+        return ProbeResult.failure(probe_name, message)
+
+    message = "Python packaging modules and metadata are physically absent."
+    return ProbeResult.success(probe_name, message)
+
+
 PYTHON_PROBES = ProbeGroup(
     name="python",
     probes=(
@@ -404,12 +443,13 @@ PYTHON_PROBES = ProbeGroup(
         pkg_resources_module_is_absent,
         distutils_hack_module_is_absent,
         package_management_metadata_is_absent,
+        python_packaging_artifacts_are_absent,
     ),
 )
 
 
 def _entry_point_is_absent(entry_point_name: str) -> ProbeResult:
-    probe_name = f"python__{entry_point_name}_entry_point_is_absent"
+    probe_name = f"python__python__{entry_point_name}_entry_point_is_absent"
     entry_point_paths: set[Path] = set()
 
     discovered_entry_point = shutil.which(entry_point_name)
@@ -430,7 +470,7 @@ def _entry_point_is_absent(entry_point_name: str) -> ProbeResult:
 
 
 def _module_is_absent(module_name: str) -> ProbeResult:
-    probe_name = f"python__{module_name}_module_is_absent"
+    probe_name = f"python__python__{module_name}_module_is_absent"
 
     try:
         module_specification = importlib.machinery.PathFinder.find_spec(module_name)
@@ -448,6 +488,45 @@ def _module_is_absent(module_name: str) -> ProbeResult:
 
     message = f"Module {module_name} is not installed."
     return ProbeResult.success(probe_name, message)
+
+
+def _get_python_package_search_paths() -> set[Path]:
+    search_paths: set[Path] = set()
+    configured_paths = sysconfig.get_paths()
+
+    for path_name in ("purelib", "platlib", "stdlib", "platstdlib"):
+        configured_path = configured_paths.get(path_name)
+        if configured_path:
+            search_paths.add(Path(configured_path))
+
+    for library_root in _PYTHON_LIBRARY_ROOTS:
+        if not library_root.is_dir():
+            continue
+
+        search_paths.update(library_root.glob("python*/site-packages"))
+        search_paths.update(library_root.glob("python*/dist-packages"))
+
+    return {search_path for search_path in search_paths if search_path.is_dir()}
+
+
+def _get_python_packaging_artifact_patterns() -> tuple[str, ...]:
+    patterns: list[str] = list(_PACKAGING_MODULE_NAMES)
+
+    for module_name in _PACKAGING_MODULE_NAMES:
+        patterns.append(f"{module_name}.py")
+
+    for distribution_name in _PACKAGING_DISTRIBUTION_NAMES:
+        normalized_names = {
+            distribution_name,
+            distribution_name.replace("_", "-"),
+        }
+
+        for normalized_name in normalized_names:
+            patterns.append(f"{normalized_name}-*.dist-info")
+            patterns.append(f"{normalized_name}-*.egg-info")
+
+    patterns.append("distutils-precedence.pth")
+    return tuple(patterns)
 
 
 def _create_probe_module(root: Path, purpose: str) -> tuple[str, Path]:
