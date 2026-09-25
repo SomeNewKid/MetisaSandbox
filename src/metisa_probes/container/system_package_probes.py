@@ -6,7 +6,7 @@ import os
 import shutil
 from pathlib import Path
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 
 
 def apt_entry_point_is_absent(
@@ -82,7 +82,7 @@ SYSTEM_PACKAGE_PROBES = ProbeGroup(
 
 def _entry_point_is_absent(entry_point_name: str) -> ProbeResult:
     normalized_name = entry_point_name.replace("-", "_")
-    probe_name = f"system_packages__{normalized_name}_entry_point_is_absent"
+    probe_name = f"container__system_packages__{normalized_name}_entry_point_is_absent"
     entry_point_paths: set[Path] = set()
 
     discovered_entry_point = shutil.which(entry_point_name)
@@ -113,7 +113,7 @@ def _entry_point_is_absent(entry_point_name: str) -> ProbeResult:
 
 
 def _path_is_absent(path: Path, path_name: str) -> ProbeResult:
-    probe_name = f"system_packages__{path_name}_is_absent"
+    probe_name = f"container__system_packages__{path_name}_is_absent"
 
     if os.path.lexists(path):
         message = f"System package-management path exists at {path}."

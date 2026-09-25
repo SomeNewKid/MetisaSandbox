@@ -10,7 +10,7 @@ import sys
 from collections.abc import Callable
 from typing import cast
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 from .probe_helpers import permit_process_spawn
 
 _CHILD_ARGUMENTS = (sys.executable, "-c", "pass")
@@ -70,7 +70,7 @@ def subprocess_popen_is_denied(
     """Verify subprocess.Popen cannot create a child process."""
     del probe_context
     return _process_operation_is_denied(
-        "process__subprocess_popen_is_denied",
+        "python__process__subprocess_popen_is_denied",
         "subprocess.Popen",
         _start_with_subprocess_popen,
     )
@@ -82,7 +82,7 @@ def subprocess_run_is_denied(
     """Verify subprocess.run cannot create a child process."""
     del probe_context
     return _process_operation_is_denied(
-        "process__subprocess_run_is_denied",
+        "python__process__subprocess_run_is_denied",
         "subprocess.run",
         lambda: subprocess.run(_CHILD_ARGUMENTS, check=False),
     )
@@ -94,7 +94,7 @@ def subprocess_call_is_denied(
     """Verify subprocess.call cannot create a child process."""
     del probe_context
     return _process_operation_is_denied(
-        "process__subprocess_call_is_denied",
+        "python__process__subprocess_call_is_denied",
         "subprocess.call",
         lambda: subprocess.call(_CHILD_ARGUMENTS),
     )
@@ -106,7 +106,7 @@ def subprocess_check_call_is_denied(
     """Verify subprocess.check_call cannot create a child process."""
     del probe_context
     return _process_operation_is_denied(
-        "process__subprocess_check_call_is_denied",
+        "python__process__subprocess_check_call_is_denied",
         "subprocess.check_call",
         lambda: subprocess.check_call(_CHILD_ARGUMENTS),
     )
@@ -118,7 +118,7 @@ def subprocess_check_output_is_denied(
     """Verify subprocess.check_output cannot create a child process."""
     del probe_context
     return _process_operation_is_denied(
-        "process__subprocess_check_output_is_denied",
+        "python__process__subprocess_check_output_is_denied",
         "subprocess.check_output",
         lambda: subprocess.check_output(_CHILD_ARGUMENTS),
     )
@@ -130,7 +130,7 @@ def os_system_is_denied(
     """Verify os.system cannot create a shell process."""
     del probe_context
     return _process_operation_is_denied(
-        "process__os_system_is_denied",
+        "python__process__os_system_is_denied",
         "os.system",
         lambda: os.system(_child_command_text()),
     )
@@ -142,7 +142,7 @@ def os_popen_is_denied(
     """Verify os.popen cannot create a shell process."""
     del probe_context
     return _process_operation_is_denied(
-        "process__os_popen_is_denied",
+        "python__process__os_popen_is_denied",
         "os.popen",
         _start_with_os_popen,
     )
@@ -154,7 +154,7 @@ def os_spawn_family_is_denied(
     """Verify available os.spawn family functions cannot create processes."""
     del probe_context
 
-    probe_name = "process__os_spawn_family_is_denied"
+    probe_name = "python__process__os_spawn_family_is_denied"
     operations = _get_spawn_operations()
     allowed_functions: list[str] = []
     unexpected_errors: list[str] = []
@@ -191,7 +191,7 @@ def pty_spawn_is_denied(
     """Verify pty.spawn cannot create a child process."""
     del probe_context
     return _process_operation_is_denied(
-        "process__pty_spawn_is_denied",
+        "python__process__pty_spawn_is_denied",
         "pty.spawn",
         _start_with_pty_spawn,
     )
@@ -203,7 +203,7 @@ def os_exec_family_is_denied(
     """Verify the os.exec family cannot replace the workload process."""
     del probe_context
 
-    probe_name = "process__os_exec_family_is_denied"
+    probe_name = "python__process__os_exec_family_is_denied"
     allowed_functions: list[str] = []
     unexpected_results: list[str] = []
 
@@ -218,13 +218,7 @@ def os_exec_family_is_denied(
         try:
             with permit_process_spawn():
                 completed_process = subprocess.run(
-                    [
-                        sys.executable,
-                        "-I",
-                        "-B",
-                        "-c", 
-                        _EXEC_PROBE_CODE, 
-                        function_name],
+                    [sys.executable, "-I", "-B", "-c", _EXEC_PROBE_CODE, function_name],
                     env=environment,
                     stdin=subprocess.DEVNULL,
                     capture_output=True,
@@ -271,7 +265,7 @@ def os_fork_is_denied(
     """Verify os.fork cannot create a child process."""
     del probe_context
     return _process_operation_is_denied(
-        "process__os_fork_is_denied",
+        "python__process__os_fork_is_denied",
         "os.fork",
         _start_with_os_fork,
     )
@@ -283,7 +277,7 @@ def os_forkpty_is_denied(
     """Verify os.forkpty cannot create a child process."""
     del probe_context
     return _process_operation_is_denied(
-        "process__os_forkpty_is_denied",
+        "python__process__os_forkpty_is_denied",
         "os.forkpty",
         _start_with_os_forkpty,
     )
@@ -295,7 +289,7 @@ def os_posix_spawn_is_denied(
     """Verify os.posix_spawn cannot create a child process."""
     del probe_context
     return _process_operation_is_denied(
-        "process__os_posix_spawn_is_denied",
+        "python__process__os_posix_spawn_is_denied",
         "os.posix_spawn",
         _start_with_os_posix_spawn,
     )
@@ -307,7 +301,7 @@ def os_posix_spawnp_is_denied(
     """Verify os.posix_spawnp cannot create a child process."""
     del probe_context
     return _process_operation_is_denied(
-        "process__os_posix_spawnp_is_denied",
+        "python__process__os_posix_spawnp_is_denied",
         "os.posix_spawnp",
         _start_with_os_posix_spawnp,
     )

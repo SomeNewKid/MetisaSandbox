@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 
 _EXPECTED_MEMORY_LIMIT_BYTES = 128 * 1024 * 1024
 
@@ -13,7 +13,7 @@ def process_limit_is_configured(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the container process limit is configured."""
-    probe_name = "resources__process_limit_is_configured"
+    probe_name = "kernel__resources__process_limit_is_configured"
     expected_process_limit = 64
     process_limit_paths = (
         Path("/sys/fs/cgroup/pids.max"),
@@ -65,7 +65,7 @@ def memory_limit_is_configured(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the container memory limit is 128 MiB."""
-    probe_name = "resources__memory_limit_is_configured"
+    probe_name = "kernel__resources__memory_limit_is_configured"
     memory_limit_paths = (
         Path("/sys/fs/cgroup/memory.max"),
         Path("/sys/fs/cgroup/memory/memory.limit_in_bytes"),
@@ -104,7 +104,7 @@ def additional_swap_is_disabled(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the container has no swap allowance beyond its memory limit."""
-    probe_name = "resources__additional_swap_is_disabled"
+    probe_name = "kernel__resources__additional_swap_is_disabled"
     cgroup_v2_swap_path = Path("/sys/fs/cgroup/memory.swap.max")
 
     if cgroup_v2_swap_path.exists():
@@ -170,7 +170,7 @@ def cpu_limit_is_configured(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the container CPU quota is limited to one CPU."""
-    probe_name = "resources__cpu_limit_is_configured"
+    probe_name = "kernel__resources__cpu_limit_is_configured"
     cgroup_v2_cpu_path = Path("/sys/fs/cgroup/cpu.max")
 
     if cgroup_v2_cpu_path.exists():
@@ -247,7 +247,7 @@ def open_file_descriptor_limit_is_configured(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the process soft and hard open-file limits are 256."""
-    probe_name = "resources__open_file_descriptor_limit_is_configured"
+    probe_name = "kernel__resources__open_file_descriptor_limit_is_configured"
     expected_limit = 256
     process_limits_path = Path("/proc/self/limits")
 
@@ -307,7 +307,7 @@ def per_user_process_limit_is_configured(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the process soft and hard per-user process limits are 64."""
-    probe_name = "resources__per_user_process_limit_is_configured"
+    probe_name = "kernel__resources__per_user_process_limit_is_configured"
     expected_limit = 64
     process_limits_path = Path("/proc/self/limits")
 
@@ -365,7 +365,7 @@ def file_size_limit_is_configured(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the process soft and hard file-size limits are 1 MiB."""
-    probe_name = "resources__file_size_limit_is_configured"
+    probe_name = "kernel__resources__file_size_limit_is_configured"
     expected_limit = 1_048_576
     process_limits_path = Path("/proc/self/limits")
 

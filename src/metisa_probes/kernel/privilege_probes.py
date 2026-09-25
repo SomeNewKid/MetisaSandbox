@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 
 
 def no_new_privileges_is_enabled(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the process cannot acquire additional privileges."""
-    probe_name = "privileges__no_new_privileges_is_enabled"
+    probe_name = "kernel__privileges__no_new_privileges_is_enabled"
     process_status_path = Path("/proc/self/status")
 
     try:

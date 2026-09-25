@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 
 _DEBUGGING_ARGUMENTS = (
     "--remote-debugging-port",
@@ -27,7 +27,7 @@ def debugging_command_line_is_absent(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify no process has browser-debugging command-line arguments."""
-    probe_name = "browser__debugging_command_line_is_absent"
+    probe_name = "container__browser__debugging_command_line_is_absent"
     proc_path = Path("/proc")
     configured_processes: list[str] = []
 
@@ -79,7 +79,7 @@ def debugging_environment_is_absent(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify no browser-debugging endpoint is configured by environment."""
-    probe_name = "browser__debugging_environment_is_absent"
+    probe_name = "container__browser__debugging_environment_is_absent"
     configured_variables = {
         variable_name: os.environ[variable_name]
         for variable_name in _DEBUGGING_ENVIRONMENT_VARIABLES

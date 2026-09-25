@@ -8,21 +8,24 @@ from pathlib import Path
 
 from metisa_common.specification_helper import load_specification
 
-from .browser_probes import BROWSER_PROBES
-from .diagnostic_probes import DIAGNOSTIC_PROBES
-from .docker_probes import DOCKER_PROBES
-from .filesystem_probes import FILESYSTEM_PROBES
-from .hardware_probes import HARDWARE_PROBES
-from .identity_probes import IDENTITY_PROBES
-from .linux_capability_probes import LINUX_CAPABILITY_PROBES
+from .container.browser_probes import BROWSER_PROBES
+from .container.docker_probes import DOCKER_PROBES
+from .container.environment_probes import ENVIRONMENT_PROBES
+from .container.filesystem_probes import FILESYSTEM_PROBES
+from .container.identity_probes import IDENTITY_PROBES
+from .container.network_probes import NETWORK_PROBES
+from .container.system_command_probes import SYSTEM_COMMAND_PROBES
+from .container.system_package_probes import SYSTEM_PACKAGE_PROBES
+from .kernel.linux_capability_probes import LINUX_CAPABILITY_PROBES
+from .kernel.network_probes import KERNEL_NETWORK_PROBES
+from .kernel.privilege_probes import PRIVILEGE_PROBES
+from .kernel.resource_probes import RESOURCE_PROBES
 from .models import ProbeContext, ProbeGroup, ProbeResult
-from .network_probes import NETWORK_PROBES
-from .privilege_probes import PRIVILEGE_PROBES
-from .process_probes import PROCESS_PROBES
-from .python_probes import PYTHON_PROBES
-from .resource_probes import RESOURCE_PROBES
-from .system_command_probes import SYSTEM_COMMAND_PROBES
-from .system_package_probes import SYSTEM_PACKAGE_PROBES
+from .python.diagnostic_probes import DIAGNOSTIC_PROBES
+from .python.hardware_probes import HARDWARE_PROBES
+from .python.process_probes import PROCESS_PROBES
+from .python.python_probes import PYTHON_PROBES
+from .python.socket_probes import SOCKET_PROBES
 
 
 def main(
@@ -52,19 +55,22 @@ def main(
 
     probe_groups = (
         BROWSER_PROBES,
-        DIAGNOSTIC_PROBES,
         DOCKER_PROBES,
+        ENVIRONMENT_PROBES,
         FILESYSTEM_PROBES,
-        HARDWARE_PROBES,
         IDENTITY_PROBES,
-        LINUX_CAPABILITY_PROBES,
         NETWORK_PROBES,
-        PYTHON_PROBES,
-        PRIVILEGE_PROBES,
-        PROCESS_PROBES,
-        RESOURCE_PROBES,
         SYSTEM_COMMAND_PROBES,
         SYSTEM_PACKAGE_PROBES,
+        LINUX_CAPABILITY_PROBES,
+        KERNEL_NETWORK_PROBES,
+        PRIVILEGE_PROBES,
+        RESOURCE_PROBES,
+        DIAGNOSTIC_PROBES,
+        HARDWARE_PROBES,
+        PYTHON_PROBES,
+        PROCESS_PROBES,
+        SOCKET_PROBES,
     )
 
     for probe_group in probe_groups:

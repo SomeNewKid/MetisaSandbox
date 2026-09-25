@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 
 _CAPABILITY_FIELDS = (
     "CapInh",
@@ -19,7 +19,7 @@ def capability_sets_are_empty(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify all Linux capability sets are empty."""
-    probe_name = "linux_capabilities__capability_sets_are_empty"
+    probe_name = "kernel__linux_capabilities__capability_sets_are_empty"
     process_status_path = Path("/proc/self/status")
 
     try:

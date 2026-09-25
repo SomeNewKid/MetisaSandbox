@@ -6,7 +6,7 @@ import os
 import shutil
 from pathlib import Path
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 
 
 def bash_is_absent(probe_context: ProbeContext) -> ProbeResult:
@@ -204,7 +204,7 @@ SYSTEM_COMMAND_PROBES = ProbeGroup(
 
 def _entry_point_is_absent(entry_point_name: str) -> ProbeResult:
     normalized_name = entry_point_name.replace("-", "_")
-    probe_name = f"system_commands__{normalized_name}_is_absent"
+    probe_name = f"container__system_commands__{normalized_name}_is_absent"
     entry_point_paths: set[Path] = set()
 
     discovered_entry_point = shutil.which(entry_point_name)

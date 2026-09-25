@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 
 
 def sound_device_enumeration_is_denied(
@@ -14,7 +14,7 @@ def sound_device_enumeration_is_denied(
     """Verify Python cannot test for the sound-device directory."""
     del probe_context
 
-    probe_name = "hardware__sound_device_enumeration_is_denied"
+    probe_name = "python__hardware__sound_device_enumeration_is_denied"
     sound_path = Path("/dev/snd")
 
     try:
@@ -39,7 +39,7 @@ def usb_device_enumeration_is_denied(
     """Verify Python cannot enumerate the USB-device directory."""
     del probe_context
 
-    probe_name = "hardware__usb_device_enumeration_is_denied"
+    probe_name = "python__hardware__usb_device_enumeration_is_denied"
     usb_path = Path("/sys/bus/usb")
 
     try:
@@ -64,7 +64,7 @@ def bluetooth_device_enumeration_is_denied(
     """Verify Python cannot enumerate the Bluetooth-device directory."""
     del probe_context
 
-    probe_name = "hardware__bluetooth_device_enumeration_is_denied"
+    probe_name = "python__hardware__bluetooth_device_enumeration_is_denied"
     bluetooth_path = Path("/sys/class/bluetooth")
 
     try:
@@ -89,7 +89,7 @@ def video_device_enumeration_is_denied(
     """Verify Python cannot glob for video devices."""
     del probe_context
 
-    probe_name = "hardware__video_device_enumeration_is_denied"
+    probe_name = "python__hardware__video_device_enumeration_is_denied"
 
     try:
         list(Path("/dev").glob("video*"))
@@ -113,7 +113,7 @@ def serial_device_enumeration_is_denied(
     """Verify Python cannot glob for common serial-device names."""
     del probe_context
 
-    probe_name = "hardware__serial_device_enumeration_is_denied"
+    probe_name = "python__hardware__serial_device_enumeration_is_denied"
     patterns = ("ttyS*", "ttyUSB*", "ttyACM*")
     allowed_patterns: list[str] = []
     unexpected_errors: list[str] = []
@@ -148,7 +148,7 @@ def printer_enumeration_command_is_denied(
     """Verify Python cannot start the printer-enumeration command."""
     del probe_context
 
-    probe_name = "hardware__printer_enumeration_command_is_denied"
+    probe_name = "python__hardware__printer_enumeration_command_is_denied"
 
     try:
         subprocess.run(

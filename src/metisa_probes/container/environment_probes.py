@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 
 _HOST_CHANNEL_ENVIRONMENT_VARIABLES = (
     "SSH_AUTH_SOCK",
@@ -20,7 +20,7 @@ def host_channel_environment_is_absent(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify host-channel environment variables are absent."""
-    probe_name = "environment__host_channel_environment_is_absent"
+    probe_name = "container__environment__host_channel_environment_is_absent"
     configured_variables = sorted(
         variable_name
         for variable_name in _HOST_CHANNEL_ENVIRONMENT_VARIABLES

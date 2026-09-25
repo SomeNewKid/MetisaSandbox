@@ -14,7 +14,7 @@ import sysconfig
 import uuid
 from pathlib import Path
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 from .probe_helpers import permit_process_spawn
 
 _DENIED_MODULE_NAMES = (
@@ -37,7 +37,7 @@ def metisa_python_virtual_environment_is_active(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify Python is running from the Metisa virtual environment."""
-    probe_name = "python__metisa_python_virtual_environment_is_active"
+    probe_name = "python__python__metisa_python_virtual_environment_is_active"
     expected_prefix = Path("/opt/metisa-venv")
 
     actual_prefix = Path(sys.prefix)
@@ -78,7 +78,7 @@ def sitecustomize_module_is_active(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the intended sitecustomize module was loaded."""
-    probe_name = "python__sitecustomize_module_is_active"
+    probe_name = "python__python__sitecustomize_module_is_active"
     purelib_path = Path(sysconfig.get_path("purelib"))
     expected_path = purelib_path / "sitecustomize.py"
 
@@ -111,7 +111,7 @@ def denied_python_modules_cannot_be_imported(
     """Verify denied Python modules cannot be imported."""
     del probe_context
 
-    probe_name = "python__denied_python_modules_cannot_be_imported"
+    probe_name = "python__python__denied_python_modules_cannot_be_imported"
     imported_modules: list[str] = []
     unexpected_errors: list[str] = []
 
@@ -145,7 +145,7 @@ def ordinary_imports_from_writable_locations_are_denied(
     """Verify ordinary imports cannot load code from writable locations."""
     del probe_context
 
-    probe_name = "python__ordinary_imports_from_writable_locations_are_denied"
+    probe_name = "python__python__ordinary_imports_from_writable_locations_are_denied"
     imported_paths: list[Path] = []
     unexpected_errors: list[str] = []
 
@@ -193,7 +193,7 @@ def file_location_imports_from_writable_locations_are_denied(
     """Verify file-location imports cannot load code from writable locations."""
     del probe_context
 
-    probe_name = "python__file_location_imports_from_writable_locations_are_denied"
+    probe_name = "python__python__file_location_imports_from_writable_locations_are_denied"
     imported_paths: list[Path] = []
     unexpected_errors: list[str] = []
 
@@ -244,7 +244,7 @@ def scripts_from_writable_locations_cannot_be_started(
     """Verify new Python interpreters reject scripts in writable locations."""
     del probe_context
 
-    probe_name = "python__scripts_from_writable_locations_cannot_be_started"
+    probe_name = "python__python__scripts_from_writable_locations_cannot_be_started"
     executable_paths: list[Path] = []
     unexpected_results: list[str] = []
 
@@ -363,7 +363,7 @@ def package_management_metadata_is_absent(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify package-management distribution metadata is unavailable."""
-    probe_name = "python__package_management_metadata_is_absent"
+    probe_name = "python__python__package_management_metadata_is_absent"
     distribution_names = ("pip", "setuptools", "wheel")
     installed_distributions: list[str] = []
 

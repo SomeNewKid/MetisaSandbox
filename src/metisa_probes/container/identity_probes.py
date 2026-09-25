@@ -5,7 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 
 
 def current_user_is_sandbox_user(
@@ -14,7 +14,7 @@ def current_user_is_sandbox_user(
     """Verify the probes are running as the sandbox user."""
     del probe_context
 
-    probe_name = "identity__current_user_is_sandbox_user"
+    probe_name = "container__identity__current_user_is_sandbox_user"
     passwd_path = Path("/etc/passwd")
 
     get_effective_user_id_candidate = vars(os).get("geteuid")
@@ -71,7 +71,7 @@ def sandbox_user_login_shell_is_nologin(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the sandbox account uses the nologin shell."""
-    probe_name = "identity__sandbox_user_login_shell_is_nologin"
+    probe_name = "container__identity__sandbox_user_login_shell_is_nologin"
     passwd_path = Path("/etc/passwd")
     expected_shell = "/usr/sbin/nologin"
 

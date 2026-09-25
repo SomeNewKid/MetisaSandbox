@@ -7,14 +7,14 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 
 
 def sandbox_output_volume_is_writable(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the configured output volume is writable."""
-    probe_name = "filesystem__sandbox_output_volume_is_writable"
+    probe_name = "container__filesystem__sandbox_output_volume_is_writable"
     output_volume = Path(probe_context.output_volume)
     probe_file = output_volume / ".probe-write-test"
 
@@ -33,7 +33,7 @@ def sandbox_source_volume_is_not_writable(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the configured source volume is not writable."""
-    probe_name = "filesystem__sandbox_source_volume_is_not_writable"
+    probe_name = "container__filesystem__sandbox_source_volume_is_not_writable"
     source_volume = Path(probe_context.source_volume)
     probe_file = source_volume / ".probe-write-test"
 
@@ -53,7 +53,7 @@ def sandbox_source_module_file_is_readable(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the configured source module files are readable."""
-    probe_name = "filesystem__sandbox_source_module_file_is_readable"
+    probe_name = "container__filesystem__sandbox_source_module_file_is_readable"
     source_volume = Path(probe_context.source_volume)
     probe_file = source_volume / "metisa_probes" / "__init__.py"
 
@@ -81,7 +81,7 @@ def sandbox_source_module_is_not_writable(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the configured source module is not writable."""
-    probe_name = "filesystem__sandbox_source_module_is_not_writable"
+    probe_name = "container__filesystem__sandbox_source_module_is_not_writable"
     source_volume = Path(probe_context.source_volume)
     probe_file = source_volume / "metisa_probes" / ".probe-write-test"
 
@@ -102,7 +102,7 @@ def source_control_metadata_is_absent(
 ) -> ProbeResult:
     """Verify the staged source contains no Git metadata."""
     return _forbidden_source_entries_are_absent(
-        probe_name="filesystem__source_control_metadata_is_absent",
+        probe_name="container__filesystem__source_control_metadata_is_absent",
         source_path=Path(probe_context.source_volume),
         description="Git metadata",
         is_forbidden=lambda path: path.name == ".git",
@@ -122,7 +122,7 @@ def development_directories_are_absent(
         "tests",
     }
     return _forbidden_source_entries_are_absent(
-        probe_name="filesystem__development_directories_are_absent",
+        probe_name="container__filesystem__development_directories_are_absent",
         source_path=Path(probe_context.source_volume),
         description="development directories",
         is_forbidden=lambda path: path.is_dir() and path.name in directory_names,
@@ -134,7 +134,7 @@ def host_sandbox_module_is_absent(
 ) -> ProbeResult:
     """Verify the host-only metisa_sandbox module is not staged."""
     return _forbidden_source_entries_are_absent(
-        probe_name="filesystem__host_sandbox_module_is_absent",
+        probe_name="container__filesystem__host_sandbox_module_is_absent",
         source_path=Path(probe_context.source_volume),
         description="host-only metisa_sandbox modules",
         is_forbidden=lambda path: path.is_dir() and path.name == "metisa_sandbox",
@@ -146,7 +146,7 @@ def generated_python_artifacts_are_absent(
 ) -> ProbeResult:
     """Verify the staged source contains no generated Python artifacts."""
     return _forbidden_source_entries_are_absent(
-        probe_name="filesystem__generated_python_artifacts_are_absent",
+        probe_name="container__filesystem__generated_python_artifacts_are_absent",
         source_path=Path(probe_context.source_volume),
         description="generated Python artifacts",
         is_forbidden=_is_generated_python_artifact,
@@ -165,7 +165,7 @@ def project_configuration_files_are_absent(
         "tox.ini",
     }
     return _forbidden_source_entries_are_absent(
-        probe_name="filesystem__project_configuration_files_are_absent",
+        probe_name="container__filesystem__project_configuration_files_are_absent",
         source_path=Path(probe_context.source_volume),
         description="project configuration files",
         is_forbidden=lambda path: path.is_file() and path.name in file_names,
@@ -176,7 +176,7 @@ def sandbox_home_directory_is_not_writable(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the sandbox account's home directory is not writable."""
-    probe_name = "filesystem__sandbox_home_directory_is_not_writable"
+    probe_name = "container__filesystem__sandbox_home_directory_is_not_writable"
 
     try:
         home_path = _get_sandbox_home_directory()
@@ -198,7 +198,7 @@ def effective_home_directory_is_not_writable(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify HOME does not redirect software to a writable location."""
-    probe_name = "filesystem__effective_home_directory_is_not_writable"
+    probe_name = "container__filesystem__effective_home_directory_is_not_writable"
 
     try:
         account_home_path = _get_sandbox_home_directory()
@@ -229,7 +229,7 @@ def effective_xdg_config_directory_is_not_writable(
 ) -> ProbeResult:
     """Verify the effective XDG configuration directory is not writable."""
     return _effective_xdg_directory_is_not_writable(
-        probe_name="filesystem__effective_xdg_config_directory_is_not_writable",
+        probe_name="container__filesystem__effective_xdg_config_directory_is_not_writable",
         environment_variable="XDG_CONFIG_HOME",
         default_child_directory=".config",
     )
@@ -240,7 +240,7 @@ def effective_xdg_cache_directory_is_not_writable(
 ) -> ProbeResult:
     """Verify the effective XDG cache directory is not writable."""
     return _effective_xdg_directory_is_not_writable(
-        probe_name="filesystem__effective_xdg_cache_directory_is_not_writable",
+        probe_name="container__filesystem__effective_xdg_cache_directory_is_not_writable",
         environment_variable="XDG_CACHE_HOME",
         default_child_directory=".cache",
     )
@@ -250,7 +250,7 @@ def effective_xdg_runtime_directory_is_absent(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify no XDG runtime directory is configured for the workload."""
-    probe_name = "filesystem__effective_xdg_runtime_directory_is_absent"
+    probe_name = "container__filesystem__effective_xdg_runtime_directory_is_absent"
     environment_variable = "XDG_RUNTIME_DIR"
 
     if environment_variable in os.environ:
@@ -266,7 +266,7 @@ def sandbox_work_location_is_available(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the configured work location is writable."""
-    probe_name = "filesystem__sandbox_work_location_is_available"
+    probe_name = "container__filesystem__sandbox_work_location_is_available"
     work_dir_volume = Path(probe_context.work_dir)
     if work_dir_volume.exists():
         success_message = f"Work directory exists at {work_dir_volume}"
@@ -280,7 +280,7 @@ def sandbox_work_location_is_writable(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the configured work location is writable."""
-    probe_name = "filesystem__sandbox_work_location_is_writable"
+    probe_name = "container__filesystem__sandbox_work_location_is_writable"
     work_dir_volume = Path(probe_context.work_dir)
     probe_file = work_dir_volume / ".probe-write-test"
 
@@ -305,7 +305,7 @@ def root_filesystem_is_read_only(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the container root filesystem is mounted read-only."""
-    probe_name = "filesystem__root_filesystem_is_read_only"
+    probe_name = "container__filesystem__root_filesystem_is_read_only"
     mountinfo_path = Path("/proc/self/mountinfo")
 
     try:
@@ -345,7 +345,7 @@ def tmp_directory_is_hardened_tmpfs(
 ) -> ProbeResult:
     """Verify /tmp is a writable, restricted 16 MiB tmpfs mount."""
     return _writable_tmpfs_is_hardened(
-        probe_name="filesystem__tmp_directory_is_hardened_tmpfs",
+        probe_name="container__filesystem__tmp_directory_is_hardened_tmpfs",
         mount_path=Path("/tmp"),
         expected_size_bytes=16 * 1024 * 1024,
     )
@@ -356,7 +356,7 @@ def sandbox_work_location_is_hardened_tmpfs(
 ) -> ProbeResult:
     """Verify /sandbox-work is a restricted 1 MiB tmpfs mount."""
     return _writable_tmpfs_is_hardened(
-        probe_name="filesystem__sandbox_work_location_is_hardened_tmpfs",
+        probe_name="container__filesystem__sandbox_work_location_is_hardened_tmpfs",
         mount_path=Path(probe_context.work_dir),
         expected_size_bytes=1024 * 1024,
     )
@@ -367,7 +367,7 @@ def proc_acpi_is_concealed(
 ) -> ProbeResult:
     """Verify /proc/acpi exposes no contents and rejects writes."""
     return _system_path_is_concealed(
-        probe_name="filesystem__proc_acpi_is_concealed",
+        probe_name="container__filesystem__proc_acpi_is_concealed",
         system_path=Path("/proc/acpi"),
     )
 
@@ -377,7 +377,7 @@ def sys_firmware_is_concealed(
 ) -> ProbeResult:
     """Verify /sys/firmware exposes no contents and rejects writes."""
     return _system_path_is_concealed(
-        probe_name="filesystem__sys_firmware_is_concealed",
+        probe_name="container__filesystem__sys_firmware_is_concealed",
         system_path=Path("/sys/firmware"),
     )
 
@@ -386,7 +386,7 @@ def etc_directory_is_not_writable(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the /etc directory is not writable."""
-    probe_name = "filesystem__etc_directory_is_not_writable"
+    probe_name = "container__filesystem__etc_directory_is_not_writable"
     probe_file = Path("/etc") / ".probe-write-test"
 
     try:
@@ -405,7 +405,7 @@ def usr_local_bin_directory_is_not_writable(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the /usr/local/bin directory is not writable."""
-    probe_name = "filesystem__usr_local_bin_directory_is_not_writable"
+    probe_name = "container__filesystem__usr_local_bin_directory_is_not_writable"
     probe_file = Path("/usr/local/bin") / ".probe-write-test"
 
     try:

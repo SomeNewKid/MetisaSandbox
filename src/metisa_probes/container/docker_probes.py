@@ -7,7 +7,7 @@ import socket
 import stat
 from pathlib import Path
 
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from ..models import ProbeContext, ProbeGroup, ProbeResult
 
 
 def docker_socket_is_absent(
@@ -19,7 +19,7 @@ def docker_socket_is_absent(
     Mounting the Docker socket would effectively
     let the workload control the host Docker daemon.
     """
-    probe_name = "docker__docker_socket_is_absent"
+    probe_name = "container__docker__docker_socket_is_absent"
     socket_file = Path("/var/run/docker.sock")
     if socket_file.exists():
         return ProbeResult.failure(probe_name, f"File exists at {socket_file}")
@@ -31,7 +31,7 @@ def docker_host_paths_are_absent(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Ensure Docker host paths are absent."""
-    probe_name = "docker__docker_host_paths_are_absent"
+    probe_name = "container__docker__docker_host_paths_are_absent"
 
     host_dir = Path("/host")
     if host_dir.exists():
@@ -49,7 +49,7 @@ def docker_container_runtime_is_detected(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify the probes are running inside a container runtime."""
-    probe_name = "docker__docker_container_runtime_is_detected"
+    probe_name = "container__docker__docker_container_runtime_is_detected"
 
     evidence = []
 
@@ -83,7 +83,7 @@ def cgroup_namespace_is_private(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify cgroup paths are rooted in the container's namespace."""
-    probe_name = "docker__cgroup_namespace_is_private"
+    probe_name = "container__docker__cgroup_namespace_is_private"
     cgroup_path = Path("/proc/self/cgroup")
 
     try:
@@ -121,7 +121,7 @@ def init_process_is_enabled(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify Docker's init process is running as PID 1."""
-    probe_name = "docker__init_process_is_enabled"
+    probe_name = "container__docker__init_process_is_enabled"
     process_name_path = Path("/proc/1/comm")
 
     try:
@@ -142,7 +142,7 @@ def host_socket_mounts_are_absent(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify no Unix sockets are mounted into the container."""
-    probe_name = "docker__host_socket_mounts_are_absent"
+    probe_name = "container__docker__host_socket_mounts_are_absent"
     mountinfo_path = Path("/proc/self/mountinfo")
 
     try:
@@ -186,7 +186,7 @@ def ssh_agent_is_unavailable(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify no SSH-agent endpoint is configured."""
-    probe_name = "docker__ssh_agent_is_unavailable"
+    probe_name = "container__docker__ssh_agent_is_unavailable"
     environment_variable = "SSH_AUTH_SOCK"
 
     if environment_variable in os.environ:
@@ -205,7 +205,7 @@ def gpg_agent_is_unavailable(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Verify no GPG-agent endpoint is configured or active."""
-    probe_name = "docker__gpg_agent_is_unavailable"
+    probe_name = "container__docker__gpg_agent_is_unavailable"
     environment_variable = "GPG_AGENT_INFO"
 
     if environment_variable in os.environ:
