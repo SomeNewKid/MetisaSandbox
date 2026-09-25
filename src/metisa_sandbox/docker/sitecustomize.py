@@ -21,7 +21,18 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
+
+_STARTUP_CONFIGURATION_ERROR = 78
+
+_VALID_RUNTIME_ROLES = frozenset(
+    {
+        "landlock",
+        "runner",
+        "probes",
+        "workload",
+    }
+) 
 
 _RUNTIME_ROLE = os.environ.pop("METISA_RUNTIME_ROLE", "")
 
@@ -82,8 +93,7 @@ _DENIED_HARDWARE_GLOBS = frozenset({"video*", "ttyS*", "ttyUSB*", "ttyACM*"})
 
 _ALLOWED_RUNNER_PROCESS_SPAWN_MARKERS = frozenset(
     {
-        "/opt/metisa-venv/bin/python -m metisa_runner",
-        "/opt/metisa-venv/bin/python -m metisa_probes",
+        "/opt/metisa-venv/bin/python -I -B -m metisa_probes",
     }
 )
 _ALLOWED_WORKLOAD_PROCESS_SPAWN_MARKERS = frozenset(
@@ -113,6 +123,41 @@ def permit_probe_process_spawn() -> Generator[None, None, None]:
         yield
     finally:
         _PROBE_SPAWN_PERMITTED.reset(token)
+
+
+def _terminate_startup(message: str) -> NoReturn:
+    """Report an invalid runtime configuration and terminal immediately."""
+    output = f"Metisa Python startup rejected: {message}\n"
+
+    try:
+        os.write(
+            2,
+            output.encode("utf-8", errors="replace"),
+        )
+    finally:
+        # ensures termination even if standard error is unavailable 
+        # or writing to it fails. 
+        # os._exit() deliberately skips ordinary exception handling, 
+        # flushing, and cleanup; 
+        # that is appropriate here because the interpreter has 
+        # not completed trusted initialization and must not continue.
+        os._exit(_STARTUP_CONFIGURATION_ERROR)
+
+
+def _validate_role() -> None:
+    if _RUNTIME_ROLE not in _VALID_RUNTIME_ROLES:
+        _terminate_startup("Invalid or missing Metisa runtime role")
+
+
+def _ensure_isolated_mode() -> None:
+    if not sys.flags.isolated:
+        _terminate_startup("Python isolated mode is not enabled")
+
+    if not sys.flags.safe_path:
+        _terminate_startup("Python safe-path mode is not enabled")
+
+    if not sys.flags.no_user_site:
+        _terminate_startup("Python user site-packages are enabled")
 
 
 def _deny_potentially_dangerous_module_imports() -> None:
@@ -550,6 +595,8 @@ def _is_allowed_command(args: object, allowed_markers: frozenset[str]) -> bool:
     return any(normalized_text.startswith(marker) for marker in allowed_markers)
 
 
+_validate_role()
+_ensure_isolated_mode()
 _apply_socket_guards()
 _deny_potentially_dangerous_module_imports()
 _deny_code_imports_from_writable_locations()

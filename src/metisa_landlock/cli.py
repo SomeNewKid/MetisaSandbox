@@ -47,7 +47,14 @@ def main(
 
 
 def _execute_runner(workload_module: str) -> NoReturn:
-    arguments = [sys.executable, "-m", _RUNNER_MODULE, workload_module]
+    arguments = [
+        sys.executable,
+        "-I",  # Run the Python interpreter in isolated mode
+        "-B",  # Don't write .pyc files on import
+        "-m",
+        _RUNNER_MODULE,
+        workload_module,
+    ]
     os.environ["METISA_RUNTIME_ROLE"] = "runner"
 
     os.execv(sys.executable, arguments)

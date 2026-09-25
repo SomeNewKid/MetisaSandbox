@@ -47,7 +47,14 @@ def _run_probes_module(
     specification_path: Path,
 ) -> int:
     result = subprocess.run(
-        [sys.executable, "-m", module_name, str(specification_path)],
+        [
+            sys.executable,
+            "-I",  # Run the Python interpreter in isolated mode
+            "-B",  # Don't write .pyc files on import
+            "-m",
+            module_name,
+            str(specification_path),
+        ],
         check=False,
     )
 
@@ -57,6 +64,11 @@ def _run_probes_module(
 def _execute_workload(
     module_name: str,
 ) -> NoReturn:
-    arguments = [sys.executable, "-m", module_name]
+    arguments = [
+        sys.executable, 
+        "-I",  # Run the Python interpreter in isolated mode
+        "-B",  # Don't write .pyc files on import
+        "-m", 
+        module_name]
 
     os.execv(sys.executable, arguments)

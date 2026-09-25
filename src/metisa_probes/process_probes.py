@@ -14,6 +14,7 @@ from .models import ProbeContext, ProbeGroup, ProbeResult
 from .probe_helpers import permit_process_spawn
 
 _CHILD_ARGUMENTS = (sys.executable, "-c", "pass")
+
 _EXEC_FUNCTION_NAMES = (
     "execl",
     "execle",
@@ -24,6 +25,7 @@ _EXEC_FUNCTION_NAMES = (
     "execvp",
     "execvpe",
 )
+
 _EXEC_PROBE_CODE = """
 import os
 import sys
@@ -32,7 +34,15 @@ function_name = sys.argv[1]
 function = vars(os)[function_name]
 executable = sys.executable
 target_code = "raise SystemExit(73)"
-arguments = (executable, "-c", target_code)
+arguments = (
+    executable,
+    "-I",
+    "-B",
+    "-c",
+    target_code,
+)
+
+os.environ["METISA_RUNTIME_ROLE"] = "workload"
 environment = os.environ.copy()
 
 try:
@@ -197,6 +207,9 @@ def os_exec_family_is_denied(
     allowed_functions: list[str] = []
     unexpected_results: list[str] = []
 
+    environment = os.environ.copy()
+    environment["METISA_RUNTIME_ROLE"] = "workload"
+
     for function_name in _EXEC_FUNCTION_NAMES:
         if not callable(vars(os).get(function_name)):
             unexpected_results.append(f"os.{function_name}: unavailable")
@@ -205,7 +218,14 @@ def os_exec_family_is_denied(
         try:
             with permit_process_spawn():
                 completed_process = subprocess.run(
-                    [sys.executable, "-c", _EXEC_PROBE_CODE, function_name],
+                    [
+                        sys.executable,
+                        "-I",
+                        "-B",
+                        "-c", 
+                        _EXEC_PROBE_CODE, 
+                        function_name],
+                    env=environment,
                     stdin=subprocess.DEVNULL,
                     capture_output=True,
                     text=True,

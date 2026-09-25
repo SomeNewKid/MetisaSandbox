@@ -6,6 +6,7 @@ import importlib
 import importlib.machinery
 import importlib.metadata
 import importlib.util
+import os
 import shutil
 import subprocess
 import sys
@@ -247,6 +248,9 @@ def scripts_from_writable_locations_cannot_be_started(
     executable_paths: list[Path] = []
     unexpected_results: list[str] = []
 
+    environment = os.environ.copy()
+    environment["METISA_RUNTIME_ROLE"] = "workload"
+
     for root in _DENIED_CODE_ROOTS:
         _, script_path = _create_probe_module(root, "script")
 
@@ -254,7 +258,13 @@ def scripts_from_writable_locations_cannot_be_started(
             try:
                 with permit_process_spawn():
                     completed_process = subprocess.run(
-                        [sys.executable, str(script_path)],
+                        [
+                            sys.executable,
+                            "-I",
+                            "-B",
+                            str(script_path),
+                        ],
+                        env=environment,
                         stdin=subprocess.DEVNULL,
                         capture_output=True,
                         text=True,

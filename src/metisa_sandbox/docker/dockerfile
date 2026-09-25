@@ -109,6 +109,11 @@ RUN set -eu; \
     done
 
 
+# Copy the metisa-source.pth file into the virtual environment's site-packages directory.
+# Allow for discovery of the Metisa source code within the virtual environment.
+COPY --chmod=0444 metisa-source.pth \
+     /opt/metisa-venv/lib/python3.12/site-packages/metisa-source.pth
+
 
 # Copy the custom sitecustomize module into the virtual environment,
 # within its site-packages directory.

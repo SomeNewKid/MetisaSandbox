@@ -307,6 +307,8 @@ def _create_docker_run_arguments(
     arguments.extend(
         [
             f"{sandbox_context.guest_python_venv}/bin/python",
+            "-I",  # Run the Python interpreter in isolated, no-bytecode mode
+            "-B",  # Don't write .pyc files on import
             "-m",
             sandbox_context.landlock_module_name,
             workload_module,
