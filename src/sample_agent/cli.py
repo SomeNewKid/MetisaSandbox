@@ -6,6 +6,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import requests
+
 IS_INTERACTIVE = False
 
 
@@ -35,11 +37,42 @@ def main(
     print(message)
     print(f"Wrote answer to {answer_path}")
 
+    url = "https://example.com"
+    try:
+        response = requests.get(url)
+        status_code = response.status_code
+        if status_code == 200:
+            html = response.text
+            if html:
+                title = _get_title_from_html(response.text)
+                if title:
+                    print(f"example.com page title: {title}")
+                else:
+                    print("Could not get example.com page title.")
+            else:
+                print("Received empty response.")
+        else:
+            print(f"Failed to get response.  Status code: {status_code}")
+    except Exception as error:
+        print("Exception", error)
+
     return 0
 
 
+# This function is only used when the agent is run without the sandbox.
 def _create_run_directory() -> Path:
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
     run_directory = Path.cwd() / ".runs" / f"run-{timestamp}" / "output"
     run_directory.mkdir(parents=True, exist_ok=False)
     return run_directory
+
+
+def _get_title_from_html(html: str) -> str:
+    tag = "title"
+    open_tag = f"<{tag}>"
+    close_tag = f"</{tag}>"
+    open_tag_index = html.find(open_tag)
+    close_tag_index = html.find(close_tag)
+    if open_tag_index < 0 or close_tag_index < 0:
+        return ""
+    return html[open_tag_index + len(open_tag) : close_tag_index]

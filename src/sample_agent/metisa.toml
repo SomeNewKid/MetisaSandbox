@@ -1,5 +1,8 @@
 agent_name = "sample_agent"
 capabilities = [
     # "interactive",
-    # "network"
+    "network"
+]
+dependencies = [
+    "requests==2.34.2"
 ]

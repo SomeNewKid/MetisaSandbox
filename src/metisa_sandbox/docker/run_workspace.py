@@ -35,10 +35,9 @@ def create_sandbox_context(
     image_identifier: str,
 ) -> SandboxContext:
     """Create a sandbox context for the given Docker image and tag."""
-    run_identifier = _create_run_identifier()
+    run_identifier, host_run_directory = _create_run_identifier_and_directory()
     network_name = f"sandbox-{run_identifier}"
     host_source_path = Path.cwd() / "src"
-    host_run_directory = _create_run_directory(run_identifier)
     output_dir_name = "output"
     host_output_path = _create_output_directory(host_run_directory, output_dir_name)
 
@@ -162,9 +161,20 @@ def _get_ignored_source_entries(
     return ignored_entries
 
 
-def _create_run_identifier() -> str:
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    return f"run-{timestamp}"
+def _create_run_identifier_and_directory() -> tuple[str, Path]:
+    suffix = 0
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
+    run_identifier = f"run-{timestamp}"
+    path: Path | None = None
+    while not path and suffix <= 99:
+        try:
+            path = _create_run_directory(run_identifier)
+        except FileExistsError:
+            suffix += 1
+            run_identifier = f"run-{timestamp}-{suffix:02d}"
+    if not path:
+        raise RuntimeError("Cannot create unique run identifier.")
+    return run_identifier, path
 
 
 def _create_run_directory(

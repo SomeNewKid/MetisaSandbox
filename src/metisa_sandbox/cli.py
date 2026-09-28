@@ -50,7 +50,7 @@ def main(
     image_reference = create_image_reference(image_name, image_tag)
 
     try:
-        docker_image_exitcode = _ensure_docker_image(image_reference)
+        docker_image_exitcode = _ensure_docker_image(specification, image_reference)
         if docker_image_exitcode != 0:
             return docker_image_exitcode
 
@@ -67,6 +67,7 @@ def main(
 
 
 def _ensure_docker_image(
+    specification: MetisaSpecification,
     image_reference: str,
 ) -> int:
     if docker_engine_started():
@@ -90,7 +91,7 @@ def _ensure_docker_image(
         return 0
 
     print_info("Building Docker image...")
-    image_built = build_docker_image(image_reference)
+    image_built = build_docker_image(specification, image_reference)
 
     if not image_built:
         print_error("Failed to build Docker image.")

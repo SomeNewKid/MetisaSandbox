@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import tomllib
 from importlib.util import find_spec
 from pathlib import Path
@@ -32,15 +33,23 @@ def get_image_tag(specification: MetisaSpecification) -> str:
         capability.value for capability in specification.capabilities
     )
 
-    serialized_capabilities = json.dumps(
-        ordered_capabilities, ensure_ascii=True, separators=(",", ":")
+    ordered_dependencies = sorted(
+        dependency for dependency in specification.dependencies
     )
 
-    capabilities_hash = hashlib.sha256(
-        serialized_capabilities.encode("utf-8")
+    ordered_collections: list[str] = list(value for value in ordered_capabilities)
+    for value in ordered_dependencies:
+        ordered_collections.append(value)
+
+    serialized_collections = json.dumps(
+        ordered_collections, ensure_ascii=True, separators=(",", ":")
+    )
+
+    collections_hash = hashlib.sha256(
+        serialized_collections.encode("utf-8")
     ).hexdigest()
 
-    return f"{_IMAGE_FORMAT_VERSION}-{capabilities_hash}"
+    return f"{_IMAGE_FORMAT_VERSION}-{collections_hash}"
 
 
 def get_workload_specification_path(
@@ -86,6 +95,15 @@ def parse_specification(
     return _create_metisa_specification(toml)
 
 
+def dependency_is_valid(dependency: str) -> bool:
+    """Validate the TOML dependency value."""
+    if not dependency.strip():
+        print(f"Dependency '{dependency}' is empty or whitespace.")
+        return False
+    match = re.fullmatch(r"([a-zA-Z0-9_-]+)(==|>=|~=)([0-9]+(?:\.[0-9]+)*)", dependency)
+    return match is not None
+
+
 def _create_metisa_specification(
     toml: dict[str, object],
 ) -> MetisaSpecification:
@@ -93,6 +111,7 @@ def _create_metisa_specification(
         {
             "agent_name",
             "capabilities",
+            "dependencies",
         }
     )
 
@@ -110,6 +129,7 @@ def _create_metisa_specification(
 
     agent_name = _get_agent_name(toml)
     capabilities = _get_capabilities(toml)
+    dependencies = _get_dependencies(toml)
     haproxy = _get_haproxy_specfication(toml)
     squid_proxy = _get_squid_proxy_specification(toml)
     ollama_sidecar = _get_ollama_sidecar_specification(toml)
@@ -117,6 +137,7 @@ def _create_metisa_specification(
     return MetisaSpecification(
         agent_name=agent_name,
         capabilities=capabilities,
+        dependencies=dependencies,
         haproxy=haproxy,
         squid_proxy=squid_proxy,
         ollama_sidecar=ollama_sidecar,
@@ -165,6 +186,31 @@ def _get_capabilities(
         capabilities.add(capability)
 
     return frozenset(capabilities)
+
+
+def _get_dependencies(
+    toml: dict[str, object],
+) -> frozenset[str]:
+
+    raw_dependencies = _get_str_tuple(
+        toml.get("dependencies"), "TOML specificiation dependencies"
+    )
+
+    dependencies: set[str] = set()
+
+    for raw_dependency in raw_dependencies:
+        if not isinstance(raw_dependency, str):
+            raise SpecificationValidationError(
+                f"TOML specification dependency '{raw_dependency}' is not supported."
+            )
+        if not dependency_is_valid(raw_dependency):
+            raise SpecificationValidationError(
+                f"TOML specification dependency '{raw_dependency}' "
+                "is not pinned or not valid."
+            )
+        dependencies.add(raw_dependency)
+
+    return frozenset(dependencies)
 
 
 def _get_haproxy_specfication(

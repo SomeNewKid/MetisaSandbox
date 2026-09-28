@@ -31,6 +31,7 @@ class MetisaSpecification:
 
     agent_name: str
     capabilities: frozenset[Capability]
+    dependencies: frozenset[str]
     haproxy: HaproxySpecification | None
     squid_proxy: SquidProxySpecification | None
     ollama_sidecar: OllamaSidecarSpecification | None

@@ -362,7 +362,7 @@ def _create_ruleset(
         unsupported_write_rights.append("refer")
     message = f"Landlock ABI: {abi_version}\n"
     if unsupported_write_rights:
-        message += f"{', '.join(unsupported_write_rights)}\n"
+        message += f"Unsupported write rights: {', '.join(unsupported_write_rights)}\n"
 
     return (int(ruleset_fd), message)
 

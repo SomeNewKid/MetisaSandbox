@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
+
+from metisa_common.models import MetisaSpecification
 
 from .docker_engine import get_docker_command_location
 
@@ -24,6 +29,7 @@ def docker_image_exists(
 
 
 def build_docker_image(
+    specification: MetisaSpecification,
     image_reference: str,
 ) -> bool:
     """Ensure the image is available for the defined Dockerfile."""
@@ -32,13 +38,27 @@ def build_docker_image(
     dockerfile_path = _get_dockerfile_location()
     build_context_path = dockerfile_path.parent
 
+    temporary_dir = tempfile.mkdtemp()
+    requirements_file = os.path.join(temporary_dir, "requirements.txt")
+    with open(requirements_file, "w", encoding="utf-8") as file:
+        for dependency in specification.dependencies:
+            file.write(dependency)
+            file.write("\n")
+
+    if Path(requirements_file).exists:
+        print("Requirements file", requirements_file)
+    else:
+        raise RuntimeError("Cannot create temporary requirements.txt file.")
+
     result = subprocess.run(
         [
             docker_command_location,
             "build",
-            "-t",
+            "--build-context",
+            f"metisa_requirements={temporary_dir}",
+            "--tag",
             image_reference,
-            "-f",
+            "--file",
             str(dockerfile_path),
             str(build_context_path),
         ],
@@ -46,6 +66,8 @@ def build_docker_image(
         text=True,
         check=False,
     )
+
+    shutil.rmtree(temporary_dir)
 
     if result.returncode != 0:
         output = result.stderr.strip() or result.stdout.strip()

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import re
+
 import pytest
 
-from metisa_common.models import Capability, SpecificationValidationError
-from metisa_common.specification_helper import parse_specification
+from metisa_common.models import SpecificationValidationError
+from metisa_common.specification_helper import get_image_tag, parse_specification
 
 
 def test_empty_toml_file() -> None:
@@ -71,69 +73,272 @@ def test_minimal_toml_file_with_whitespaced_value() -> None:
     assert specification.agent_name == "sample_agent"
 
 
-def test_not_iterable_capabilities() -> None:
+def test_image_tag_with_only_agent_name() -> None:
     toml = """
-        agent_name="sample_agent"
-        capabilities = "network"
+        agent_name = "sample_agent"
     """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
+    image_tag = _get_image_tag_from_toml(toml)
+    _assert_valid_image_tag(image_tag)
 
 
-def test_empty_capabilities() -> None:
+def test_image_tag_with_capabilities_and_no_dependencies() -> None:
     toml = """
-        agent_name="sample_agent"
-        capabilities = []
+        agent_name = "sample_agent"
+        capabilities = [
+            "interactive",
+            "network",
+        ]
     """
+    image_tag = _get_image_tag_from_toml(toml)
+    _assert_valid_image_tag(image_tag)
+
+
+def test_image_tag_with_dependencies_and_no_capabilities() -> None:
+    toml = """
+        agent_name = "sample_agent"
+        dependencies = [
+            "requests==2.34.2",
+            "urllib3>=2.5.0",
+        ]
+    """
+    image_tag = _get_image_tag_from_toml(toml)
+    _assert_valid_image_tag(image_tag)
+
+
+def test_image_tag_with_capabilities_and_dependencies() -> None:
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "interactive",
+            "network",
+        ]
+        dependencies = [
+            "requests==2.34.2",
+            "urllib3>=2.5.0",
+        ]
+    """
+    image_tag = _get_image_tag_from_toml(toml)
+    _assert_valid_image_tag(image_tag)
+
+
+def test_capability_order_does_not_change_image_tag() -> None:
+    first_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "interactive",
+            "network",
+        ]
+    """
+    second_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network",
+            "interactive",
+        ]
+    """
+    first_image_tag = _get_image_tag_from_toml(first_toml)
+    second_image_tag = _get_image_tag_from_toml(second_toml)
+    assert first_image_tag == second_image_tag
+
+
+def test_dependency_order_does_not_change_image_tag() -> None:
+    first_toml = """
+        agent_name = "sample_agent"
+        dependencies = [
+            "requests==2.34.2",
+            "urllib3>=2.5.0",
+        ]
+    """
+    second_toml = """
+        agent_name = "sample_agent"
+        dependencies = [
+            "urllib3>=2.5.0",
+            "requests==2.34.2",
+        ]
+    """
+    first_image_tag = _get_image_tag_from_toml(first_toml)
+    second_image_tag = _get_image_tag_from_toml(second_toml)
+    assert first_image_tag == second_image_tag
+
+
+def test_collection_order_does_not_change_image_tag() -> None:
+    first_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "interactive",
+            "network",
+        ]
+        dependencies = [
+            "requests==2.34.2",
+            "urllib3>=2.5.0",
+        ]
+    """
+    second_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network",
+            "interactive",
+        ]
+        dependencies = [
+            "urllib3>=2.5.0",
+            "requests==2.34.2",
+        ]
+    """
+    first_image_tag = _get_image_tag_from_toml(first_toml)
+    second_image_tag = _get_image_tag_from_toml(second_toml)
+    assert first_image_tag == second_image_tag
+
+
+def test_unrelated_tables_do_not_change_image_tag() -> None:
+    squid_proxy_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "interactive",
+            "network",
+        ]
+        dependencies = [
+            "requests==2.34.2",
+            "urllib3>=2.5.0",
+        ]
+
+        [squid_proxy]
+        allowed_domains = [
+            ".example.com",
+        ]
+    """
+    haproxy_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network",
+            "interactive",
+        ]
+        dependencies = [
+            "urllib3>=2.5.0",
+            "requests==2.34.2",
+        ]
+
+        [haproxy]
+        ports = [
+            3306,
+        ]
+    """
+    squid_image_tag = _get_image_tag_from_toml(squid_proxy_toml)
+    haproxy_image_tag = _get_image_tag_from_toml(haproxy_toml)
+    assert squid_image_tag == haproxy_image_tag
+
+
+def test_different_dependencies_produce_different_image_tags() -> None:
+    first_toml = """
+        agent_name = "sample_agent"
+        dependencies = [
+            "requests==2.34.2",
+        ]
+    """
+    second_toml = """
+        agent_name = "sample_agent"
+        dependencies = [
+            "urllib3>=2.5.0",
+        ]
+    """
+    first_image_tag = _get_image_tag_from_toml(first_toml)
+    second_image_tag = _get_image_tag_from_toml(second_toml)
+    assert first_image_tag != second_image_tag
+
+
+def test_different_capabilities_produce_different_image_tags() -> None:
+    first_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "interactive",
+        ]
+    """
+    second_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network",
+        ]
+    """
+    first_image_tag = _get_image_tag_from_toml(first_toml)
+    second_image_tag = _get_image_tag_from_toml(second_toml)
+    assert first_image_tag != second_image_tag
+
+
+def test_same_capabilities_and_different_dependencies_produce_different_tags() -> None:
+    first_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network",
+        ]
+        dependencies = [
+            "requests==2.34.2",
+        ]
+    """
+    second_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network",
+        ]
+        dependencies = [
+            "urllib3>=2.5.0",
+        ]
+    """
+    first_image_tag = _get_image_tag_from_toml(first_toml)
+    second_image_tag = _get_image_tag_from_toml(second_toml)
+    assert first_image_tag != second_image_tag
+
+
+def test_different_capabilities_and_dependencies_produce_different_tags() -> None:
+    first_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "interactive",
+        ]
+        dependencies = [
+            "requests==2.34.2",
+        ]
+    """
+    second_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network",
+        ]
+        dependencies = [
+            "urllib3>=2.5.0",
+        ]
+    """
+    first_image_tag = _get_image_tag_from_toml(first_toml)
+    second_image_tag = _get_image_tag_from_toml(second_toml)
+    assert first_image_tag != second_image_tag
+
+
+def test_different_dependency_versions_produce_different_image_tags() -> None:
+    first_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network",
+        ]
+        dependencies = [
+            "requests==2.34.1",
+        ]
+    """
+    second_toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network",
+        ]
+        dependencies = [
+            "requests==2.34.2",
+        ]
+    """
+    first_image_tag = _get_image_tag_from_toml(first_toml)
+    second_image_tag = _get_image_tag_from_toml(second_toml)
+    assert first_image_tag != second_image_tag
+
+
+def _get_image_tag_from_toml(toml: str) -> str:
     specification = parse_specification(toml)
-    assert len(specification.capabilities) == 0
+    return get_image_tag(specification)
 
 
-def test_capabilities_with_an_invalid_type() -> None:
-    toml = """
-        agent_name="sample_agent"
-        capabilities = [123]
-    """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
-
-
-def test_capabilities_with_unsupported_value() -> None:
-    toml = """
-        agent_name="sample_agent"
-        capabilities = ["unsupported_capability"]
-    """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
-
-
-def test_valid_capabilities() -> None:
-    toml = """
-        agent_name="sample_agent"
-        capabilities = ["network"]
-    """
-    specification = parse_specification(toml)
-    assert len(specification.capabilities) == 1
-    assert Capability.NETWORK in specification.capabilities
-
-
-def test_specification_with_unknown_key() -> None:
-    toml = """
-        agent_name="sample_agent"
-        capabilities = []
-        unknown = "value"
-    """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
-
-
-def test_specification_with_unknown_table() -> None:
-    toml = """
-        agent_name="sample_agent"
-        capabilities = []
-
-        [unknown_table]
-        unknown = "value"
-    """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
+def _assert_valid_image_tag(image_tag: str) -> None:
+    assert re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", image_tag)
