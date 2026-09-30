@@ -1,14 +1,10 @@
-"""Provides utility methods for working with Docker images."""
+"""Provides utility methods for Docker image management."""
 
 from __future__ import annotations
 
-import os
-import shutil
 import subprocess
-import tempfile
+from collections.abc import Mapping
 from pathlib import Path
-
-from metisa_common.models import MetisaSpecification
 
 from .docker_engine import get_docker_command_location
 
@@ -29,50 +25,44 @@ def docker_image_exists(
 
 
 def build_docker_image(
-    specification: MetisaSpecification,
     image_reference: str,
-) -> bool:
-    """Ensure the image is available for the defined Dockerfile."""
+    dockerfile_path: Path,
+    build_context_path: Path,
+    *,
+    named_build_contexts: Mapping[str, Path] | None = None,
+) -> None:
+    """Build a Docker image using the specified Dockerfile and build context."""
     docker_command_location = get_docker_command_location()
 
-    dockerfile_path = _get_dockerfile_location()
-    build_context_path = dockerfile_path.parent
+    arguments = [
+        docker_command_location,
+        "build",
+    ]
 
-    temporary_dir = tempfile.mkdtemp()
-    requirements_file = os.path.join(temporary_dir, "requirements.txt")
-    sorted_dependencies: list[str] = sorted(specification.dependencies)
-    with open(requirements_file, "w", encoding="utf-8") as file:
-        for dependency in sorted_dependencies:
-            file.write(dependency)
-            file.write("\n")
+    if named_build_contexts:
+        for name, path in named_build_contexts.items():
+            arguments.extend(["--build-context", f"{name}={str(path)}"])
 
-    if not Path(requirements_file).exists:
-        raise RuntimeError("Cannot create temporary requirements.txt file.")
-
-    result = subprocess.run(
+    arguments.extend(
         [
-            docker_command_location,
-            "build",
-            "--build-context",
-            f"temporary_dir={temporary_dir}",
             "--tag",
             image_reference,
             "--file",
             str(dockerfile_path),
             str(build_context_path),
-        ],
+        ]
+    )
+
+    result = subprocess.run(
+        args=arguments,
         capture_output=True,
         text=True,
         check=False,
     )
 
-    shutil.rmtree(temporary_dir)
-
     if result.returncode != 0:
         output = result.stderr.strip() or result.stdout.strip()
         raise RuntimeError(f"Could not build Docker image.\n{output}")
-
-    return True
 
 
 def create_image_reference(
@@ -81,10 +71,3 @@ def create_image_reference(
 ) -> str:
     """Create a Docker image reference from the image name and tag."""
     return f"{image_name}:{image_tag}"
-
-
-def _get_dockerfile_location() -> Path:
-    dockerfile_location = Path(__file__).with_name("dockerfile")
-    if not dockerfile_location.exists():
-        raise RuntimeError("Dockerfile is not available.")
-    return dockerfile_location

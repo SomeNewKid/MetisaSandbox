@@ -17,29 +17,27 @@ def validate_specification(
     specification: MetisaSpecification,
 ) -> None:
     """Validate a Metisa TOML specification."""
-    _validate_capabilities(
-        specification.capabilities
-        )
+    _validate_capabilities(specification.capabilities)
 
     _validate_squid_proxy_specification(
         specification.capabilities,
         specification.squid_proxy,
-        )
+    )
 
     _validate_ha_proxy_specification(
         specification.capabilities,
         specification.haproxy,
-        )
-    
+    )
+
     _validate_mcp_sidecar_specification(
-        specification.capabilities, 
+        specification.capabilities,
         specification.mcp_sidecar,
-        )
+    )
 
     _validate_ollama_sidecar_specification(
-        specification.capabilities, 
+        specification.capabilities,
         specification.ollama_sidecar,
-        )
+    )
 
 
 def _validate_capabilities(
@@ -48,7 +46,7 @@ def _validate_capabilities(
     if Capability.INTERNET in capabilities:
         if Capability.NETWORK not in capabilities:
             raise SpecificationValidationError(
-                "\"internet\" capability requires \"network\" capability."
+                '"internet" capability requires "network" capability.'
             )
         pass
 
@@ -62,11 +60,11 @@ def _validate_squid_proxy_specification(
 
     if Capability.INTERNET not in capabilities:
         raise SpecificationValidationError(
-            "\"[squid_proxy]\" table requires \"internet\" capability."
+            '"[squid_proxy]" table requires "internet" capability.'
         )
     pass
 
-    
+
 def _validate_ha_proxy_specification(
     capabilities: frozenset[Capability],
     haproxy_specification: HaproxySpecification | None,

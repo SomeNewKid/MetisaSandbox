@@ -17,11 +17,11 @@ from .docker.docker_engine import (
     start_docker_desktop,
 )
 from .docker.docker_image import (
-    build_docker_image,
     create_image_reference,
     docker_image_exists,
 )
-from .docker.docker_sandbox import (
+from .metisa_container.metisa_container_image import build_metisa_container_image
+from .sandbox_manager import (
     run_workload_in_sandbox,
 )
 from .terminal.terminal_helper import (
@@ -91,11 +91,7 @@ def _ensure_docker_image(
         return 0
 
     print_info("Building Docker image...")
-    image_built = build_docker_image(specification, image_reference)
-
-    if not image_built:
-        print_error("Failed to build Docker image.")
-        return 1
+    build_metisa_container_image(specification, image_reference)
 
     print_info("Docker image built.")
     return 0

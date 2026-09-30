@@ -65,7 +65,10 @@ def _get_landlock_log_path() -> Path:
     if not output_dir:
         raise RuntimeError(f"{_SANDBOX_OUTPUT_DIR_ENV} is not set.")
 
-    log_dir = Path(output_dir) / ".logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
+    logs_dir = Path(output_dir) / ".logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
 
-    return log_dir / "landlock.txt"
+    metisa_logs_dir = logs_dir / "metisa"
+    metisa_logs_dir.mkdir(parents=True, exist_ok=True)
+
+    return metisa_logs_dir / "landlock.txt"
