@@ -9,7 +9,10 @@ from metisa_common.specification_helper import parse_specification
 def test_squid_proxy_missing_details() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = [
+            "network",
+            "internet",
+        ]
 
         [squid_proxy]
     """
@@ -20,7 +23,10 @@ def test_squid_proxy_missing_details() -> None:
 def test_squid_proxy_with_unknown_key() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = [
+            "network",
+            "internet",
+        ]
 
         [squid_proxy]
         unknown = []
@@ -29,10 +35,43 @@ def test_squid_proxy_with_unknown_key() -> None:
         _ = parse_specification(toml)
 
 
+def test_squid_proxy_invalid_if_internet_capability_but_no_network_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = [
+            "internet",
+        ]
+
+        [squid_proxy]
+        allowed_domains = []
+        allowed_ip_addresses = []
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
+def test_squid_proxy_invalid_if_no_internet_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = [
+            "network",
+        ]
+
+        [squid_proxy]
+        allowed_domains = []
+        allowed_ip_addresses = []
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
 def test_squid_proxy_missing_allowed_domains() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = [
+            "network",
+            "internet",
+        ]
 
         [squid_proxy]
         allowed_ip_addresses = []
@@ -46,7 +85,10 @@ def test_squid_proxy_missing_allowed_domains() -> None:
 def test_squid_proxy_empty_allowed_domains() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = [
+            "network",
+            "internet",
+        ]
 
         [squid_proxy]
         allowed_domains = []
@@ -60,7 +102,10 @@ def test_squid_proxy_empty_allowed_domains() -> None:
 def test_squid_proxy_populated_allowed_domains() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = [
+            "network",
+            "internet",
+        ]
 
         [squid_proxy]
         allowed_domains = [
@@ -78,7 +123,10 @@ def test_squid_proxy_populated_allowed_domains() -> None:
 def test_squid_proxy_invalid_types_in_allowed_domains() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = [
+            "network",
+            "internet",
+        ]
 
         [squid_proxy]
         allowed_domains = [
@@ -92,7 +140,10 @@ def test_squid_proxy_invalid_types_in_allowed_domains() -> None:
 def test_squid_proxy_empty_value_in_allowed_domains() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = [
+            "network",
+            "internet",
+        ]
 
         [squid_proxy]
         allowed_domains = [
@@ -106,7 +157,10 @@ def test_squid_proxy_empty_value_in_allowed_domains() -> None:
 def test_squid_proxy_missing_allowed_ip_addresses() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = [
+            "network",
+            "internet",
+        ]
 
         [squid_proxy]
         allowed_domains = []
@@ -120,7 +174,10 @@ def test_squid_proxy_missing_allowed_ip_addresses() -> None:
 def test_squid_proxy_empty_allowed_ip_addresses() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = [
+            "network",
+            "internet",
+        ]
 
         [squid_proxy]
         allowed_ip_addresses = []
@@ -134,7 +191,10 @@ def test_squid_proxy_empty_allowed_ip_addresses() -> None:
 def test_squid_proxy_populated_allowed_ip_addresses() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = [
+            "network",
+            "internet",
+        ]
 
         [squid_proxy]
         allowed_ip_addresses = [
@@ -151,7 +211,10 @@ def test_squid_proxy_populated_allowed_ip_addresses() -> None:
 def test_squid_proxy_invalid_types_in_allowed_ip_addresses() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = [
+            "network",
+            "internet",
+        ]
 
         [squid_proxy]
         allowed_ip_addresses = [
@@ -165,7 +228,10 @@ def test_squid_proxy_invalid_types_in_allowed_ip_addresses() -> None:
 def test_squid_proxy_empty_value_in_allowed_ip_addresses() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = [
+            "network",
+            "internet",
+        ]
 
         [squid_proxy]
         allowed_ip_addresses = [

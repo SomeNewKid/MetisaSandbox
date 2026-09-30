@@ -12,6 +12,7 @@ class Capability(StrEnum):
 
     INTERACTIVE = "interactive"
     NETWORK = "network"
+    INTERNET = "internet"
     MCP_CLIENT = "mcp_client"
     JINA_READER = "jina_reader"
     CODE_EXECUTION = "code_execution"

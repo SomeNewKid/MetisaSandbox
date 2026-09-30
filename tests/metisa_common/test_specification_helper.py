@@ -195,6 +195,7 @@ def test_unrelated_tables_do_not_change_image_tag() -> None:
         capabilities = [
             "interactive",
             "network",
+            "internet",
         ]
         dependencies = [
             "requests==2.34.2",
@@ -211,6 +212,7 @@ def test_unrelated_tables_do_not_change_image_tag() -> None:
         capabilities = [
             "network",
             "interactive",
+            "internet",
         ]
         dependencies = [
             "urllib3>=2.5.0",

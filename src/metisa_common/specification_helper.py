@@ -18,6 +18,7 @@ from .models import (
     SpecificationValidationError,
     SquidProxySpecification,
 )
+from .specification_validator import validate_specification
 
 _IMAGE_FORMAT_VERSION = 1
 
@@ -134,7 +135,7 @@ def _create_metisa_specification(
     squid_proxy = _get_squid_proxy_specification(toml)
     ollama_sidecar = _get_ollama_sidecar_specification(toml)
     mcp_sidecar = _get_mcp_sidecar_specification(toml)
-    return MetisaSpecification(
+    specification = MetisaSpecification(
         agent_name=agent_name,
         capabilities=capabilities,
         dependencies=dependencies,
@@ -143,6 +144,9 @@ def _create_metisa_specification(
         ollama_sidecar=ollama_sidecar,
         mcp_sidecar=mcp_sidecar,
     )
+
+    validate_specification(specification)
+    return specification
 
 
 def _get_agent_name(

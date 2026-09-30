@@ -40,14 +40,13 @@ def build_docker_image(
 
     temporary_dir = tempfile.mkdtemp()
     requirements_file = os.path.join(temporary_dir, "requirements.txt")
+    sorted_dependencies: list[str] = sorted(specification.dependencies)
     with open(requirements_file, "w", encoding="utf-8") as file:
-        for dependency in specification.dependencies:
+        for dependency in sorted_dependencies:
             file.write(dependency)
             file.write("\n")
 
-    if Path(requirements_file).exists:
-        print("Requirements file", requirements_file)
-    else:
+    if not Path(requirements_file).exists:
         raise RuntimeError("Cannot create temporary requirements.txt file.")
 
     result = subprocess.run(
@@ -55,7 +54,7 @@ def build_docker_image(
             docker_command_location,
             "build",
             "--build-context",
-            f"metisa_requirements={temporary_dir}",
+            f"temporary_dir={temporary_dir}",
             "--tag",
             image_reference,
             "--file",

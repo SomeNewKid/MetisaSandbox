@@ -14,7 +14,7 @@ FROM python:3.12-slim AS builder
 RUN python -m venv /opt/metisa-venv
 
 # Install capability-specific packages before removing `pip`.
-COPY --from=metisa_requirements \
+COPY --from=temporary_dir \
      --chmod=0444 \
      requirements.txt \
      /tmp/requirements.txt
