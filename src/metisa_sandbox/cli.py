@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import sys
 
-from metisa_common.models import MetisaSpecification
 from metisa_common.specification_helper import (
-    get_image_name,
     get_image_tag,
+    get_workload_image_name,
     get_workload_specification_path,
     load_specification,
+)
+from metisa_common.specification_models import (
+    MetisaSpecification,
 )
 
 from .docker.docker_engine import (
@@ -20,9 +22,11 @@ from .docker.docker_image import (
     create_image_reference,
     docker_image_exists,
 )
-from .metisa_container.metisa_container_image import build_metisa_container_image
+from .metisa_container.metisa_container_image import (
+    build_metisa_container_image,
+)
 from .sandbox_manager import (
-    run_workload_in_sandbox,
+    run_metisa_container_workload_in_sandbox,
 )
 from .terminal.terminal_helper import (
     get_first_argument,
@@ -45,16 +49,18 @@ def main(
     specification_path = get_workload_specification_path(workload_module)
     specification = load_specification(specification_path)
 
-    image_name = get_image_name()
+    image_name = get_workload_image_name()
     image_tag = get_image_tag(specification)
     image_reference = create_image_reference(image_name, image_tag)
 
     try:
-        docker_image_exitcode = _ensure_docker_image(specification, image_reference)
+        docker_image_exitcode = _ensure_metisa_container_image(
+            specification, image_reference
+        )
         if docker_image_exitcode != 0:
             return docker_image_exitcode
 
-        docker_workload_exitcode = _run_docker_workload(
+        docker_workload_exitcode = _run_metisa_container_workload(
             specification, image_reference, workload_module
         )
         if docker_workload_exitcode != 0:
@@ -66,7 +72,7 @@ def main(
     return 0
 
 
-def _ensure_docker_image(
+def _ensure_metisa_container_image(
     specification: MetisaSpecification,
     image_reference: str,
 ) -> int:
@@ -86,23 +92,24 @@ def _ensure_docker_image(
             print_warning("Docker Engine not started.")
             return 1
 
+    image_alias = "Docker Metisa workload image"
     if docker_image_exists(image_reference):
-        print_info("Docker image already exists.")
+        print_info(f"{image_alias} already exists.")
         return 0
 
-    print_info("Building Docker image...")
+    print_info(f"Building {image_alias}...")
     build_metisa_container_image(specification, image_reference)
 
-    print_info("Docker image built.")
+    print_info(f"{image_alias} built.")
     return 0
 
 
-def _run_docker_workload(
+def _run_metisa_container_workload(
     specification: MetisaSpecification,
     image_reference: str,
     workload_module: str,
 ) -> int:
-    return_code = run_workload_in_sandbox(
+    return_code = run_metisa_container_workload_in_sandbox(
         specification, image_reference, workload_module
     )
     if return_code == 0:

@@ -7,7 +7,7 @@ import socket
 import stat
 from pathlib import Path
 
-from ..models import ProbeContext, ProbeGroup, ProbeResult
+from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 
 def docker_socket_is_absent(

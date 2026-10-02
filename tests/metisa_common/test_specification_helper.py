@@ -4,8 +4,8 @@ import re
 
 import pytest
 
-from metisa_common.models import SpecificationValidationError
 from metisa_common.specification_helper import get_image_tag, parse_specification
+from metisa_common.specification_models import SpecificationValidationError
 
 
 def test_empty_toml_file() -> None:

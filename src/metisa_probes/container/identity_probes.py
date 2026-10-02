@@ -5,7 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
-from ..models import ProbeContext, ProbeGroup, ProbeResult
+from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 
 def current_user_is_sandbox_user(

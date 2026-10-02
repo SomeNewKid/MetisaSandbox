@@ -17,3 +17,4 @@ class SandboxContext:
 
     host_run_path: Path
     host_output_path: Path
+    host_logs_path: Path

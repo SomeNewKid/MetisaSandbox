@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..models import ProbeContext, ProbeGroup, ProbeResult
+from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 _CAPABILITY_FIELDS = (
     "CapInh",

@@ -7,3 +7,9 @@ capabilities = [
 dependencies = [
     "requests==2.34.2"
 ]
+
+[squid_proxy]
+allowed_domains = [
+  ".example.com"
+]
+allowed_ip_addresses = []

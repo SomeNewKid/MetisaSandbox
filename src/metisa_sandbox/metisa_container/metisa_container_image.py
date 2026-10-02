@@ -7,7 +7,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from metisa_common.models import MetisaSpecification
+from metisa_common.specification_models import MetisaSpecification
 
 from ..docker.docker_image import build_docker_image
 

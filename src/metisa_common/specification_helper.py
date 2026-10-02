@@ -9,7 +9,7 @@ import tomllib
 from importlib.util import find_spec
 from pathlib import Path
 
-from .models import (
+from .specification_models import (
     Capability,
     HaproxySpecification,
     McpSidecarSpecification,
@@ -18,17 +18,21 @@ from .models import (
     SpecificationValidationError,
     SquidProxySpecification,
 )
-from .specification_validator import validate_specification
+from .specification_validator import (
+    validate_specification,
+)
 
 _IMAGE_FORMAT_VERSION = 1
 
 
-def get_image_name() -> str:
-    """Get the name of the Docker image for the Metisa sandbox."""
-    return "metisa-sandbox"
+def get_workload_image_name() -> str:
+    """Get the name of the Docker image for the Metisa workload container."""
+    return "metisa-workload"
 
 
-def get_image_tag(specification: MetisaSpecification) -> str:
+def get_image_tag(
+    specification: MetisaSpecification,
+) -> str:
     """Get a deterministic Docker image tag for the required capabilities."""
     ordered_capabilities = sorted(
         capability.value for capability in specification.capabilities
@@ -42,14 +46,18 @@ def get_image_tag(specification: MetisaSpecification) -> str:
     for value in ordered_dependencies:
         ordered_collections.append(value)
 
+    return generate_image_tag(ordered_collections)
+
+
+def generate_image_tag(collection: list[str]) -> str:
+    """Generate a deterministic Docker image tag for the given collection of strings."""
+    ordered_collections = sorted(collection)
     serialized_collections = json.dumps(
         ordered_collections, ensure_ascii=True, separators=(",", ":")
     )
-
     collections_hash = hashlib.sha256(
         serialized_collections.encode("utf-8")
     ).hexdigest()
-
     return f"{_IMAGE_FORMAT_VERSION}-{collections_hash}"
 
 
@@ -96,7 +104,9 @@ def parse_specification(
     return _create_metisa_specification(toml)
 
 
-def dependency_is_valid(dependency: str) -> bool:
+def dependency_is_valid(
+    dependency: str,
+) -> bool:
     """Validate the TOML dependency value."""
     if not dependency.strip():
         print(f"Dependency '{dependency}' is empty or whitespace.")
@@ -392,7 +402,7 @@ def _get_str_tuple(
         if len(trimmed_value) == 0:
             error = f"{section_name} must use non-whitespace strings."
             raise SpecificationValidationError(error)
-        trimmed_values.append(trimmed_value)
+        trimmed_values.append(item)
 
     return tuple(trimmed_values)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import socket
 
-from ..models import ProbeContext, ProbeGroup, ProbeResult
+from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 _IPV4_LINK_LOCAL_TEST_ADDRESSES = (
     "169.254.0.0",

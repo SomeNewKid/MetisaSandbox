@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from metisa_common.models import Capability, SpecificationValidationError
 from metisa_common.specification_helper import parse_specification
+from metisa_common.specification_models import Capability, SpecificationValidationError
 
 
 def test_not_iterable_capabilities() -> None:

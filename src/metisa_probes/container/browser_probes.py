@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from ..models import ProbeContext, ProbeGroup, ProbeResult
+from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 _DEBUGGING_ARGUMENTS = (
     "--remote-debugging-port",

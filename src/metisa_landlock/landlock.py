@@ -12,7 +12,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from metisa_common.models import MetisaSpecification
+from metisa_common.specification_models import (
+    MetisaSpecification,
+)
 
 
 class _LandlockPermission(StrEnum):
@@ -451,7 +453,9 @@ def _create_permissions(
     return permission_bits
 
 
-def _get_write_file_rights(abi_version: int) -> int:
+def _get_write_file_rights(
+    abi_version: int,
+) -> int:
     write_rights = _BASE_WRITE_FILE_RIGHTS
 
     if abi_version >= 3:
@@ -460,7 +464,9 @@ def _get_write_file_rights(abi_version: int) -> int:
     return write_rights
 
 
-def _get_modify_directory_rights(abi_version: int) -> int:
+def _get_modify_directory_rights(
+    abi_version: int,
+) -> int:
     write_rights = _BASE_MODIFY_DIRECTORY_RIGHTS
 
     if abi_version >= 2:
@@ -469,7 +475,9 @@ def _get_modify_directory_rights(abi_version: int) -> int:
     return write_rights
 
 
-def _get_linux_open_flag(flag_name: str) -> int:
+def _get_linux_open_flag(
+    flag_name: str,
+) -> int:
     flag = getattr(os, flag_name, None)
     if not isinstance(flag, int):
         message = f"Required Linux open flag {flag_name} is unavailable."

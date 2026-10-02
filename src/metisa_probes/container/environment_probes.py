@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from ..models import ProbeContext, ProbeGroup, ProbeResult
+from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 _HOST_CHANNEL_ENVIRONMENT_VARIABLES = (
     "SSH_AUTH_SOCK",

@@ -6,7 +6,7 @@ import os
 import shutil
 from pathlib import Path
 
-from ..models import ProbeContext, ProbeGroup, ProbeResult
+from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 
 def apt_entry_point_is_absent(

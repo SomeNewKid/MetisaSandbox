@@ -7,7 +7,7 @@ import os
 import stat
 from pathlib import Path
 
-from ..models import ProbeContext, ProbeGroup, ProbeResult
+from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 _DENIED_DIRECTORY = Path("/metisa-denied")
 _DENIED_FILE = _DENIED_DIRECTORY / "readable.txt"

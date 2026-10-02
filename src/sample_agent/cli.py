@@ -67,7 +67,9 @@ def _create_run_directory() -> Path:
     return run_directory
 
 
-def _get_title_from_html(html: str) -> str:
+def _get_title_from_html(
+    html: str,
+) -> str:
     tag = "title"
     open_tag = f"<{tag}>"
     close_tag = f"</{tag}>"

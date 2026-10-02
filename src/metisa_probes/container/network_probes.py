@@ -9,9 +9,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from metisa_common.models import Capability
+from metisa_common.specification_models import Capability
 
-from ..models import ProbeContext, ProbeGroup, ProbeResult
+from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 _WORKLOAD_NETWORK_ALIAS = "metisa-workload"
 _DOCKER_DNS_RESOLVER = "127.0.0.11"
@@ -180,6 +180,12 @@ def proxy_configuration_is_absent(
 ) -> ProbeResult:
     """Ensure the workload receives no proxy configuration."""
     probe_name = "container__network__proxy_configuration_is_absent"
+    specification = probe_context.specification
+
+    if Capability.INTERNET in specification.capabilities:
+        message = "Internet access is enabled. Skipping probe."
+        return ProbeResult.success(probe_name, message)
+
     configured_variables = {
         variable_name: variable_value
         for variable_name, variable_value in os.environ.items()
@@ -207,11 +213,45 @@ def proxy_configuration_is_absent(
     return ProbeResult.success(probe_name, message)
 
 
+def proxy_configuration_exists(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure an internet-enabled workload receives proxy configuration."""
+    probe_name = "container__network__proxy_configuration_exists"
+    specification = probe_context.specification
+
+    if Capability.INTERNET not in specification.capabilities:
+        message = "Internet access is not enabled. Skipping probe."
+        return ProbeResult.success(probe_name, message)
+
+    discovered_proxies = urllib.request.getproxies()
+    required_schemes = {"http", "https"}
+    missing_schemes = sorted(required_schemes - discovered_proxies.keys())
+
+    if missing_schemes:
+        schemes = ", ".join(missing_schemes)
+        message = f"Proxy configuration is missing for: {schemes}."
+        return ProbeResult.failure(probe_name, message)
+
+    proxies = ", ".join(
+        f"{scheme}={discovered_proxies[scheme]!r}"
+        for scheme in sorted(required_schemes)
+    )
+    message = f"Python discovered proxy configuration: {proxies}."
+    return ProbeResult.success(probe_name, message)
+
+
 def external_http_is_blocked(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Ensure outbound unsecured HTTP access is unavailable."""
     probe_name = "container__docker__external_http_is_blocked"
+    specification = probe_context.specification
+
+    if Capability.INTERNET in specification.capabilities:
+        message = "Internet access is enabled. Skipping probe."
+        return ProbeResult.success(probe_name, message)
+
     target_url = "http://example.com"
     timeout_seconds = 5
 
@@ -247,11 +287,54 @@ def external_http_is_blocked(
     return ProbeResult.failure(probe_name, message)
 
 
+def external_http_is_allowed(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure an internet-enabled workload can access external HTTP."""
+    probe_name = "container__network__external_http_is_allowed"
+    specification = probe_context.specification
+
+    if Capability.INTERNET not in specification.capabilities:
+        message = "Internet access is not enabled. Skipping probe."
+        return ProbeResult.success(probe_name, message)
+
+    target_url = "http://example.com"
+    timeout_seconds = 5
+    request = urllib.request.Request(target_url, method="GET")
+
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            status_code = response.status
+    except urllib.error.HTTPError as error:
+        message = (
+            f"External HTTP request reached {target_url} "
+            f"and returned HTTP {error.code}."
+        )
+        return ProbeResult.success(probe_name, message)
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        message = (
+            f"External HTTP request to {target_url} failed: "
+            f"{type(error).__name__}: {error}"
+        )
+        return ProbeResult.failure(probe_name, message)
+
+    message = (
+        f"External HTTP request reached {target_url} and returned HTTP {status_code}."
+    )
+    return ProbeResult.success(probe_name, message)
+
+
 def external_https_is_blocked(
     probe_context: ProbeContext,
 ) -> ProbeResult:
     """Ensure outbound HTTPS access is unavailable."""
     probe_name = "container__network__external_https_is_blocked"
+    specification = probe_context.specification
+
+    if Capability.INTERNET in specification.capabilities:
+        message = "Internet access is enabled. Skipping probe."
+        return ProbeResult.success(probe_name, message)
+
     target_url = "https://example.com"
     timeout_seconds = 15
 
@@ -287,6 +370,50 @@ def external_https_is_blocked(
     return ProbeResult.failure(probe_name, message)
 
 
+def external_https_is_allowed(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure an internet-enabled workload can access external HTTPS."""
+    probe_name = "container__network__external_https_is_allowed"
+    specification = probe_context.specification
+
+    if Capability.INTERNET not in specification.capabilities:
+        message = "Internet access is not enabled. Skipping probe."
+        return ProbeResult.success(probe_name, message)
+
+    target_url = "https://example.com"
+    timeout_seconds = 15
+
+    tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    tls_context.check_hostname = False
+    tls_context.verify_mode = ssl.CERT_NONE
+
+    request = urllib.request.Request(target_url, method="GET")
+
+    try:
+        with urllib.request.urlopen(
+            request, timeout=timeout_seconds, context=tls_context
+        ) as response:
+            status_code = response.status
+    except urllib.error.HTTPError as error:
+        message = (
+            f"External HTTPS request reached {target_url} "
+            f"and returned HTTP {error.code}."
+        )
+        return ProbeResult.success(probe_name, message)
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        message = (
+            f"External HTTPS request to {target_url} failed: "
+            f"{type(error).__name__}: {error}"
+        )
+        return ProbeResult.failure(probe_name, message)
+
+    message = (
+        f"External HTTPS request reached {target_url} and returned HTTP {status_code}."
+    )
+    return ProbeResult.success(probe_name, message)
+
+
 def _decode_ipv4_proc_endpoint(encoded_endpoint: str) -> tuple[str, int]:
     encoded_host, encoded_port = encoded_endpoint.split(":", maxsplit=1)
     host_bytes = bytes.fromhex(encoded_host)
@@ -316,7 +443,10 @@ NETWORK_PROBES = ProbeGroup(
         only_loopback_network_interface_exists,
         docker_dns_resolver_is_only_listening_tcp_endpoint,
         proxy_configuration_is_absent,
+        proxy_configuration_exists,
         external_http_is_blocked,
+        external_http_is_allowed,
         external_https_is_blocked,
+        external_https_is_allowed,
     ),
 )

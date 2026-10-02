@@ -12,7 +12,9 @@ from metisa_common.specification_helper import (
     load_specification,
 )
 
-from .landlock import apply_landlock_rules
+from .landlock import (
+    apply_landlock_rules,
+)
 
 _RUNNER_MODULE = "metisa_runner"
 _SANDBOX_OUTPUT_DIR_ENV = "SANDBOX_OUTPUT_DIR"
@@ -46,7 +48,9 @@ def main(
         return 1
 
 
-def _execute_runner(workload_module: str) -> NoReturn:
+def _execute_runner(
+    workload_module: str,
+) -> NoReturn:
     arguments = [
         sys.executable,
         "-I",  # Run the Python interpreter in isolated mode

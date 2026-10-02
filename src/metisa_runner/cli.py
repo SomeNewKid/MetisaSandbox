@@ -25,7 +25,7 @@ def main(
     workload_module = args[0]
     specification_path = get_workload_specification_path(workload_module)
 
-    print("Docker probes starting...", end="\n", flush=True)
+    print("Metisa probes starting...", end="\n", flush=True)
     os.environ["METISA_RUNTIME_ROLE"] = "probes"
     probes_exit_code = _run_probes_module(_PROBES_MODULE, specification_path)
     if probes_exit_code != 0:
@@ -34,6 +34,7 @@ def main(
 
     print("Docker workload starting...", end="\n", flush=True)
     os.environ["METISA_RUNTIME_ROLE"] = "workload"
+    print("Metisa probes finished.", end="\n", flush=True)
 
     try:
         _execute_workload(workload_module)

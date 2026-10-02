@@ -14,8 +14,8 @@ def create_sandbox_context() -> SandboxContext:
     run_identifier, host_run_directory = _create_run_identifier_and_directory()
     private_network_name = f"metisa-private-{run_identifier}"
     egress_network_name = f"metisa-egress-{run_identifier}"
-    output_dir_name = "output"
-    host_output_path = _create_output_directory(host_run_directory, output_dir_name)
+    host_output_path = _create_output_directory(host_run_directory, "output")
+    host_logs_path = _create_logs_directory(host_run_directory, ".logs")
 
     return SandboxContext(
         run_identifier=run_identifier,
@@ -23,6 +23,7 @@ def create_sandbox_context() -> SandboxContext:
         egress_network_name=egress_network_name,
         host_run_path=host_run_directory,
         host_output_path=host_output_path,
+        host_logs_path=host_logs_path,
     )
 
 
@@ -31,10 +32,7 @@ def create_log_file(
     image_reference: str,
 ) -> Path:
     """Create a log file for the sandbox context."""
-    logs_dir = sandbox_context.host_run_path / ".logs"
-    logs_dir.mkdir(parents=True, exist_ok=True)
-
-    metisa_logs_dir = logs_dir / "metisa"
+    metisa_logs_dir = sandbox_context.host_logs_path / "metisa"
     metisa_logs_dir.mkdir(parents=True, exist_ok=True)
 
     log_file = metisa_logs_dir / "docker.txt"
@@ -61,17 +59,28 @@ def append_log_file(
 
 
 def clean_up_run_directory(
-    host_run_directory: Path,
-    output_directory: Path,
+    host_output_directory: Path,
+    host_logs_directory: Path,
 ) -> None:
     """Clean up the run directory, preserving log files."""
-    output_logs_dir = output_directory / ".logs"
+    output_logs_dir = host_output_directory / ".logs"
     if output_logs_dir.exists():
-        run_logs_dir = host_run_directory / ".logs"
-        run_logs_dir.mkdir(parents=True, exist_ok=True)
-        for item in output_logs_dir.iterdir():
-            shutil.move(item, run_logs_dir)
-        output_logs_dir.rmdir()
+        for source_path in output_logs_dir.rglob("*"):
+            if not source_path.is_file():
+                continue
+
+            relative_path = source_path.relative_to(output_logs_dir)
+            destination_path = host_logs_directory / relative_path
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
+
+            if destination_path.exists():
+                raise FileExistsError(
+                    f"Log destination already exists: {destination_path}"
+                )
+
+            shutil.move(source_path, destination_path)
+
+        shutil.rmtree(output_logs_dir)
 
 
 def _create_run_identifier_and_directory() -> tuple[str, Path]:
@@ -105,3 +114,12 @@ def _create_output_directory(
     output_directory = host_run_directory / output_dir_name
     output_directory.mkdir(parents=True, exist_ok=False)
     return output_directory
+
+
+def _create_logs_directory(
+    host_run_directory: Path,
+    logs_dir_name: str,
+) -> Path:
+    logs_directory = host_run_directory / logs_dir_name
+    logs_directory.mkdir(parents=True, exist_ok=False)
+    return logs_directory

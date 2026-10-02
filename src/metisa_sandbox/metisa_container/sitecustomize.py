@@ -125,7 +125,9 @@ def permit_probe_process_spawn() -> Generator[None, None, None]:
         _PROBE_SPAWN_PERMITTED.reset(token)
 
 
-def _terminate_startup(message: str) -> NoReturn:
+def _terminate_startup(
+    message: str,
+) -> NoReturn:
     """Report an invalid runtime configuration and terminal immediately."""
     output = f"Metisa Python startup rejected: {message}\n"
 

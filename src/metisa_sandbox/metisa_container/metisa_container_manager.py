@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from metisa_common.models import Capability, MetisaSpecification
+from metisa_common.specification_models import Capability, MetisaSpecification
 
 from ..sandbox_context import SandboxContext
 from .metisa_container_workspace import LANDLOCK_MODULE_NAME
@@ -22,6 +22,7 @@ def create_docker_run_arguments(
     staged_source_path: Path,
     workload_module: str,
     is_network_required: bool,
+    squid_proxy_url: str | None,
 ) -> list[str]:
     """Create the list of Docker run arguments for the workload container."""
     is_interactive = Capability.INTERACTIVE in specification.capabilities
@@ -90,6 +91,26 @@ def create_docker_run_arguments(
                 "metisa-workload",
             ]
         )
+        if squid_proxy_url is not None:
+            no_proxy_destinations = ",".join(
+                ["localhost", "127.0.0.1", "::1", "metisa-workload", "metisa-squid"]
+            )
+            arguments.extend(
+                [
+                    "--env",
+                    f"HTTP_PROXY={squid_proxy_url}",
+                    "--env",
+                    f"HTTPS_PROXY={squid_proxy_url}",
+                    "--env",
+                    f"NO_PROXY={no_proxy_destinations}",
+                    "--env",
+                    f"http_proxy={squid_proxy_url}",
+                    "--env",
+                    f"https_proxy={squid_proxy_url}",
+                    "--env",
+                    f"no_proxy={no_proxy_destinations}",
+                ]
+            )
     else:
         arguments.extend(
             [

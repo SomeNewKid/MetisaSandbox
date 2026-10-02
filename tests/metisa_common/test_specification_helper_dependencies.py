@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from metisa_common.models import SpecificationValidationError
 from metisa_common.specification_helper import dependency_is_valid, parse_specification
+from metisa_common.specification_models import SpecificationValidationError
 
 
 @pytest.mark.parametrize(

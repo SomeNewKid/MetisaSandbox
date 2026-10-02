@@ -14,7 +14,7 @@ import sysconfig
 import uuid
 from pathlib import Path
 
-from ..models import ProbeContext, ProbeGroup, ProbeResult
+from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 from .probe_helpers import permit_process_spawn
 
 _DENIED_MODULE_NAMES = (

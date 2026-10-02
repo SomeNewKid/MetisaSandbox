@@ -21,7 +21,7 @@ from .kernel.linux_capability_probes import LINUX_CAPABILITY_PROBES
 from .kernel.network_probes import KERNEL_NETWORK_PROBES
 from .kernel.privilege_probes import PRIVILEGE_PROBES
 from .kernel.resource_probes import RESOURCE_PROBES
-from .models import ProbeContext, ProbeGroup, ProbeResult
+from .probe_models import ProbeContext, ProbeGroup, ProbeResult
 from .python.diagnostic_probes import DIAGNOSTIC_PROBES
 from .python.hardware_probes import HARDWARE_PROBES
 from .python.process_probes import PROCESS_PROBES

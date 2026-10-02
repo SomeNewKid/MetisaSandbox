@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from metisa_common.models import SpecificationValidationError
 from metisa_common.specification_helper import parse_specification
+from metisa_common.specification_models import SpecificationValidationError
 
 
 def test_mcp_sidecar_missing_details() -> None:

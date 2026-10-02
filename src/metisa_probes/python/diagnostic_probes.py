@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sysconfig
 
-from ..models import ProbeContext, ProbeGroup, ProbeResult
+from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 
 def purelib_path(probe_context: ProbeContext) -> ProbeResult:

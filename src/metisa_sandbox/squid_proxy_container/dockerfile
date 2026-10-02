@@ -1,1 +1,49 @@
 FROM ubuntu:24.04
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+        --no-install-recommends \
+        ca-certificates \
+        curl \
+        squid \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --chmod=0444 squid.conf /etc/squid/squid.conf
+
+# Install capability-specific packages before removing `pip`.
+COPY --from=temporary_dir \
+     --chmod=0444 \
+     metisa-allow.conf \
+     /etc/squid/metisa-allow.conf
+
+RUN /usr/sbin/squid -k parse -f /etc/squid/squid.conf
+
+EXPOSE 3128
+
+STOPSIGNAL SIGTERM
+
+# -N keeps Squid in the foreground so that it remains the container's main process.
+CMD ["/usr/sbin/squid", "-N", "-f", "/etc/squid/squid.conf"]
+
+HEALTHCHECK \
+    --start-period=30s \
+    --start-interval=1s \
+    --interval=30s \
+    --timeout=2s \
+    --retries=3 \
+    CMD curl \
+        --fail \
+        --silent \
+        --max-time 1 \
+        http://127.0.0.1:3128/squid-internal-mgr/info \
+        > /dev/null \
+        || exit 1
+
+RUN install \
+    --directory \
+    --owner=proxy \
+    --group=proxy \
+    --mode=0755 \
+    /run/squid
+
+USER proxy:proxy
