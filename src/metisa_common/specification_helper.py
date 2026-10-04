@@ -14,7 +14,7 @@ from .specification_models import (
     Capability,
     HaproxyBackend,
     HaproxySpecification,
-    McpSidecarSpecification,
+    McpServerSpecification,
     MetisaSpecification,
     OllamaSidecarSpecification,
     SpecificationValidationError,
@@ -257,7 +257,7 @@ def _create_metisa_specification(
             "squid_proxy",
             "haproxy",
             "ollama_sidecar",
-            "mcp_sidecar",
+            "mcp_server",
         }
     )
 
@@ -271,7 +271,7 @@ def _create_metisa_specification(
     haproxy = _get_haproxy_specfication(toml)
     squid_proxy = _get_squid_proxy_specification(toml)
     ollama_sidecar = _get_ollama_sidecar_specification(toml)
-    mcp_sidecar = _get_mcp_sidecar_specification(toml)
+    mcp_server = _get_mcp_server_specification(toml)
     specification = MetisaSpecification(
         agent_name=agent_name,
         capabilities=capabilities,
@@ -280,7 +280,7 @@ def _create_metisa_specification(
         haproxy=haproxy,
         squid_proxy=squid_proxy,
         ollama_sidecar=ollama_sidecar,
-        mcp_sidecar=mcp_sidecar,
+        mcp_server=mcp_server,
     )
 
     validate_specification(specification)
@@ -523,34 +523,32 @@ def _get_ollama_sidecar_specification(
     return OllamaSidecarSpecification(models=models)
 
 
-def _get_mcp_sidecar_specification(
+def _get_mcp_server_specification(
     toml: dict[str, object],
-) -> McpSidecarSpecification | None:
-    mcp_sidecar = toml.get("mcp_sidecar")
-    if not mcp_sidecar:
+) -> McpServerSpecification | None:
+    mcp_server = toml.get("mcp_server")
+    if not mcp_server:
         return None
 
-    if not isinstance(mcp_sidecar, dict):
+    if not isinstance(mcp_server, dict):
         raise SpecificationValidationError(
-            "TOML specification mcp_sidecar must be a table."
+            "TOML specification mcp_server must be a table."
         )
 
-    MCP_SIDECAR_KEYS = frozenset(
+    MCP_SERVER_KEYS = frozenset(
         {
             "tools",
             "resources",
         }
     )
 
-    _validate_known_keys(mcp_sidecar, "mcp_sidecar", MCP_SIDECAR_KEYS)
+    _validate_known_keys(mcp_server, "mcp_server", MCP_SERVER_KEYS)
 
-    tools = _get_str_tuple(mcp_sidecar.get("tools"), "MCP Sidecar allowed domains")
+    tools = _get_str_tuple(mcp_server.get("tools"), "MCP Server tools")
 
-    resources = _get_str_tuple(
-        mcp_sidecar.get("resources"), "MCP Sidecar allowed IP addresses"
-    )
+    resources = _get_str_tuple(mcp_server.get("resources"), "MCP Server resources")
 
-    return McpSidecarSpecification(tools=tools, resources=resources)
+    return McpServerSpecification(tools=tools, resources=resources)
 
 
 def _validate_known_keys(

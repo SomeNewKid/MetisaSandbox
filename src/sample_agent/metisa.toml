@@ -4,10 +4,12 @@ capabilities = [
     "network",
     "internet",
     "localnet",
+    "mcp_client",
 ]
 dependencies = [
     "requests==2.34.2",
     "pymysql==1.2.3",
+    "mcp==2.3.0",
 ]
 environs = [
     "METISA_PROBE_1=hard-coded value",
@@ -24,4 +26,12 @@ allowed_ip_addresses = []
 [haproxy]
 backends = [
     { listen_port = 3306, host = "host.docker.internal", port = 3306 },
+]
+
+[mcp_server]
+tools = [
+    "say_hello",
+]
+resources = [
+    "hello",
 ]

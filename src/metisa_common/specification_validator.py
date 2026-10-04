@@ -7,7 +7,7 @@ import re
 from .specification_models import (
     Capability,
     HaproxySpecification,
-    McpSidecarSpecification,
+    McpServerSpecification,
     MetisaSpecification,
     OllamaSidecarSpecification,
     SpecificationValidationError,
@@ -31,9 +31,9 @@ def validate_specification(
         specification.haproxy,
     )
 
-    _validate_mcp_sidecar_specification(
+    _validate_mcp_server_specification(
         specification.capabilities,
-        specification.mcp_sidecar,
+        specification.mcp_server,
     )
 
     _validate_ollama_sidecar_specification(
@@ -136,6 +136,12 @@ def _validate_capabilities(
                 '"localnet" capability requires "network" capability.'
             )
 
+    if Capability.MCP_CLIENT in capabilities:
+        if Capability.NETWORK not in capabilities:
+            raise SpecificationValidationError(
+                '"mcp_client" capability requires "network" capability.'
+            )
+
 
 def _validate_squid_proxy_specification(
     capabilities: frozenset[Capability],
@@ -191,12 +197,17 @@ def _validate_haproxy_specification(
         raise SpecificationValidationError(error)
 
 
-def _validate_mcp_sidecar_specification(
+def _validate_mcp_server_specification(
     capabilities: frozenset[Capability],
-    mcp_sidecar_specification: McpSidecarSpecification | None,
+    mcp_server_specification: McpServerSpecification | None,
 ):
-    if mcp_sidecar_specification is None:
+    if mcp_server_specification is None:
         return
+
+    if Capability.MCP_CLIENT not in capabilities:
+        raise SpecificationValidationError(
+            '"[mcp_server]" table requires "mcp_client" capability.'
+        )
 
 
 def _validate_ollama_sidecar_specification(

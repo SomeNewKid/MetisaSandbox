@@ -202,10 +202,7 @@ def get_docker_container_logs(
 def execute_docker_command(
     arguments: Sequence[str],
 ) -> tuple[int, str]:
-    """
-    Run a command inside the named Docker container and 
-    return its exit code and output message.
-    """
+    """Run a command inside the named Docker container."""
     docker_command_location = get_docker_command_location()
 
     command = [

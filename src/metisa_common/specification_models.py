@@ -37,7 +37,7 @@ class MetisaSpecification:
     haproxy: HaproxySpecification | None
     squid_proxy: SquidProxySpecification | None
     ollama_sidecar: OllamaSidecarSpecification | None
-    mcp_sidecar: McpSidecarSpecification | None
+    mcp_server: McpServerSpecification | None
 
 
 @dataclass(frozen=True)
@@ -72,8 +72,8 @@ class OllamaSidecarSpecification:
 
 
 @dataclass(frozen=True)
-class McpSidecarSpecification:
-    """Represents the MCP Sidecar section of the Metisa specification."""
+class McpServerSpecification:
+    """Represents the MCP Server section of the Metisa specification."""
 
     tools: tuple[str, ...]
     resources: tuple[str, ...]

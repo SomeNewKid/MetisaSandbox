@@ -41,6 +41,66 @@ STOPSIGNAL SIGTERM
 # -N keeps Squid in the foreground so that it remains the container's main process.
 CMD ["/usr/sbin/squid", "-N", "-f", "/etc/squid/squid.conf"]
 
+# Remove Ubuntu package-management commands and metadata.
+RUN rm -f \
+       /usr/bin/apt \
+       /usr/bin/apt-get \
+       /usr/bin/dpkg \
+       /usr/bin/dpkg-query \
+    && rm -rf \
+       /var/lib/apt \
+       /var/cache/apt \
+       /var/lib/dpkg \
+       /var/log/apt
+       
+# Remove restricted administrative, namespace, persistence,
+# remote-access, and desktop-automation commands.
+RUN set -eu; \
+    for command in \
+        bash \
+        busctl \
+        dbus-send \
+        findmnt \
+        git \
+        gpg \
+        gpg-connect-agent \
+        gpgconf \
+        journalctl \
+        loginctl \
+        mount \
+        nice \
+        nohup \
+        nsenter \
+        perl \
+        renice \
+        scp \
+        sftp \
+        setsid \
+        ssh \
+        ssh-add \
+        su \
+        systemd-run \
+        systemctl \
+        umount \
+        unshare \
+        service \
+        gdbus \
+        qdbus \
+        wmctrl \
+        xdotool \
+    ; do \
+        for directory in \
+            /bin \
+            /sbin \
+            /usr/bin \
+            /usr/sbin \
+            /usr/local/bin \
+            /usr/local/sbin \
+        ; do \
+            rm -f "${directory}/${command}"; \
+        done; \
+    done
+
 # Healthcheck used by Docker, periodically checking Squid's internal manager endpoint.
 # Read health status from host: docker.exe inspect <container_name>
 HEALTHCHECK \

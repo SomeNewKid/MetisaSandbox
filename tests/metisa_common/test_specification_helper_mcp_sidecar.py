@@ -6,81 +6,116 @@ from metisa_common.specification_helper import parse_specification
 from metisa_common.specification_models import SpecificationValidationError
 
 
-def test_mcp_sidecar_missing_details() -> None:
+def test_missing_mcp_server_table() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
-
-        [mcp_sidecar]
+        capabilities = ["network", "mcp_client"]
     """
     specification = parse_specification(toml)
-    assert specification.mcp_sidecar is None
+    assert specification.mcp_server is None
 
 
-def test_mcp_sidecar_with_unknown_key() -> None:
+def test_mcp_server_missing_details() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = ["network", "mcp_client"]
 
-        [mcp_sidecar]
+        [mcp_server]
+    """
+    specification = parse_specification(toml)
+    assert specification.mcp_server is None
+
+
+def test_mcp_server_invalid_if_no_network_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["mcp_client"]
+
+        [mcp_server]
+        tools=[]        
+        resources = []
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
+def test_mcp_server_invalid_if_no_mcp_client_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["network"]
+
+        [mcp_server]
+        tools=[]        
+        resources = []
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
+def test_mcp_server_with_unknown_key() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["network", "mcp_client"]
+
+        [mcp_server]
         unknown = []
     """
     with pytest.raises(SpecificationValidationError):
         _ = parse_specification(toml)
 
 
-def test_mcp_sidecar_missing_tools() -> None:
+def test_mcp_server_missing_tools() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = ["network", "mcp_client"]
 
-        [mcp_sidecar]
+        [mcp_server]
         resources = []
     """
     specification = parse_specification(toml)
-    assert specification.mcp_sidecar is not None
-    assert len(specification.mcp_sidecar.tools) == 0
-    assert len(specification.mcp_sidecar.resources) == 0
+    assert specification.mcp_server is not None
+    assert len(specification.mcp_server.tools) == 0
+    assert len(specification.mcp_server.resources) == 0
 
 
-def test_mcp_sidecar_empty_tools() -> None:
+def test_mcp_server_empty_tools() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = ["network", "mcp_client"]
 
-        [mcp_sidecar]
+        [mcp_server]
         tools = []
     """
     specification = parse_specification(toml)
-    assert specification.mcp_sidecar is not None
-    assert len(specification.mcp_sidecar.tools) == 0
-    assert len(specification.mcp_sidecar.resources) == 0
+    assert specification.mcp_server is not None
+    assert len(specification.mcp_server.tools) == 0
+    assert len(specification.mcp_server.resources) == 0
 
 
-def test_mcp_sidecar_populated_tools() -> None:
+def test_mcp_server_populated_tools() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = ["network", "mcp_client"]
 
-        [mcp_sidecar]
+        [mcp_server]
         tools = [
             "run_script"
         ]
         resources = []
     """
     specification = parse_specification(toml)
-    assert specification.mcp_sidecar is not None
-    assert len(specification.mcp_sidecar.tools) == 1
-    assert specification.mcp_sidecar.tools[0] == "run_script"
-    assert len(specification.mcp_sidecar.resources) == 0
+    assert specification.mcp_server is not None
+    assert len(specification.mcp_server.tools) == 1
+    assert specification.mcp_server.tools[0] == "run_script"
+    assert len(specification.mcp_server.resources) == 0
 
 
-def test_mcp_sidecar_invalid_types_in_tools() -> None:
+def test_mcp_server_invalid_types_in_tools() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = ["network", "mcp_client"]
 
-        [mcp_sidecar]
+        [mcp_server]
         tools = [
             123
         ]
@@ -89,12 +124,12 @@ def test_mcp_sidecar_invalid_types_in_tools() -> None:
         _ = parse_specification(toml)
 
 
-def test_mcp_sidecar_empty_value_in_tools() -> None:
+def test_mcp_server_empty_value_in_tools() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = ["network", "mcp_client"]
 
-        [mcp_sidecar]
+        [mcp_server]
         tools = [
             ""
         ]
@@ -103,57 +138,57 @@ def test_mcp_sidecar_empty_value_in_tools() -> None:
         _ = parse_specification(toml)
 
 
-def test_mcp_sidecar_missing_resources() -> None:
+def test_mcp_server_missing_resources() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = ["network", "mcp_client"]
 
-        [mcp_sidecar]
+        [mcp_server]
         tools = []
     """
     specification = parse_specification(toml)
-    assert specification.mcp_sidecar is not None
-    assert len(specification.mcp_sidecar.tools) == 0
-    assert len(specification.mcp_sidecar.resources) == 0
+    assert specification.mcp_server is not None
+    assert len(specification.mcp_server.tools) == 0
+    assert len(specification.mcp_server.resources) == 0
 
 
-def test_mcp_sidecar_empty_resources() -> None:
+def test_mcp_server_empty_resources() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = ["network", "mcp_client"]
 
-        [mcp_sidecar]
+        [mcp_server]
         resources = []
     """
     specification = parse_specification(toml)
-    assert specification.mcp_sidecar is not None
-    assert len(specification.mcp_sidecar.tools) == 0
-    assert len(specification.mcp_sidecar.resources) == 0
+    assert specification.mcp_server is not None
+    assert len(specification.mcp_server.tools) == 0
+    assert len(specification.mcp_server.resources) == 0
 
 
-def test_mcp_sidecar_populated_resources() -> None:
+def test_mcp_server_populated_resources() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = ["network", "mcp_client"]
 
-        [mcp_sidecar]
+        [mcp_server]
         resources = [
             "refund_policy"
         ]
     """
     specification = parse_specification(toml)
-    assert specification.mcp_sidecar is not None
-    assert len(specification.mcp_sidecar.tools) == 0
-    assert len(specification.mcp_sidecar.resources) == 1
-    assert specification.mcp_sidecar.resources[0] == "refund_policy"
+    assert specification.mcp_server is not None
+    assert len(specification.mcp_server.tools) == 0
+    assert len(specification.mcp_server.resources) == 1
+    assert specification.mcp_server.resources[0] == "refund_policy"
 
 
-def test_mcp_sidecar_invalid_types_in_resources() -> None:
+def test_mcp_server_invalid_types_in_resources() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = ["network", "mcp_client"]
 
-        [mcp_sidecar]
+        [mcp_server]
         resources = [
             123
         ]
@@ -162,12 +197,12 @@ def test_mcp_sidecar_invalid_types_in_resources() -> None:
         _ = parse_specification(toml)
 
 
-def test_mcp_sidecar_empty_value_in_resources() -> None:
+def test_mcp_server_empty_value_in_resources() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = ["network", "mcp_client"]
 
-        [mcp_sidecar]
+        [mcp_server]
         resources = [
             ""
         ]
@@ -176,12 +211,12 @@ def test_mcp_sidecar_empty_value_in_resources() -> None:
         _ = parse_specification(toml)
 
 
-def test_mcp_sidecar_whitespace_value_in_resources() -> None:
+def test_mcp_server_whitespace_value_in_resources() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = []
+        capabilities = ["network", "mcp_client"]
 
-        [mcp_sidecar]
+        [mcp_server]
         resources = [
             ""
         ]

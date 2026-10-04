@@ -16,11 +16,13 @@ from .docker.docker_container import (
 from .haproxy_sidecar.haproxy_manager import (
     create_haproxy_container,
 )
+from .mcp_server_sidecar.mcp_server_manager import (
+    create_mcp_server_container,
+)
 from .metisa_container.metisa_container_manager import (
     create_docker_run_arguments,
 )
 from .metisa_container.metisa_container_workspace import (
-    clean_up_staged_source,
     create_staged_source_directory,
 )
 from .sandbox_context import (
@@ -42,6 +44,9 @@ from .squid_proxy_sidecar.squid_proxy_manager import (
     create_squid_proxy_container,
     get_squid_proxy_url,
 )
+from .utilities.workspace_helper import (
+    clean_up_staged_source,
+)
 
 
 def run_metisa_container_workload_in_sandbox(
@@ -56,6 +61,7 @@ def run_metisa_container_workload_in_sandbox(
     is_egress_network_required = (
         is_internet_access_required or is_localnet_access_required
     )
+    is_mcp_server_required = Capability.MCP_CLIENT in specification.capabilities
 
     sandbox_context: SandboxContext | None = None
     log_file: Path | None = None
@@ -66,6 +72,7 @@ def run_metisa_container_workload_in_sandbox(
     squid_proxy_container_name: str | None = None
     squid_proxy_url: str | None = None
     haproxy_container_name: str | None = None
+    mcp_server_container_name: str | None = None
 
     if is_internet_access_required:
         squid_proxy_url = get_squid_proxy_url()
@@ -117,6 +124,13 @@ def run_metisa_container_workload_in_sandbox(
                 )
                 print("Created HAProxy container.")
 
+        if is_mcp_server_required:
+            print("Creating MCP Server container.")
+            mcp_server_container_name = create_mcp_server_container(
+                specification, sandbox_context
+            )
+            print("Created MCP Server container.")
+
         is_interactive = Capability.INTERACTIVE in specification.capabilities
 
         return_code = run_docker_container(arguments, interactive=is_interactive)
@@ -136,7 +150,9 @@ def run_metisa_container_workload_in_sandbox(
 
                 if squid_proxy_container_name is not None:
                     _stop_and_remove_squid_proxy_container(
-                        sandbox_context, cleanup_errors, squid_proxy_container_name
+                        sandbox_context,
+                        cleanup_errors,
+                        squid_proxy_container_name,
                     )
 
                 if haproxy_container_name is not None:
@@ -144,6 +160,13 @@ def run_metisa_container_workload_in_sandbox(
                         sandbox_context,
                         cleanup_errors,
                         haproxy_container_name,
+                    )
+
+                if mcp_server_container_name is not None:
+                    _stop_and_remove_mcp_server_container(
+                        sandbox_context,
+                        cleanup_errors,
+                        mcp_server_container_name,
                     )
 
                 if egress_network_created:
@@ -237,6 +260,21 @@ def _stop_and_remove_haproxy_container(
         container_name=haproxy_container_name,
         container_title="HAProxy",
         log_folder="haproxy",
+    )
+
+
+def _stop_and_remove_mcp_server_container(
+    sandbox_context: SandboxContext,
+    cleanup_errors: list[str],
+    mcp_server_container_name: str,
+) -> None:
+
+    _stop_and_remove_container(
+        sandbox_context=sandbox_context,
+        cleanup_errors=cleanup_errors,
+        container_name=mcp_server_container_name,
+        container_title="MCP Server",
+        log_folder="mcp_server",
     )
 
 

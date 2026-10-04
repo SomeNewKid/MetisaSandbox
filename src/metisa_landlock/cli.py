@@ -49,7 +49,6 @@ def main(
         return 1
 
 
-
 def _execute_runner(
     workload_module: str,
 ) -> NoReturn:

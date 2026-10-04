@@ -45,7 +45,10 @@ def create_docker_network(
 
 
 def connect_container_to_docker_network(
-    container_name: str, network_name: str, *, aliases: Sequence[str] = ()
+    container_name: str,
+    network_name: str,
+    *,
+    aliases: Sequence[str] = (),
 ) -> None:
     """Connect the named container to the named Docker network."""
     docker_command_location = get_docker_command_location()

@@ -1,0 +1,160 @@
+# Dockerfile concept: https://docs.docker.com/build/concepts/dockerfile/
+# Dockerfile reference: https://docs.docker.com/reference/dockerfile/
+
+# ---------------------------------------------------------------------------
+
+# This image may end up with installation-only components
+# such as `pip`, compilers, headers, wheels, metadata, and caches
+FROM python:3.12-slim AS builder
+
+# Create the Python virtual environment
+#   /opt is a Linux filesystem convention for optional, 
+#   self-contained software installed outside the 
+#   operating system’s normal package-managed directories.
+RUN python -m venv /opt/metisa-venv
+
+# Install capability-specific packages before removing `pip`.
+COPY --from=temporary_dir \
+     --chmod=0444 \
+     requirements.txt \
+     /tmp/requirements.txt
+
+RUN /opt/metisa-venv/bin/python -m pip install \
+       --disable-pip-version-check \
+       --no-cache-dir \
+       --requirement /tmp/requirements.txt \
+    && /opt/metisa-venv/bin/python -m pip check \
+    && rm -f /tmp/requirements.txt
+
+# Remove installation distributions from the virtual environment.
+RUN /opt/metisa-venv/bin/python -m pip uninstall \
+       --yes \
+       setuptools \
+       wheel \
+    && /opt/metisa-venv/bin/python -m pip uninstall \
+       --yes \
+       pip
+
+# ---------------------------------------------------------------------------
+
+# This image purposely copies only the needed components,
+# omitting installation-only components in the `builder`.
+FROM python:3.12-slim AS runtime
+
+# Copy the Python virtual environment
+COPY --from=builder /opt/metisa-venv /opt/metisa-venv
+
+# Remove installation distributions supplied by base image.
+RUN python -m pip uninstall \
+       --yes \
+       setuptools \
+       wheel \
+    && python -m pip uninstall \
+       --yes \
+       pip
+
+# Remove Debian package-management commands and metadata.
+RUN rm -f \
+       /usr/bin/apt \
+       /usr/bin/apt-get \
+       /usr/bin/dpkg \
+       /usr/bin/dpkg-query \
+    && rm -rf \
+       /var/lib/apt \
+       /var/cache/apt \
+       /var/lib/dpkg \
+       /var/log/apt
+
+# Remove restricted administrative, namespace, persistence,
+# remote-access, and desktop-automation commands.
+RUN set -eu; \
+    for command in \
+        bash \
+        busctl \
+        dbus-send \
+        findmnt \
+        git \
+        gpg \
+        gpg-connect-agent \
+        gpgconf \
+        journalctl \
+        loginctl \
+        mount \
+        nice \
+        nohup \
+        nsenter \
+        perl \
+        renice \
+        scp \
+        sftp \
+        setsid \
+        ssh \
+        ssh-add \
+        su \
+        systemd-run \
+        systemctl \
+        umount \
+        unshare \
+        service \
+        gdbus \
+        qdbus \
+        wmctrl \
+        xdotool \
+    ; do \
+        for directory in \
+            /bin \
+            /sbin \
+            /usr/bin \
+            /usr/sbin \
+            /usr/local/bin \
+            /usr/local/sbin \
+        ; do \
+            rm -f "${directory}/${command}"; \
+        done; \
+    done
+    
+# Remove Python packages 
+RUN --mount=type=bind,source=remove_python_packaging.py,target=/tmp/remove_python_packaging.py,readonly \
+    python /tmp/remove_python_packaging.py
+
+# Copy the metisa-source.pth file into the virtual environment's site-packages directory.
+# Allow for discovery of the Metisa source code within the virtual environment.
+COPY --chmod=0444 metisa-source.pth \
+     /opt/metisa-venv/lib/python3.12/site-packages/metisa-source.pth
+
+# Copy the custom sitecustomize module into the virtual environment,
+# within its site-packages directory.
+# Python runtime discovers it automatically during startup.
+# (This must occur after the trusted build-time operations have finished.)
+COPY --chmod=0444 sitecustomize.py \
+     /opt/metisa-venv/lib/python3.12/site-packages/sitecustomize.py
+
+COPY --chmod=0444 sitecustomize.py \
+     /usr/local/lib/python3.12/site-packages/sitecustomize.py
+
+# Healthcheck used by Docker, periodically checking HAProxy's health endpoint.
+# Read health status from host: docker.exe inspect <container_name>
+HEALTHCHECK \
+    --start-period=10s \
+    --start-interval=1s \
+    --interval=30s \
+    --timeout=2s \
+    --retries=3 \
+    CMD "/opt/metisa-venv/bin/python" \
+        "-I" \
+        "-B" \
+        "-c" \
+        "import http.client, sys; connection = http.client.HTTPConnection('127.0.0.1', 8000, timeout=2); connection.request('GET', '/health'); response = connection.getresponse(); status = response.status; connection.close(); sys.exit(0 if status == 200 else 1)" \
+        || exit 1
+
+# Create non-root sandbox group and user
+RUN groupadd --gid 10001 sandbox \
+    && useradd \
+     --uid 10001 \
+     --gid 10001 \
+     --create-home \
+     --shell /usr/sbin/nologin \
+     sandbox
+
+# Set the default Linux identity for processes executed in the image.
+USER sandbox

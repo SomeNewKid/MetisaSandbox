@@ -31,11 +31,11 @@ _SQUID_PROXY_IMAGE_NAME = "metisa-squid-proxy"
 
 
 def create_squid_proxy_container(
-    metisa_specification: MetisaSpecification,
+    specification: MetisaSpecification,
     sandbox_context: SandboxContext,
 ) -> str:
     """Create the Squid Proxy container and connect it to the Docker networks."""
-    image_name = _ensure_squid_proxy_image_exists(metisa_specification)
+    image_name = _ensure_squid_proxy_image_exists(specification)
     container_name = _create_squid_proxy_container_name(sandbox_context.run_identifier)
 
     arguments = [
@@ -51,6 +51,21 @@ def create_squid_proxy_container(
     arguments.extend(
         [
             "--read-only",
+        ]
+    )
+
+    # Linux control groups, or cgroups, organize processes and
+    # enforce resource accounting and limits such as:
+    # - Memory usage
+    # - CPU allocation
+    # - Process counts
+    # - I/O limits
+    # Docker already places each container into one or more cgroups.
+    # A cgroup namespace controls how much of that cgroup hierarchy a process can see.
+    arguments.extend(
+        [
+            "--cgroupns",
+            "private",
         ]
     )
 
@@ -192,7 +207,7 @@ def _create_squid_proxy_container_name(
 
 
 def _create_squid_proxy_image(
-    metisa_specification: MetisaSpecification,
+    specification: MetisaSpecification,
     image_reference: str,
 ) -> None:
     dockerfile_location = _get_dockerfile_location()
@@ -200,7 +215,7 @@ def _create_squid_proxy_image(
 
     temporary_dir = tempfile.mkdtemp()
     metisa_conf_file = os.path.join(temporary_dir, "metisa-allow.conf")
-    metisa_conf_contents = _create_metisa_allow_conf(metisa_specification)
+    metisa_conf_contents = _create_metisa_allow_conf(specification)
     with open(metisa_conf_file, "w", encoding="utf-8") as file:
         file.write(metisa_conf_contents)
 
