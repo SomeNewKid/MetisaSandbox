@@ -26,7 +26,7 @@ def validate_specification(
         specification.squid_proxy,
     )
 
-    _validate_ha_proxy_specification(
+    _validate_haproxy_specification(
         specification.capabilities,
         specification.haproxy,
     )
@@ -130,6 +130,12 @@ def _validate_capabilities(
                 '"internet" capability requires "network" capability.'
             )
 
+    if Capability.LOCALNET in capabilities:
+        if Capability.NETWORK not in capabilities:
+            raise SpecificationValidationError(
+                '"localnet" capability requires "network" capability.'
+            )
+
 
 def _validate_squid_proxy_specification(
     capabilities: frozenset[Capability],
@@ -146,22 +152,43 @@ def _validate_squid_proxy_specification(
     for value in squid_proxy_specification.allowed_domains:
         if not is_valid_domain_name(value, suffix_domain_ok=True):
             raise SpecificationValidationError(
-                f"[squid_proxy] tabe had invalid allowed domain: {value}"
+                f"[squid_proxy] table had invalid allowed domain: {value}"
             )
 
     for value in squid_proxy_specification.allowed_ip_addresses:
         if not is_valid_ip_address(value):
             raise SpecificationValidationError(
-                f"[squid_proxy] tabe had invalid allowed IP address: {value}"
+                f"[squid_proxy] table had invalid allowed IP address: {value}"
             )
 
 
-def _validate_ha_proxy_specification(
+def _validate_haproxy_specification(
     capabilities: frozenset[Capability],
     haproxy_specification: HaproxySpecification | None,
 ):
     if haproxy_specification is None:
         return
+
+    if Capability.LOCALNET not in capabilities:
+        raise SpecificationValidationError(
+            '"[haproxy]" table requires "localnet" capability.'
+        )
+
+    listen_ports: list[int] = []
+    conflicted_ports: list[int] = []
+    for backend in haproxy_specification.backends:
+        listen_port = backend.listen_port
+        if listen_port in listen_ports:
+            if listen_port not in conflicted_ports:
+                conflicted_ports.append(listen_port)
+        else:
+            listen_ports.append(listen_port)
+
+    if conflicted_ports:
+        plural = "s" if len(conflicted_ports) > 1 else ""
+        csv = ", ".join(str(port) for port in conflicted_ports)
+        error = f"HAProxy backend conflict on port{plural}: {csv}"
+        raise SpecificationValidationError(error)
 
 
 def _validate_mcp_sidecar_specification(
@@ -189,11 +216,19 @@ def _is_valid_domain_name_part(
     length_of_part = len(part)
     if (length_of_part < 1) or (length_of_part > 63):
         return False
-    pattern = (
-        "^[a-zA-Z]"  # start with a letter
-        "[a-zA-Z0-9-]+"  # letters, digits, hypens
-        "[a-zA-Z0-9]$"  # end with a letter or digit
-    )
+    if length_of_part == 1:
+        pattern = "^[a-zA-Z]$"  # must be a letter
+    elif length_of_part == 2:
+        pattern = (
+            "^[a-zA-Z]"  # start with a letter
+            "[a-zA-Z0-9]$"  # end with a letter or digit
+        )
+    else:
+        pattern = (
+            "^[a-zA-Z]"  # start with a letter
+            "[a-zA-Z0-9-]+"  # letters, digits, hypens
+            "[a-zA-Z0-9]$"  # end with a letter or digit
+        )
     return bool(re.match(pattern, part))
 
 

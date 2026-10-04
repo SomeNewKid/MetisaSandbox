@@ -1,0 +1,72 @@
+FROM ubuntu:24.04
+
+# Install needed packages:
+# - ca-certificates for TLS Certificate Authorities
+# - curl for issuing HTTP health check
+# - squid for the Squid Proxy
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+        --no-install-recommends \
+        ca-certificates \
+        curl \
+        squid \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the base Squid configuration from the build context.
+COPY --chmod=0444 squid.conf /etc/squid/squid.conf
+
+# Copy the generated Squid access-control configuration 
+# from the temporary build context.
+COPY --from=temporary_dir \
+     --chmod=0444 \
+     metisa-allow.conf \
+     /etc/squid/metisa-allow.conf
+
+# Verify the squid.conf file (does not start Squid).
+# For an invalid file, returns a non-zero exit code.
+RUN /usr/sbin/squid -k parse -f /etc/squid/squid.conf
+
+# Document port 3128 as the port on which Squid accepts proxy connections.
+# This does not publish the port to the host.
+EXPOSE 3128
+
+# STOPSIGNAL: Ask Docker to send Squid SIGTERM when stopping the container.
+# SIGTERM: request an orderly termination, giving Squid opportunity to 
+#          close connections and flush state.
+# Note that SIGTERM is Docker's default stop signal, 
+# so this line is not really needed.
+STOPSIGNAL SIGTERM
+
+# Start the Squid Proxy process.
+# -N keeps Squid in the foreground so that it remains the container's main process.
+CMD ["/usr/sbin/squid", "-N", "-f", "/etc/squid/squid.conf"]
+
+# Healthcheck used by Docker, periodically checking Squid's internal manager endpoint.
+# Read health status from host: docker.exe inspect <container_name>
+HEALTHCHECK \
+    --start-period=30s \
+    --start-interval=1s \
+    --interval=30s \
+    --timeout=2s \
+    --retries=3 \
+    CMD curl \
+        --fail \
+        --silent \
+        --max-time 1 \
+        http://127.0.0.1:3128/squid-internal-mgr/info \
+        > /dev/null \
+        || exit 1
+
+# Create Squid's runtime directory and grant the proxy user ownership
+# 'install' conveniently performs the equivalent of 
+# 'mkdir', 'chown', and 'chmod' in one command.
+RUN install \
+    --directory \
+    --owner=proxy \
+    --group=proxy \
+    --mode=0755 \
+    /run/squid
+
+# From this point forward, run as the 'proxy' non-root user.
+# The 'proxy' user is automatically created when installing the Squid Proxy package.
+USER proxy:proxy

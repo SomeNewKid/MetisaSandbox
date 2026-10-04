@@ -35,44 +35,154 @@ def create_squid_proxy_container(
     sandbox_context: SandboxContext,
 ) -> str:
     """Create the Squid Proxy container and connect it to the Docker networks."""
-    image_name = ensure_squid_proxy_image_exists(metisa_specification)
+    image_name = _ensure_squid_proxy_image_exists(metisa_specification)
     container_name = _create_squid_proxy_container_name(sandbox_context.run_identifier)
 
     arguments = [
-        "--network",
-        sandbox_context.egress_network_name,
         "--name",
         container_name,
-        image_name,
+        "--network",
+        sandbox_context.egress_network_name,
     ]
+
+    # Mount the container's root filesystem as strictly read-only
+    # Couple with in memory temporary writes (--tmpfs)
+    # or with read-write mounted volumes (-volume /host/path:/volume:rw).
+    arguments.extend(
+        [
+            "--read-only",
+        ]
+    )
+
+    # Mount temporary (in memory) filesystems.
+    arguments.extend(
+        [
+            "--tmpfs",
+            "/tmp:rw,size=16m,nosuid,nodev,noexec",
+        ]
+    )
+
+    # Executing another program cannot grant the process privileges
+    # it did not already have.  It prevents privilege escalation through:
+    # Set-user-ID,
+    # Set-group-ID,
+    # Executables with Linux file capabilities.
+    arguments.extend(
+        [
+            "--security-opt",
+            "no-new-privileges=true",
+        ]
+    )
+
+    # Drop all Linux capabilities for the container.
+    # https://man7.org/linux/man-pages/man7/capabilities.7.html
+    # Docker already excludes more dangerous capabilities such as
+    # SYS_ADMIN, NET_ADMIN, SYS_PTRACE, and SYS_MODULE by default.
+    arguments.extend(["--cap-drop", "ALL"])
+
+    # Without --init, the command supplied after the image
+    # becomes PID 1 inside the container.
+    # PID 1 has special responsibilities on Linux.
+    # In particular, it inherits orphaned descendant processes and
+    # must collect, or “reap,” processes that have exited.
+    # Ordinary applications are not always designed to perform that role correctly.
+    # With --init, Docker inserts its small docker-init process as PID 1.
+    arguments.extend(
+        [
+            "--init",  # correctly reaps exited and orphaned processes.
+            "--pids-limit",  # Bounds how many processes the container may have at once
+            "64",
+        ]
+    )
+
+    # Set CPU limits for the container.
+    arguments.extend(
+        [
+            "--cpus",
+            "1",
+        ]
+    )
+
+    # Set memory limits for the container.
+    arguments.extend(
+        [
+            "--memory",
+            "128m",
+            "--memory-swap",  # no additional swap beyond the memory limit
+            "128m",
+        ]
+    )
+
+    # Set the open file descriptor limits for the container.
+    # A file descriptor is a small non-negative integer that
+    # a Unix process uses as a handle to an open operating-system resource.
+    # Limiting descriptors protects against accidental or hostile resource exhaustion.
+    arguments.extend(
+        [
+            "--ulimit",
+            "nofile=256:256",
+        ]
+    )
+
+    # Set the per-user process limits for the container.
+    arguments.extend(
+        [
+            "--ulimit",
+            "nproc=64:64",
+        ]
+    )
+
+    # Set the file size limits for the container.
+    arguments.extend(
+        [
+            "--ulimit",
+            "fsize=1048576:1048576",
+        ]
+    )
+
+    # Require privileges when binding ports below 1024.
+    arguments.extend(
+        [
+            "--sysctl",
+            "net.ipv4.ip_unprivileged_port_start=1024",
+        ]
+    )
+
+    # The image name must be specified last in the arguments list.
+    arguments.extend(
+        [
+            image_name,
+        ]
+    )
     create_docker_container(arguments)
+
     connect_container_to_docker_network(
         container_name=container_name,
         network_name=sandbox_context.private_network_name,
         aliases=(_SQUID_PROXY_ALIAS,),
     )
+
     start_docker_container(container_name)
     started_successfully = inspect_docker_container(container_name)
     if not started_successfully:
-        raise RuntimeError("Squid Proxy application failed to start.")
+        raise RuntimeError("Squid Proxy sidecar failed to start.")
 
     return container_name
 
 
-def ensure_squid_proxy_image_exists(
+def get_squid_proxy_url() -> str:
+    """Get the URL for the Squid Proxy container."""
+    return f"http://{_SQUID_PROXY_ALIAS}:{_SQUID_PROXY_PORT}"
+
+
+def _ensure_squid_proxy_image_exists(
     specification: MetisaSpecification,
 ) -> str:
-    """Ensure that the Squid Proxy Docker image exists."""
     image_tag = _generate_image_tag(specification)
     image_reference = f"{_SQUID_PROXY_IMAGE_NAME}:{image_tag}"
     if not docker_image_exists(image_reference):
         _create_squid_proxy_image(specification, image_reference)
     return image_reference
-
-
-def get_squid_proxy_url() -> str:
-    """Get the URL of the Squid Proxy."""
-    return f"http://{_SQUID_PROXY_ALIAS}:{_SQUID_PROXY_PORT}"
 
 
 def _create_squid_proxy_container_name(
@@ -160,7 +270,7 @@ def _create_metisa_allow_conf(
         http_access_list.append(f"http_access allow {list_name}")
 
     if specification.squid_proxy.allowed_ip_addresses:
-        joined = " .".join(specification.squid_proxy.allowed_ip_addresses)
+        joined = " ".join(specification.squid_proxy.allowed_ip_addresses)
         list_name = "metisa_allowed_ip_addresses"
         acl_list.append(f"acl {list_name} dst {joined}")
         http_access_list.append(f"http_access allow {list_name}")

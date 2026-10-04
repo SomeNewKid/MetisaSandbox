@@ -199,6 +199,34 @@ def get_docker_container_logs(
     return result.stdout, result.stderr
 
 
+def execute_docker_command(
+    arguments: Sequence[str],
+) -> tuple[int, str]:
+    """
+    Run a command inside the named Docker container and 
+    return its exit code and output message.
+    """
+    docker_command_location = get_docker_command_location()
+
+    command = [
+        docker_command_location,
+        "exec",
+    ]
+
+    for arg in arguments:
+        command.append(arg)
+
+    result = subprocess.run(
+        args=command,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    output = result.stderr.strip() or result.stdout.strip()
+    return result.returncode, output
+
+
 def _run_command(
     command: list[str],
     error_message_prefix: str = "An error occurred",

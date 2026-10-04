@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import tomllib
 from importlib.util import find_spec
@@ -11,6 +12,7 @@ from pathlib import Path
 
 from .specification_models import (
     Capability,
+    HaproxyBackend,
     HaproxySpecification,
     McpSidecarSpecification,
     MetisaSpecification,
@@ -23,6 +25,7 @@ from .specification_validator import (
 )
 
 _IMAGE_FORMAT_VERSION = 1
+_VALID_RESOLVERS = ("host",)
 
 
 def get_workload_image_name() -> str:
@@ -115,6 +118,128 @@ def dependency_is_valid(
     return match is not None
 
 
+# Example in a `metisa.toml` file:
+#   environs = [
+#     "METISA_PROBE_1=hard-coded value",
+#     "METISA_PROBE_2=${host:METISA_PROBE_2}",
+#   ]
+# The latter uses a simple version of the named-resolver pattern
+# https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html
+def environ_is_valid(
+    environ: str,
+) -> bool:
+    """Validate the TOML environ value."""
+    try:
+        _, value = _get_environ_name_value(environ)
+    except ValueError:
+        return False
+
+    if not value.startswith("${"):
+        return True  # hard-coded value
+
+    if not value.endswith("}"):
+        return False  # invalid name-resolver pattern
+
+    resolver_pattern = value[2:-1]
+
+    try:
+        _, resolver_value = _get_environ_resolver_name_value(resolver_pattern)
+    except ValueError:
+        return False
+
+    return resolver_value is not None
+
+
+def get_resolved_environs(
+    specification: MetisaSpecification,
+) -> list[str]:
+    """Resolve all environment variables specified in the Metisa specification."""
+    resolved_list: list[str] = []
+
+    for environ in specification.environs:
+        if not environ_is_valid(environ):
+            raise ValueError(f"Environ is not valid: {environ}")
+        resolved_env = _resolve_environ(environ)
+        resolved_list.append(resolved_env)
+
+    return resolved_list
+
+
+def _resolve_environ(
+    environ: str,
+) -> str:
+    name, value = _get_environ_name_value(environ)
+    if value.startswith("${") and value.endswith("}"):
+        resolver_pattern = value[2:-1]
+        value = _resolve_environ_value(resolver_pattern)
+    return f"{name}={value}"
+
+
+def _get_environ_name_value(
+    environ: str,
+) -> tuple[str, str]:
+    if not environ:
+        raise ValueError("Environ is not valid.")
+    error_message = f"Environ is not valid: '{environ}'"
+
+    name_value = environ.split("=", 1)
+    if len(name_value) != 2:
+        raise ValueError(error_message)
+
+    name = name_value[0]
+    if not name:
+        raise ValueError(error_message)
+
+    value = name_value[1]
+
+    return name, value
+
+
+# Example in a `metisa.toml` file:
+#   environs = [
+#     "METISA_PROBE_2=${host:METISA_PROBE_2}",
+#   ]
+# This uses a simple version of the named-resolver pattern
+# https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html
+def _get_environ_resolver_name_value(
+    resolver_pattern: str,
+) -> tuple[str, str]:
+    if not resolver_pattern:
+        raise ValueError("Environ resolver pattern not valid.")
+    error_message = f"Environ resolver pattern not valid: {resolver_pattern}"
+
+    name_value = resolver_pattern.split(":")
+    if len(name_value) != 2:
+        raise ValueError(error_message)
+
+    name = name_value[0]
+    if name not in _VALID_RESOLVERS:
+        raise ValueError(f"Environ resolver type not supported: {name}")
+
+    value = name_value[1]
+    if not value:
+        raise ValueError(error_message)
+
+    return name, value
+
+
+def _resolve_environ_value(
+    resolver_pattern: str,
+) -> str:
+    name, value = _get_environ_resolver_name_value(resolver_pattern)
+    if name not in _VALID_RESOLVERS:
+        raise ValueError(f"Environ resolver not supported: {name}")
+    if name == "host":
+        return _resolve_environ_host_value(value)
+    raise ValueError(f"Environ resolver not supported: {name}")
+
+
+def _resolve_environ_host_value(
+    name: str,
+) -> str:
+    return os.environ.get(name, "")
+
+
 def _create_metisa_specification(
     toml: dict[str, object],
 ) -> MetisaSpecification:
@@ -123,6 +248,7 @@ def _create_metisa_specification(
             "agent_name",
             "capabilities",
             "dependencies",
+            "environs",
         }
     )
 
@@ -141,6 +267,7 @@ def _create_metisa_specification(
     agent_name = _get_agent_name(toml)
     capabilities = _get_capabilities(toml)
     dependencies = _get_dependencies(toml)
+    environs = _get_environs(toml)
     haproxy = _get_haproxy_specfication(toml)
     squid_proxy = _get_squid_proxy_specification(toml)
     ollama_sidecar = _get_ollama_sidecar_specification(toml)
@@ -149,6 +276,7 @@ def _create_metisa_specification(
         agent_name=agent_name,
         capabilities=capabilities,
         dependencies=dependencies,
+        environs=environs,
         haproxy=haproxy,
         squid_proxy=squid_proxy,
         ollama_sidecar=ollama_sidecar,
@@ -205,7 +333,6 @@ def _get_capabilities(
 def _get_dependencies(
     toml: dict[str, object],
 ) -> frozenset[str]:
-
     raw_dependencies = _get_str_tuple(
         toml.get("dependencies"), "TOML specificiation dependencies"
     )
@@ -227,6 +354,27 @@ def _get_dependencies(
     return frozenset(dependencies)
 
 
+def _get_environs(
+    toml: dict[str, object],
+) -> frozenset[str]:
+    raw_environs = _get_str_tuple(toml.get("environs"), "TOML specification environs")
+
+    environs: set[str] = set()
+
+    for raw_environ in raw_environs:
+        if not isinstance(raw_environ, str):
+            raise SpecificationValidationError(
+                f"TOML specification environ '{raw_environ}' is not supported."
+            )
+        if not environ_is_valid(raw_environ):
+            raise SpecificationValidationError(
+                f"TOML specification environ '{raw_environ}' is not valid."
+            )
+        environs.add(raw_environ)
+
+    return frozenset(environs)
+
+
 def _get_haproxy_specfication(
     toml: dict[str, object],
 ) -> HaproxySpecification | None:
@@ -241,21 +389,78 @@ def _get_haproxy_specfication(
 
     HAPROXY_KEYS = frozenset(
         {
-            "ports",
+            "backends",
         }
     )
 
     _validate_known_keys(haproxy, "haproxy", HAPROXY_KEYS)
 
-    ports = _get_int_tuple(haproxy["ports"], "HAProxy ports")
+    backends: list[HaproxyBackend] = []
 
-    for port in ports:
-        if port < 1:
-            raise SpecificationValidationError(
-                "TOML specification haproxy ports must be positive integers."
-            )
+    raw_backends = haproxy.get("backends", [])
+    if raw_backends is not None:
+        if isinstance(raw_backends, str):
+            raise SpecificationValidationError("HAProxy backends must be an array.")
+        if not isinstance(raw_backends, list):
+            raise SpecificationValidationError("HAProxy backends must be an array.")
 
-    return HaproxySpecification(ports=ports)
+        for raw_backend in raw_backends:
+            if not isinstance(raw_backend, dict):
+                error = "HAProxy backends must be an array of ojects"
+                raise SpecificationValidationError(error)
+
+            backend = _get_haproxy_backend(raw_backend)
+            if backend in backends:
+                error = (
+                    "Duplicate HAProxy backend: "
+                    f"listen_port={backend.listen_port}, "
+                    f"host={backend.host}, "
+                    f"port={backend.port}."
+                )
+                raise SpecificationValidationError(error)
+
+            backends.append(backend)
+
+    return HaproxySpecification(backends=tuple(backends))
+
+
+def _get_haproxy_backend(
+    definition: dict[str, object],
+) -> HaproxyBackend:
+    listen_port = definition.get("listen_port")
+    if not listen_port:
+        error = "HAProxy backend must specify a listen_port."
+        raise SpecificationValidationError(error)
+    if not isinstance(listen_port, int):
+        error = "HAProxy backend must specify an integer listen_port."
+        raise SpecificationValidationError(error)
+    if listen_port < 1:
+        error = "HAProxy backend must specify a positive integer listen_port."
+        raise SpecificationValidationError(error)
+
+    host = definition.get("host")
+    if not host:
+        error = "HAProxy backend must specify a host"
+        raise SpecificationValidationError(error)
+    if not isinstance(host, str):
+        error = "HAProxy backend must specify a string host."
+        raise SpecificationValidationError(error)
+    if not host:
+        error = "HAProxy backend must specify a valid host."
+        raise SpecificationValidationError(error)
+
+    port = definition.get("port")
+    if not port:
+        error = "HAProxy backend must specify a port."
+        raise SpecificationValidationError(error)
+    if not isinstance(port, int):
+        error = "HAProxy backend must specify an integer port."
+        raise SpecificationValidationError(error)
+    if port < 1:
+        error = "HAProxy backend must specify a positive integer port."
+        raise SpecificationValidationError(error)
+
+    return HaproxyBackend(listen_port=listen_port, host=host, port=port)
 
 
 def _get_squid_proxy_specification(
@@ -382,8 +587,12 @@ def _get_str_tuple(
     collection: object | None,
     section_name: str,
 ) -> tuple[str]:
-    if not collection:
+    if collection is None:
         return tuple([])
+
+    if isinstance(collection, str):
+        error = f"{section_name} must be an array."
+        raise SpecificationValidationError(error)
 
     if not isinstance(collection, list):
         error = f"{section_name} must be iterable."

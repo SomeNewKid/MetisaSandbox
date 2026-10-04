@@ -1,0 +1,51 @@
+FROM ubuntu:24.04
+
+# Install needed packages:
+# - curl for issuing HTTP health check
+# - haproxy for the HAProxy
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+        --no-install-recommends \
+        curl \
+        haproxy \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the generated HAProxy configuration file, which defines
+# TCP listeners and fixed backend destinations.
+COPY --from=temporary_dir \
+     --chmod=0444 \
+     haproxy.cfg \
+     /etc/haproxy/haproxy.cfg
+
+# Document port 8404 as the port on which HAProxy exposes its health endpoint.
+# This does not publish the port to the host.
+EXPOSE 8404
+
+# STOPSIGNAL: Ask Docker to send HAProxy SIGTERM when stopping the container.
+# SIGTERM: request a hard stop for HAProxy. (SIGUSR1 for a graceful shutdown.)
+# Note that SIGTERM is Docker's default stop signal, 
+# so this line is not really needed.
+STOPSIGNAL SIGTERM
+
+# -db keeps the HAProxy process in the foreground.
+CMD ["/usr/sbin/haproxy", "-db", "-f", "/etc/haproxy/haproxy.cfg"]
+
+# Healthcheck used by Docker, periodically checking HAProxy's health endpoint.
+# Read health status from host: docker.exe inspect <container_name>
+HEALTHCHECK \
+    --start-period=30s \
+    --start-interval=1s \
+    --interval=30s \
+    --timeout=2s \
+    --retries=3 \
+    CMD curl \
+        --fail \
+        --silent \
+        --max-time 1 \
+        http://127.0.0.1:8404/health \
+        > /dev/null \
+        || exit 1
+
+# Set the container's default runtime user to the 'haproxy' non-root user.
+# The 'haproxy' user is automatically created when installing the HAProxy package.
+USER haproxy:haproxy

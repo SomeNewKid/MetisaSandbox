@@ -31,10 +31,10 @@ def main(
     if probes_exit_code != 0:
         print("Sandbox probes failed.  Workload will not be run.", file=sys.stderr)
         return probes_exit_code
+    print("Metisa probes finished.", end="\n", flush=True)
 
     print("Docker workload starting...", end="\n", flush=True)
     os.environ["METISA_RUNTIME_ROLE"] = "workload"
-    print("Metisa probes finished.", end="\n", flush=True)
 
     try:
         _execute_workload(workload_module)

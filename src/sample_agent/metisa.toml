@@ -3,13 +3,25 @@ capabilities = [
     # "interactive",
     "network",
     "internet",
+    "localnet",
 ]
 dependencies = [
-    "requests==2.34.2"
+    "requests==2.34.2",
+    "pymysql==1.2.3",
+]
+environs = [
+    "METISA_PROBE_1=hard-coded value",
+    "METISA_PROBE_2=${host:METISA_PROBE_2}",
+    "SANDBOX_TESTER_MARIADB_CREDENTIALS=${host:SANDBOX_TESTER_MARIADB_CREDENTIALS}",
 ]
 
 [squid_proxy]
 allowed_domains = [
-  ".example.com"
+  ".example.com",
 ]
 allowed_ip_addresses = []
+
+[haproxy]
+backends = [
+    { listen_port = 3306, host = "host.docker.internal", port = 3306 },
+]

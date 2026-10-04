@@ -13,7 +13,10 @@ from metisa_common.specification_validator import (
     ("value", "suffix_domain_ok"),
     [
         pytest.param("example.com", False, id="registered-domain"),
-        pytest.param("api.example.com", False, id="subdomain"),
+        pytest.param("a.example.com", False, id="one-character subdomain"),
+        pytest.param("ai.example.com", False, id="two-character subdomain"),
+        pytest.param("api.example.com", False, id="three-character subdomain"),
+        pytest.param("apis.example.com", False, id="four-character subdomain"),
         pytest.param("api-service.example.com", False, id="hyphenated-label"),
         pytest.param("api2.example.com", False, id="alphanumeric-label"),
         pytest.param("EXAMPLE.com", False, id="mixed-case"),

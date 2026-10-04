@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import errno
+import ipaddress
 import os
 import socket
 import ssl
@@ -15,6 +17,9 @@ from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 _WORKLOAD_NETWORK_ALIAS = "metisa-workload"
 _DOCKER_DNS_RESOLVER = "127.0.0.11"
+_HAPROXY_NETWORK_ALIAS = "metisa-haproxy"
+_HAPROXY_HEALTH_PORT = 8404
+_TCP_TIMEOUT_SECONDS = 3
 _PROXY_ENVIRONMENT_VARIABLES = frozenset(
     {
         "all_proxy",
@@ -414,6 +419,256 @@ def external_https_is_allowed(
     return ProbeResult.success(probe_name, message)
 
 
+def docker_dns_resolution_works(probe_context: ProbeContext) -> ProbeResult:
+    """Ensure Docker DNS is configured, reachable, and resolves the workload alias."""
+    probe_name = "container__network__docker_dns_resolution_works"
+    if Capability.NETWORK not in probe_context.specification.capabilities:
+        return ProbeResult.success(
+            probe_name, "Networking is disabled. Skipping probe."
+        )
+
+    try:
+        resolver_config = Path("/etc/resolv.conf").read_text(encoding="utf-8")
+        nameservers = [
+            fields[1]
+            for line in resolver_config.splitlines()
+            if len(fields := line.split()) >= 2 and fields[0] == "nameserver"
+        ]
+        if nameservers != [_DOCKER_DNS_RESOLVER]:
+            return ProbeResult.failure(
+                probe_name, "Expected only the Docker DNS resolver."
+            )
+        errors = _tcp_connection_errors(_DOCKER_DNS_RESOLVER, 53)
+        if errors:
+            return ProbeResult.failure(
+                probe_name, "Docker DNS TCP endpoint is unreachable."
+            )
+        addresses = _resolve_network_alias(_WORKLOAD_NETWORK_ALIAS)
+    except (OSError, ValueError) as error:
+        return ProbeResult.failure(
+            probe_name, f"Docker DNS verification failed: {error}"
+        )
+
+    if not addresses:
+        return ProbeResult.failure(
+            probe_name, "Docker DNS returned no workload addresses."
+        )
+    return ProbeResult.success(
+        probe_name, "Docker DNS resolves the workload network alias."
+    )
+
+
+def haproxy_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
+    """Ensure a localnet-enabled workload can resolve the HAProxy alias."""
+    probe_name = "container__network__haproxy_alias_resolves"
+    if Capability.LOCALNET not in probe_context.specification.capabilities:
+        return ProbeResult.success(probe_name, "Localnet is disabled. Skipping probe.")
+    try:
+        addresses = _resolve_network_alias(_HAPROXY_NETWORK_ALIAS)
+    except (OSError, ValueError) as error:
+        return ProbeResult.failure(
+            probe_name, f"HAProxy alias resolution failed: {error}"
+        )
+    if not addresses:
+        return ProbeResult.failure(probe_name, "HAProxy alias returned no addresses.")
+    return ProbeResult.success(
+        probe_name, "HAProxy alias resolves to non-loopback addresses."
+    )
+
+
+def haproxy_alias_is_absent(probe_context: ProbeContext) -> ProbeResult:
+    """Ensure HAProxy has no DNS record when localnet is disabled."""
+    probe_name = "container__network__haproxy_alias_is_absent"
+    capabilities = probe_context.specification.capabilities
+    if Capability.NETWORK not in capabilities or Capability.LOCALNET in capabilities:
+        return ProbeResult.success(
+            probe_name, "HAProxy absence check is inapplicable. Skipping probe."
+        )
+    # Docker DNS availability is checked by the separate DNS probe.
+    try:
+        socket.getaddrinfo(_HAPROXY_NETWORK_ALIAS, None, type=socket.SOCK_STREAM)
+    except socket.gaierror as error:
+        absent_codes = {
+            socket.EAI_NONAME,
+            getattr(socket, "EAI_NODATA", socket.EAI_NONAME),
+        }
+        if error.errno in absent_codes:
+            return ProbeResult.success(probe_name, "HAProxy alias has no DNS record.")
+        return ProbeResult.failure(
+            probe_name, f"HAProxy DNS lookup failed unexpectedly: {error}"
+        )
+    except OSError as error:
+        return ProbeResult.failure(
+            probe_name, f"HAProxy DNS lookup failed unexpectedly: {error}"
+        )
+    return ProbeResult.failure(
+        probe_name, "HAProxy alias resolves although localnet is disabled."
+    )
+
+
+def haproxy_declared_listeners_are_reachable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure every declared HAProxy TCP frontend accepts connections."""
+    probe_name = "container__network__haproxy_declared_listeners_are_reachable"
+    specification = probe_context.specification
+    if Capability.LOCALNET not in specification.capabilities:
+        return ProbeResult.success(probe_name, "Localnet is disabled. Skipping probe.")
+    if specification.haproxy is None:
+        return ProbeResult.failure(probe_name, "HAProxy configuration is missing.")
+    for backend in specification.haproxy.backends:
+        try:
+            errors = _tcp_connection_errors(_HAPROXY_NETWORK_ALIAS, backend.listen_port)
+        except OSError as error:
+            return ProbeResult.failure(
+                probe_name, f"HAProxy listener lookup failed: {error}"
+            )
+        if errors:
+            return ProbeResult.failure(
+                probe_name,
+                f"HAProxy listener {backend.listen_port} is unreachable: {errors}",
+            )
+    # A TCP handshake proves frontend availability, not database availability.
+    return ProbeResult.success(
+        probe_name, "All declared HAProxy TCP listeners accept connections."
+    )
+
+
+def haproxy_undeclared_listener_is_unavailable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure one undeclared HAProxy port refuses connections without scanning."""
+    probe_name = "container__network__haproxy_undeclared_listener_is_unavailable"
+    specification = probe_context.specification
+    if Capability.LOCALNET not in specification.capabilities:
+        return ProbeResult.success(probe_name, "Localnet is disabled. Skipping probe.")
+    if specification.haproxy is None:
+        return ProbeResult.failure(probe_name, "HAProxy configuration is missing.")
+    declared_ports = {backend.listen_port for backend in specification.haproxy.backends}
+    excluded_ports = declared_ports | {_HAPROXY_HEALTH_PORT}
+    port = next(
+        (port for port in range(65535, 0, -1) if port not in excluded_ports), None
+    )
+    if port is None:
+        return ProbeResult.success(
+            probe_name, "No undeclared TCP ports exist. Skipping probe."
+        )
+    return _assert_haproxy_port_refused(probe_name, port)
+
+
+def haproxy_health_endpoint_is_private(probe_context: ProbeContext) -> ProbeResult:
+    """Ensure the loopback-only HAProxy health listener is not workload-accessible."""
+    probe_name = "container__network__haproxy_health_endpoint_is_private"
+    specification = probe_context.specification
+    if Capability.LOCALNET not in specification.capabilities:
+        return ProbeResult.success(probe_name, "Localnet is disabled. Skipping probe.")
+    if specification.haproxy is None:
+        return ProbeResult.failure(probe_name, "HAProxy configuration is missing.")
+    if any(
+        backend.listen_port == _HAPROXY_HEALTH_PORT
+        for backend in specification.haproxy.backends
+    ):
+        return ProbeResult.failure(
+            probe_name, "A backend conflicts with the reserved health port."
+        )
+    return _assert_haproxy_port_refused(probe_name, _HAPROXY_HEALTH_PORT)
+
+
+def workload_has_no_default_route(probe_context: ProbeContext) -> ProbeResult:
+    """Ensure neither IPv4 nor IPv6 provides a usable workload default route."""
+    probe_name = "container__network__workload_has_no_default_route"
+    try:
+        ipv4_routes = Path("/proc/net/route").read_text(encoding="utf-8")
+        ipv6_routes = Path("/proc/net/ipv6_route").read_text(encoding="utf-8")
+        ipv4_lines = ipv4_routes.splitlines()
+        if not ipv4_lines or ipv4_lines[0].split() != [
+            "Iface",
+            "Destination",
+            "Gateway",
+            "Flags",
+            "RefCnt",
+            "Use",
+            "Metric",
+            "Mask",
+            "MTU",
+            "Window",
+            "IRTT",
+        ]:
+            raise ValueError("Missing or malformed IPv4 route table header.")
+        for entry in ipv4_lines[1:]:
+            fields = entry.split()
+            if len(fields) != 11:
+                raise ValueError("Malformed IPv4 route entry.")
+            destination = int(fields[1], 16)
+            mask = int(fields[7], 16)
+            flags = int(fields[3], 16)
+            if destination == 0 and mask == 0 and flags & 1 and not flags & 0x200:
+                return ProbeResult.failure(
+                    probe_name, "A usable IPv4 default route exists."
+                )
+        for entry in ipv6_routes.splitlines():
+            fields = entry.split()
+            if len(fields) != 10:
+                raise ValueError("Malformed IPv6 route entry.")
+            destination = int(fields[0], 16)
+            prefix = int(fields[1], 16)
+            flags = int(fields[8], 16)
+            # Linux lists unreachable default-route sentinels with RTF_REJECT set.
+            if destination == 0 and prefix == 0 and flags & 1 and not flags & 0x200:
+                return ProbeResult.failure(
+                    probe_name, "A usable IPv6 default route exists."
+                )
+    except (OSError, ValueError) as error:
+        return ProbeResult.failure(
+            probe_name, f"Could not inspect workload routes: {error}"
+        )
+    return ProbeResult.success(
+        probe_name, "No usable IPv4 or IPv6 default route exists."
+    )
+
+
+def _resolve_network_alias(alias: str) -> set[str]:
+    address_info = socket.getaddrinfo(alias, None, type=socket.SOCK_STREAM)
+    addresses = {str(address[4][0]) for address in address_info}
+    for address in addresses:
+        parsed_address = ipaddress.ip_address(address)
+        if parsed_address.is_loopback or parsed_address.is_unspecified:
+            raise ValueError(
+                f"Network alias {alias} resolved to a loopback or unspecified address."
+            )
+    return addresses
+
+
+def _tcp_connection_errors(host: str, port: int) -> list[OSError]:
+    address_info = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    if not address_info:
+        raise OSError("No TCP destination addresses were returned.")
+    errors: list[OSError] = []
+    for family, socket_type, protocol, _, address in address_info:
+        try:
+            with socket.socket(family, socket_type, protocol) as connection:
+                connection.settimeout(_TCP_TIMEOUT_SECONDS)
+                connection.connect(address)
+            return []
+        except OSError as error:
+            errors.append(error)
+    return errors
+
+
+def _assert_haproxy_port_refused(probe_name: str, port: int) -> ProbeResult:
+    try:
+        errors = _tcp_connection_errors(_HAPROXY_NETWORK_ALIAS, port)
+    except OSError as error:
+        return ProbeResult.failure(probe_name, f"HAProxy port lookup failed: {error}")
+    if errors and all(error.errno == errno.ECONNREFUSED for error in errors):
+        return ProbeResult.success(
+            probe_name, f"HAProxy port {port} refuses connections."
+        )
+    return ProbeResult.failure(
+        probe_name, f"HAProxy port {port} did not refuse connections: {errors}"
+    )
+
+
 def _decode_ipv4_proc_endpoint(encoded_endpoint: str) -> tuple[str, int]:
     encoded_host, encoded_port = encoded_endpoint.split(":", maxsplit=1)
     host_bytes = bytes.fromhex(encoded_host)
@@ -448,5 +703,12 @@ NETWORK_PROBES = ProbeGroup(
         external_http_is_allowed,
         external_https_is_blocked,
         external_https_is_allowed,
+        docker_dns_resolution_works,
+        haproxy_alias_resolves,
+        haproxy_alias_is_absent,
+        haproxy_declared_listeners_are_reachable,
+        haproxy_undeclared_listener_is_unavailable,
+        haproxy_health_endpoint_is_private,
+        workload_has_no_default_route,
     ),
 )

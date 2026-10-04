@@ -22,16 +22,33 @@ from .sandbox_context import SandboxContext
 # The Squid Proxy is attached to both, making it "dual homed".
 #
 #  private network                   egress network
-#  ┌────────────────────────┐        ┌────────────────────────┐
-#  │ Workload ──> Squid     │        │ Squid     ──> Internet │
-#  │              interface ├────────┤ interface              │
-#  └────────────────────────┘        └────────────────────────┘
+#  ┌────────────────────────┐        ┌─────────────────────────┐
+#  │ Workload ──> Squid     │        │ Squid     ──> Internet  │
+#  │              interface ├────────┤ interface               │
+#  └────────────────────────┘        └─────────────────────────┘
 #
 # 1. The workload resolves `metisa-squid` on its private network.
-# 2. The workload options a TCP connection to Squid on port `3128`.
-# 3, Squid receives the HTTP or HTTPS `CONNECT` request.
+# 2. The workload opens a TCP connection to Squid on port `3128`.
+# 3. Squid receives the HTTP or HTTPS `CONNECT` request.
 # 4. Squid opens a separate outbound connection through its egress-network interface.
 # 5. Squid relays application data between those two connections.
+#
+# -----------------------------------------------------------------------------------
+#
+# When the "LOCALNET" capability is decalred, an egress network is created.
+# The HAProxy is the connection between the two networks.
+# The HAProxy is attached to both, making it "dual homed".
+#
+#  private network                   egress network
+#  ┌────────────────────────┐        ┌─────────────────────────┐
+#  │ Workload ──> HAProxy   │        │ HAProxy   ──> Localnet  │
+#  │              interface ├────────┤ interface     (MariaDB) │
+#  └────────────────────────┘        └─────────────────────────┘
+#
+# 1. The workload resolves `metisa-haproxy` on its private network.
+# 2. The workload opens a TCP connection to HAProxy on a configured listener port.
+# 3. HAProxy opens a separate outbound connection through its egress-network interface.
+# 4. HAProxy relays application data between those two connections.
 #
 # -----------------------------------------------------------------------------------
 

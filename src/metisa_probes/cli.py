@@ -28,6 +28,7 @@ from .python.process_probes import PROCESS_PROBES
 from .python.python_probes import PYTHON_PROBES
 from .python.socket_probes import SOCKET_PROBES
 
+_VERBOSE_OUTPUT = False
 
 def main(
     argv: list[str] | None = None,
@@ -103,7 +104,8 @@ def _run_probe_group(
 
         _write_probe_log_entry(log_path, result)
         status = "PASS" if result.passed else "FAIL"
-        print(f"[{status}] {result.name}: {result.message}")
+        if _VERBOSE_OUTPUT or not result.passed:
+            print(f"[{status}] {result.name}: {result.message}")
 
         if not result.passed:
             success = False

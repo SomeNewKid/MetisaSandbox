@@ -13,10 +13,10 @@ class Capability(StrEnum):
     INTERACTIVE = "interactive"
     NETWORK = "network"
     INTERNET = "internet"
+    LOCALNET = "localnet"
     MCP_CLIENT = "mcp_client"
     JINA_READER = "jina_reader"
     CODE_EXECUTION = "code_execution"
-    HAPROXY = "haproxy"
     OLLAMA = "ollama"
     PLAYWRIGHT_CHROMIUM = "playwright_chromium"
     OPENAI = "openai"
@@ -33,6 +33,7 @@ class MetisaSpecification:
     agent_name: str
     capabilities: frozenset[Capability]
     dependencies: frozenset[str]
+    environs: frozenset[str]
     haproxy: HaproxySpecification | None
     squid_proxy: SquidProxySpecification | None
     ollama_sidecar: OllamaSidecarSpecification | None
@@ -43,7 +44,16 @@ class MetisaSpecification:
 class HaproxySpecification:
     """Represents the HAProxy section of the Metisa specification."""
 
-    ports: tuple[int, ...]
+    backends: tuple[HaproxyBackend, ...]
+
+
+@dataclass(frozen=True)
+class HaproxyBackend:
+    """Represents a backend configuration for HAProxy."""
+
+    listen_port: int
+    host: str
+    port: int
 
 
 @dataclass(frozen=True)

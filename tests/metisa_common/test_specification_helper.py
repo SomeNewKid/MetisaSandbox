@@ -196,6 +196,7 @@ def test_unrelated_tables_do_not_change_image_tag() -> None:
             "interactive",
             "network",
             "internet",
+            "localnet",
         ]
         dependencies = [
             "requests==2.34.2",
@@ -213,6 +214,7 @@ def test_unrelated_tables_do_not_change_image_tag() -> None:
             "network",
             "interactive",
             "internet",
+            "localnet",
         ]
         dependencies = [
             "urllib3>=2.5.0",
@@ -220,8 +222,8 @@ def test_unrelated_tables_do_not_change_image_tag() -> None:
         ]
 
         [haproxy]
-        ports = [
-            3306,
+        backends = [
+            { listen_port = 3306, host = "host.docker.internal", port = 3306 },
         ]
     """
     squid_image_tag = _get_image_tag_from_toml(squid_proxy_toml)

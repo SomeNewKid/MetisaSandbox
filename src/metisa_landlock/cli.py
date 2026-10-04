@@ -40,12 +40,14 @@ def main(
     except Exception as error:
         print(f"Failed to apply Landlock rules: {error}", file=sys.stderr)
         return 1
+    print("Metisa landlock finished.", end="\n", flush=True)
 
     try:
         return _execute_runner(workload_module)
     except OSError as error:
         print(f"Failed to execute runner: {error}", file=sys.stderr)
         return 1
+
 
 
 def _execute_runner(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from metisa_common.specification_helper import get_resolved_environs
 from metisa_common.specification_models import Capability, MetisaSpecification
 
 from ..sandbox_context import SandboxContext
@@ -26,6 +27,8 @@ def create_docker_run_arguments(
 ) -> list[str]:
     """Create the list of Docker run arguments for the workload container."""
     is_interactive = Capability.INTERACTIVE in specification.capabilities
+
+    environs: list[str] = []
 
     # Initialize the list of Docker run arguments.
     arguments = []
@@ -95,19 +98,13 @@ def create_docker_run_arguments(
             no_proxy_destinations = ",".join(
                 ["localhost", "127.0.0.1", "::1", "metisa-workload", "metisa-squid"]
             )
-            arguments.extend(
+            environs.extend(
                 [
-                    "--env",
                     f"HTTP_PROXY={squid_proxy_url}",
-                    "--env",
                     f"HTTPS_PROXY={squid_proxy_url}",
-                    "--env",
                     f"NO_PROXY={no_proxy_destinations}",
-                    "--env",
                     f"http_proxy={squid_proxy_url}",
-                    "--env",
                     f"https_proxy={squid_proxy_url}",
-                    "--env",
                     f"no_proxy={no_proxy_destinations}",
                 ]
             )
@@ -156,11 +153,9 @@ def create_docker_run_arguments(
     )
 
     # Set environment variables for the container.
-    arguments.extend(
+    environs.extend(
         [
-            "--env",
             f"SANDBOX_OUTPUT_DIR={_GUEST_OUTPUT_DIR}",
-            "--env",
             "METISA_RUNTIME_ROLE=landlock",
         ]
     )
@@ -240,6 +235,17 @@ def create_docker_run_arguments(
             "net.ipv4.ip_unprivileged_port_start=1024",
         ]
     )
+
+    specified_environs = get_resolved_environs(specification)
+    environs.extend(specified_environs)
+
+    for environ in environs:
+        arguments.extend(
+            [
+                "--env",
+                environ,
+            ]
+        )
 
     # ---------------- The following switches must be last ----------------
 
