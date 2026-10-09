@@ -6,6 +6,7 @@ import json
 import subprocess
 import time
 from collections.abc import Sequence
+from pathlib import Path
 
 from .docker_engine import get_docker_command_location
 
@@ -56,8 +57,8 @@ def run_docker_container(
 
     process = subprocess.Popen(
         command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        # stdout=subprocess.PIPE,
+        # stderr=subprocess.STDOUT,
         text=True,
         bufsize=0,
     )
@@ -217,11 +218,51 @@ def execute_docker_command(
         args=command,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
 
     output = result.stderr.strip() or result.stdout.strip()
     return result.returncode, output
+
+
+def copy_container_file_to_host_file(
+    container_name: str,
+    container_file: str,
+    host_file: str,
+) -> None:
+    """Copy a file from the container to the host."""
+    docker_command_location = get_docker_command_location()
+
+    Path(host_file).parent.mkdir(parents=True, exist_ok=True)
+
+    command = [
+        docker_command_location,
+        "container",
+        "cp",
+        f"{container_name}:{container_file}",
+        host_file,
+    ]
+
+    _run_command(
+        command, f"Could not copy file '{container_file}' from '{container_name}'"
+    )
+
+
+def copy_container_files_to_host_folder(
+    container_name: str,
+    container_files: list[str],
+    host_folder: str,
+) -> None:
+    """Copy listed files from the container to the host."""
+    for container_file in container_files:
+        filename = container_file.split("/")[-1]
+        if not filename:
+            raise ValueError(f"Container file not valid: {container_file}")
+        copy_container_file_to_host_file(
+            container_name, container_file, str(Path(host_folder) / filename)
+        )
 
 
 def _run_command(
@@ -232,6 +273,8 @@ def _run_command(
         args=command,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
 

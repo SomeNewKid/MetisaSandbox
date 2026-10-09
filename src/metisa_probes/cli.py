@@ -122,8 +122,10 @@ def _get_log_path(
     output_volume = Path(probe_context.output_volume)
     log_directory = output_volume / ".logs"
     log_directory.mkdir(parents=True, exist_ok=True)
+    metisa_log_directory = log_directory / "metisa"
+    metisa_log_directory.mkdir(parents=True, exist_ok=True)
 
-    return log_directory / "metisa_probes.jsonl"
+    return metisa_log_directory / "metisa_probes.jsonl"
 
 
 def _write_probe_log_entry(

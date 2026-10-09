@@ -287,6 +287,8 @@ def scripts_from_writable_locations_cannot_be_started(
                         stdin=subprocess.DEVNULL,
                         capture_output=True,
                         text=True,
+                        encoding="utf-8",
+                        errors="replace",
                         timeout=5,
                         check=False,
                     )

@@ -77,3 +77,4 @@ class McpServerSpecification:
 
     tools: tuple[str, ...]
     resources: tuple[str, ...]
+    environs: frozenset[str]

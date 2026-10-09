@@ -315,7 +315,7 @@ def external_http_is_allowed(
             f"External HTTP request reached {target_url} "
             f"and returned HTTP {error.code}."
         )
-        return ProbeResult.success(probe_name, message)
+        return ProbeResult.failure(probe_name, message)
     except (urllib.error.URLError, TimeoutError, OSError) as error:
         message = (
             f"External HTTP request to {target_url} failed: "
@@ -323,10 +323,58 @@ def external_http_is_allowed(
         )
         return ProbeResult.failure(probe_name, message)
 
+    if not 200 <= status_code <= 209:
+        message = (
+            f"External HTTP request reached {target_url} "
+            f"and returned unexpected HTTP {status_code}."
+        )
+        return ProbeResult.failure(probe_name, message)
+
     message = (
         f"External HTTP request reached {target_url} and returned HTTP {status_code}."
     )
     return ProbeResult.success(probe_name, message)
+
+
+def disallowed_external_http_is_blocked(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure the internet proxy denies HTTP to a disallowed destination."""
+    probe_name = "container__network__disallowed_external_http_is_blocked"
+    specification = probe_context.specification
+
+    if Capability.INTERNET not in specification.capabilities:
+        message = "Internet access is not enabled. Skipping probe."
+        return ProbeResult.success(probe_name, message)
+
+    target_url = "http://example.invalid"
+    timeout_seconds = 5
+    request = urllib.request.Request(target_url, method="GET")
+
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            status_code = response.status
+    except urllib.error.HTTPError as error:
+        if error.code == 403:
+            message = f"External HTTP request to {target_url} was denied by the proxy."
+            return ProbeResult.success(probe_name, message)
+
+        message = (
+            f"External HTTP request to {target_url} returned unexpected "
+            f"HTTP {error.code}."
+        )
+        return ProbeResult.failure(probe_name, message)
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        message = (
+            f"Could not confirm proxy denial for {target_url}: "
+            f"{type(error).__name__}: {error}"
+        )
+        return ProbeResult.failure(probe_name, message)
+
+    message = (
+        f"External HTTP request reached {target_url} and returned HTTP {status_code}."
+    )
+    return ProbeResult.failure(probe_name, message)
 
 
 def external_https_is_blocked(
@@ -405,7 +453,7 @@ def external_https_is_allowed(
             f"External HTTPS request reached {target_url} "
             f"and returned HTTP {error.code}."
         )
-        return ProbeResult.success(probe_name, message)
+        return ProbeResult.failure(probe_name, message)
     except (urllib.error.URLError, TimeoutError, OSError) as error:
         message = (
             f"External HTTPS request to {target_url} failed: "
@@ -413,10 +461,76 @@ def external_https_is_allowed(
         )
         return ProbeResult.failure(probe_name, message)
 
+    if not 200 <= status_code <= 209:
+        message = (
+            f"External HTTPS request reached {target_url} "
+            f"and returned unexpected HTTP {status_code}."
+        )
+        return ProbeResult.failure(probe_name, message)
+
     message = (
         f"External HTTPS request reached {target_url} and returned HTTP {status_code}."
     )
     return ProbeResult.success(probe_name, message)
+
+
+def disallowed_external_https_is_blocked(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure the internet proxy denies HTTPS to a disallowed destination."""
+    probe_name = "container__network__disallowed_external_https_is_blocked"
+    specification = probe_context.specification
+
+    if Capability.INTERNET not in specification.capabilities:
+        message = "Internet access is not enabled. Skipping probe."
+        return ProbeResult.success(probe_name, message)
+
+    target_url = "https://example.invalid"
+    timeout_seconds = 15
+
+    tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    tls_context.check_hostname = False
+    tls_context.verify_mode = ssl.CERT_NONE
+
+    request = urllib.request.Request(target_url, method="GET")
+
+    try:
+        with urllib.request.urlopen(
+            request, timeout=timeout_seconds, context=tls_context
+        ) as response:
+            status_code = response.status
+    except urllib.error.HTTPError as error:
+        if error.code == 403:
+            message = f"External HTTPS request to {target_url} was denied by the proxy."
+            return ProbeResult.success(probe_name, message)
+
+        message = (
+            f"External HTTPS request to {target_url} returned unexpected "
+            f"HTTP {error.code}."
+        )
+        return ProbeResult.failure(probe_name, message)
+    except urllib.error.URLError as error:
+        reason = str(error.reason)
+        if "403" in reason and "Forbidden" in reason:
+            message = f"External HTTPS request to {target_url} was denied by the proxy."
+            return ProbeResult.success(probe_name, message)
+
+        message = (
+            f"Could not confirm proxy denial for {target_url}: "
+            f"{type(error).__name__}: {error}"
+        )
+        return ProbeResult.failure(probe_name, message)
+    except (TimeoutError, OSError) as error:
+        message = (
+            f"Could not confirm proxy denial for {target_url}: "
+            f"{type(error).__name__}: {error}"
+        )
+        return ProbeResult.failure(probe_name, message)
+
+    message = (
+        f"External HTTPS request reached {target_url} and returned HTTP {status_code}."
+    )
+    return ProbeResult.failure(probe_name, message)
 
 
 def docker_dns_resolution_works(probe_context: ProbeContext) -> ProbeResult:
@@ -701,8 +815,10 @@ NETWORK_PROBES = ProbeGroup(
         proxy_configuration_exists,
         external_http_is_blocked,
         external_http_is_allowed,
+        disallowed_external_http_is_blocked,
         external_https_is_blocked,
         external_https_is_allowed,
+        disallowed_external_https_is_blocked,
         docker_dns_resolution_works,
         haproxy_alias_resolves,
         haproxy_alias_is_absent,

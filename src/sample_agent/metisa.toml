@@ -8,13 +8,11 @@ capabilities = [
 ]
 dependencies = [
     "requests==2.34.2",
-    "pymysql==1.2.3",
     "mcp==2.3.0",
 ]
 environs = [
     "METISA_PROBE_1=hard-coded value",
     "METISA_PROBE_2=${host:METISA_PROBE_2}",
-    "SANDBOX_TESTER_MARIADB_CREDENTIALS=${host:SANDBOX_TESTER_MARIADB_CREDENTIALS}",
 ]
 
 [squid_proxy]
@@ -30,8 +28,13 @@ backends = [
 
 [mcp_server]
 tools = [
-    "say_hello",
+    "test_tool_2",
+    "test_tool_3",
+    "get_active_items",
 ]
 resources = [
-    "hello",
+    "test_resource_2",
+]
+environs = [
+    "SANDBOX_TESTER_MARIADB_CREDENTIALS=${host:SANDBOX_TESTER_MARIADB_CREDENTIALS}",
 ]

@@ -11,6 +11,7 @@ class SandboxContext:
     """Contextual information for a Docker sandbox."""
 
     run_identifier: str
+    workload_container_name: str
 
     private_network_name: str
     egress_network_name: str

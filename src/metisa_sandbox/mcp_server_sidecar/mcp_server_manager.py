@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 from pathlib import Path
 
-from metisa_common.specification_helper import generate_image_tag
-from metisa_common.specification_models import MetisaSpecification
+from metisa_common.specification_helper import (
+    generate_image_tag,
+    get_resolved_environs_for_mcp_server,
+)
+from metisa_common.specification_models import (
+    McpServerSpecification,
+    MetisaSpecification,
+)
 
 from ..docker.docker_container import (
     create_docker_container,
@@ -27,20 +34,33 @@ from .mcp_server_workspace import (
 _IMAGE_FORMAT_VERSION = 1
 _MCP_SERVER_IMAGE_NAME = "metisa-mcp-server"
 _MCP_SERVER_NETWORK_ALIAS = "metisa-mcp-server"
+_MCP_SERVER_PORT = 8000
 _GUEST_SOURCE_DIR = "/sandbox-source"
-_GUEST_WORK_DIR = "/sandbox-work"
 _GUEST_PYTHON_VENV = "/opt/metisa-venv"
+_USE_SQUID_PROXY = False
 
 
 def create_mcp_server_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-) -> str:
+    squid_proxy_url: str | None,
+) -> tuple[str, Path]:
     """Create the MCP Server container and connect it to the Docker network."""
+    if specification.mcp_server is None:
+        raise RuntimeError("Metisa specification has no [mcp_server] section.")
+
     image_name = _ensure_mcp_server_image_exists(specification)
     container_name = _create_mcp_server_container_name(sandbox_context.run_identifier)
 
-    staged_source_path = create_staged_source_directory(sandbox_context)    
+    staged_source_path = create_staged_source_directory(sandbox_context)
+
+    metisa_json_file = staged_source_path / "metisa.json"
+    metisa_json = _create_metisa_json(specification.mcp_server)
+    with metisa_json_file.open("w", encoding="utf-8") as file:
+        file.write(metisa_json)
+
+    if not metisa_json_file.exists():
+        raise RuntimeError("Could not create metisa.json file.")
 
     environs: list[str] = []
 
@@ -190,8 +210,6 @@ def create_mcp_server_container(
     arguments.extend(
         [
             "--tmpfs",
-            f"{_GUEST_WORK_DIR}:rw,size=1m,nosuid,nodev,noexec",
-            "--tmpfs",
             "/tmp:rw,size=16m,nosuid,nodev,noexec",
         ]
     )
@@ -202,7 +220,22 @@ def create_mcp_server_container(
             "--workdir",
             _GUEST_SOURCE_DIR,
         ]
-    )    
+    )
+
+    if squid_proxy_url is not None and _USE_SQUID_PROXY:
+        no_proxy_destinations = ",".join(
+            ["localhost", "127.0.0.1", "::1", "metisa-workload", "metisa-squid"]
+        )
+        environs.extend(
+            [
+                f"HTTP_PROXY={squid_proxy_url}",
+                f"HTTPS_PROXY={squid_proxy_url}",
+                f"NO_PROXY={no_proxy_destinations}",
+                f"http_proxy={squid_proxy_url}",
+                f"https_proxy={squid_proxy_url}",
+                f"no_proxy={no_proxy_destinations}",
+            ]
+        )
 
     # Set environment variables for the container.
     environs.extend(
@@ -210,6 +243,9 @@ def create_mcp_server_container(
             "METISA_RUNTIME_ROLE=landlock",
         ]
     )
+
+    specified_environs = get_resolved_environs_for_mcp_server(specification)
+    environs.extend(specified_environs)
 
     for environ in environs:
         arguments.extend(
@@ -238,7 +274,7 @@ def create_mcp_server_container(
             "--host",
             "0.0.0.0",
             "--port",
-            "8000",
+            str(_MCP_SERVER_PORT),
         ]
     )
 
@@ -249,7 +285,7 @@ def create_mcp_server_container(
     if not started_successfully:
         raise RuntimeError("MCP Server sidecar failed to start.")
 
-    return container_name
+    return container_name, staged_source_path
 
 
 def _ensure_mcp_server_image_exists(
@@ -307,3 +343,13 @@ def _generate_image_tag(
     collection.extend(list(specification.mcp_server.resources))
     hash = generate_image_tag(collection)
     return f"{_IMAGE_FORMAT_VERSION}-{hash}"
+
+
+def _create_metisa_json(mcp_specification: McpServerSpecification) -> str:
+    tools = [tool for tool in mcp_specification.tools]
+    resources = [resource for resource in mcp_specification.resources]
+    config = {
+        "tools": tools,
+        "resources": resources,
+    }
+    return json.dumps(config, indent=2)

@@ -223,3 +223,91 @@ def test_mcp_server_whitespace_value_in_resources() -> None:
     """
     with pytest.raises(SpecificationValidationError):
         _ = parse_specification(toml)
+
+
+def test_mcp_server_missing_environs() -> None:
+    """Default omitted MCP environment declarations to an empty collection."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "mcp_client"]
+
+        [mcp_server]
+        tools = []
+        resources = []
+    """
+    specification = parse_specification(toml)
+    assert specification.mcp_server is not None
+    assert specification.mcp_server.environs == frozenset()
+
+
+def test_mcp_server_empty_environs() -> None:
+    """Accept an explicitly empty MCP environment declaration list."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "mcp_client"]
+
+        [mcp_server]
+        tools = []
+        resources = []
+        environs = []
+    """
+    specification = parse_specification(toml)
+    assert specification.mcp_server is not None
+    assert specification.mcp_server.environs == frozenset()
+
+
+def test_mcp_server_valid_environs() -> None:
+    """Preserve MCP literals and host references separately from workload environs."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "mcp_client"]
+        environs = ["WORKLOAD=value"]
+
+        [mcp_server]
+        tools = []
+        resources = []
+        environs = [
+            "LITERAL=hard-coded value",
+            "SECRET=${host:HOST_SECRET}",
+            "EMPTY=",
+            "TOKEN=part1=part2",
+        ]
+    """
+    specification = parse_specification(toml)
+    assert specification.mcp_server is not None
+    assert specification.mcp_server.environs == frozenset(
+        {
+            "LITERAL=hard-coded value",
+            "SECRET=${host:HOST_SECRET}",
+            "EMPTY=",
+            "TOKEN=part1=part2",
+        }
+    )
+    assert specification.environs == frozenset({"WORKLOAD=value"})
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        "123",
+        '""',
+        '"   "',
+        '"NAME"',
+        '"NAME=${vault:secret}"',
+        '"NAME=${host:secret"',
+    ],
+)
+def test_mcp_server_environs_with_invalid_item(item: str) -> None:
+    """Reject a list containing an invalid item among valid declarations."""
+    toml = f"""
+        agent_name = "sample_agent"
+        capabilities = ["network", "mcp_client"]
+
+        [mcp_server]
+        tools = []
+        resources = []
+        environs = ["VALID=value", {item}, "ALSO_VALID=value"]
+    """
+    with pytest.raises(SpecificationValidationError) as error:
+        _ = parse_specification(toml)
+    assert "unknown keys" not in str(error.value)

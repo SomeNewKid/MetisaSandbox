@@ -8,6 +8,7 @@ from pathlib import Path
 from metisa_common.specification_models import Capability, MetisaSpecification
 
 from .docker.docker_container import (
+    copy_container_files_to_host_folder,
     get_docker_container_logs,
     remove_docker_container,
     run_docker_container,
@@ -65,7 +66,7 @@ def run_metisa_container_workload_in_sandbox(
 
     sandbox_context: SandboxContext | None = None
     log_file: Path | None = None
-    staged_source_path: Path | None = None
+    metisa_staged_source: Path | None = None
     private_network_created = False
     egress_network_created = False
     return_code: int | None = None
@@ -73,6 +74,7 @@ def run_metisa_container_workload_in_sandbox(
     squid_proxy_url: str | None = None
     haproxy_container_name: str | None = None
     mcp_server_container_name: str | None = None
+    mcp_server_staged_source: Path | None = None
 
     if is_internet_access_required:
         squid_proxy_url = get_squid_proxy_url()
@@ -82,7 +84,7 @@ def run_metisa_container_workload_in_sandbox(
 
         log_file = create_log_file(sandbox_context, image_reference)
 
-        staged_source_path = create_staged_source_directory(
+        metisa_staged_source = create_staged_source_directory(
             sandbox_context, workload_module
         )
 
@@ -90,7 +92,7 @@ def run_metisa_container_workload_in_sandbox(
             specification,
             sandbox_context,
             image_reference,
-            staged_source_path,
+            metisa_staged_source,
             workload_module,
             is_private_network_required,
             squid_proxy_url,
@@ -126,8 +128,10 @@ def run_metisa_container_workload_in_sandbox(
 
         if is_mcp_server_required:
             print("Creating MCP Server container.")
-            mcp_server_container_name = create_mcp_server_container(
-                specification, sandbox_context
+            mcp_server_container_name, mcp_server_staged_source = (
+                create_mcp_server_container(
+                    specification, sandbox_context, squid_proxy_url
+                )
             )
             print("Created MCP Server container.")
 
@@ -147,6 +151,11 @@ def run_metisa_container_workload_in_sandbox(
             try:
                 print("Cleaning up environment.")
                 cleanup_errors: list[str] = []
+
+                _stop_and_remove_metisa_workload_container(
+                    sandbox_context,
+                    cleanup_errors,
+                )
 
                 if squid_proxy_container_name is not None:
                     _stop_and_remove_squid_proxy_container(
@@ -202,8 +211,11 @@ def run_metisa_container_workload_in_sandbox(
                     sandbox_context.host_logs_path,
                 )
 
-                if staged_source_path is not None:
-                    clean_up_staged_source(staged_source_path)
+                if metisa_staged_source is not None:
+                    clean_up_staged_source(metisa_staged_source)
+
+                if mcp_server_staged_source is not None:
+                    clean_up_staged_source(mcp_server_staged_source)
 
                 if log_file is not None and return_code is not None:
                     append_log_file(log_file, [f"Return code: {return_code}"])
@@ -218,7 +230,9 @@ def _save_container_logs(
 ) -> None:
     if sandbox_context is None:
         return
-    target_log_dir = sandbox_context.host_logs_path / target_dir_name
+    run_logs_path = sandbox_context.host_logs_path
+    run_logs_path.mkdir(parents=True, exist_ok=True)
+    target_log_dir = run_logs_path / target_dir_name
     stdout, stderr = get_docker_container_logs(container_name)
     _save_log_file(target_log_dir / "stdout.txt", stdout)
     _save_log_file(target_log_dir / "stderr.txt", stderr)
@@ -233,19 +247,59 @@ def _save_log_file(
         file.write(content)
 
 
+def _save_files_from_container(
+    sandbox_context: SandboxContext,
+    container_name: str,
+    container_files: list[str],
+    log_folder: str,
+) -> None:
+    run_logs_path = sandbox_context.host_logs_path
+    run_logs_path.mkdir(parents=True, exist_ok=True)
+    target_log_dir = run_logs_path / log_folder
+    target_log_dir.mkdir(parents=True, exist_ok=True)
+    copy_container_files_to_host_folder(
+        container_name,
+        container_files,
+        str(target_log_dir),
+    )
+
+
+def _stop_and_remove_metisa_workload_container(
+    sandbox_context: SandboxContext,
+    cleanup_errors: list[str],
+) -> None:
+    _stop_and_remove_container(
+        sandbox_context=sandbox_context,
+        cleanup_errors=cleanup_errors,
+        container_name=sandbox_context.workload_container_name,
+        container_title="Metisa Workload",
+        log_folder="metisa",
+    )
+
+
 def _stop_and_remove_squid_proxy_container(
     sandbox_context: SandboxContext,
     cleanup_errors: list[str],
     squid_proxy_container_name: str,
 ) -> None:
-
-    _stop_and_remove_container(
-        sandbox_context=sandbox_context,
-        cleanup_errors=cleanup_errors,
-        container_name=squid_proxy_container_name,
-        container_title="Squid Proxy",
-        log_folder="squid_proxy",
-    )
+    log_folder = "squid_proxy"
+    try:
+        _save_files_from_container(
+            sandbox_context,
+            squid_proxy_container_name,
+            ["/etc/squid/squid.conf", "/etc/squid/metisa-allow.conf"],
+            log_folder,
+        )
+    except Exception as error:
+        cleanup_errors.append(f"Could not save Squid Proxy config files: {error}")
+    finally:
+        _stop_and_remove_container(
+            sandbox_context=sandbox_context,
+            cleanup_errors=cleanup_errors,
+            container_name=squid_proxy_container_name,
+            container_title="Squid Proxy",
+            log_folder=log_folder,
+        )
 
 
 def _stop_and_remove_haproxy_container(
@@ -253,14 +307,24 @@ def _stop_and_remove_haproxy_container(
     cleanup_errors: list[str],
     haproxy_container_name: str,
 ) -> None:
-
-    _stop_and_remove_container(
-        sandbox_context=sandbox_context,
-        cleanup_errors=cleanup_errors,
-        container_name=haproxy_container_name,
-        container_title="HAProxy",
-        log_folder="haproxy",
-    )
+    log_folder = "haproxy"
+    try:
+        _save_files_from_container(
+            sandbox_context,
+            haproxy_container_name,
+            ["/etc/haproxy/haproxy.cfg"],
+            log_folder,
+        )
+    except Exception as error:
+        cleanup_errors.append(f"Could not save HAProxy config files: {error}")
+    finally:
+        _stop_and_remove_container(
+            sandbox_context=sandbox_context,
+            cleanup_errors=cleanup_errors,
+            container_name=haproxy_container_name,
+            container_title="HAProxy",
+            log_folder=log_folder,
+        )
 
 
 def _stop_and_remove_mcp_server_container(
@@ -268,14 +332,24 @@ def _stop_and_remove_mcp_server_container(
     cleanup_errors: list[str],
     mcp_server_container_name: str,
 ) -> None:
-
-    _stop_and_remove_container(
-        sandbox_context=sandbox_context,
-        cleanup_errors=cleanup_errors,
-        container_name=mcp_server_container_name,
-        container_title="MCP Server",
-        log_folder="mcp_server",
-    )
+    log_folder = "mcp_server"
+    try:
+        _save_files_from_container(
+            sandbox_context,
+            mcp_server_container_name,
+            ["/sandbox-source/metisa.json"],
+            log_folder,
+        )
+    except Exception as error:
+        cleanup_errors.append(f"Could not save HAProxy config files: {error}")
+    finally:
+        _stop_and_remove_container(
+            sandbox_context=sandbox_context,
+            cleanup_errors=cleanup_errors,
+            container_name=mcp_server_container_name,
+            container_title="MCP Server",
+            log_folder="mcp_server",
+        )
 
 
 def _stop_and_remove_container(
@@ -285,7 +359,6 @@ def _stop_and_remove_container(
     container_title: str,
     log_folder: str,
 ) -> None:
-
     squid_stopped = False
 
     try:

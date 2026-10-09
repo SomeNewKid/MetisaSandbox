@@ -150,13 +150,30 @@ def environ_is_valid(
     return resolver_value is not None
 
 
-def get_resolved_environs(
+def get_resolved_environs_for_metisa(
     specification: MetisaSpecification,
 ) -> list[str]:
-    """Resolve all environment variables specified in the Metisa specification."""
+    """Resolve environment variables specified for the Metisa workload container."""
+    return _get_resolved_environs(specification.environs)
+
+
+def get_resolved_environs_for_mcp_server(
+    specification: MetisaSpecification,
+) -> list[str]:
+    """Resolve environment variables specified for the MCP server workload container."""
+    if not specification.mcp_server:
+        return []
+    if not specification.mcp_server.environs:
+        return []
+    return _get_resolved_environs(specification.mcp_server.environs)
+
+
+def _get_resolved_environs(
+    environs: frozenset[str],
+) -> list[str]:
     resolved_list: list[str] = []
 
-    for environ in specification.environs:
+    for environ in environs:
         if not environ_is_valid(environ):
             raise ValueError(f"Environ is not valid: {environ}")
         resolved_env = _resolve_environ(environ)
@@ -267,7 +284,7 @@ def _create_metisa_specification(
     agent_name = _get_agent_name(toml)
     capabilities = _get_capabilities(toml)
     dependencies = _get_dependencies(toml)
-    environs = _get_environs(toml)
+    environs = _get_environs(toml, "TOML specification environs")
     haproxy = _get_haproxy_specfication(toml)
     squid_proxy = _get_squid_proxy_specification(toml)
     ollama_sidecar = _get_ollama_sidecar_specification(toml)
@@ -356,8 +373,9 @@ def _get_dependencies(
 
 def _get_environs(
     toml: dict[str, object],
+    source: str,
 ) -> frozenset[str]:
-    raw_environs = _get_str_tuple(toml.get("environs"), "TOML specification environs")
+    raw_environs = _get_str_tuple(toml.get("environs"), source)
 
     environs: set[str] = set()
 
@@ -539,6 +557,7 @@ def _get_mcp_server_specification(
         {
             "tools",
             "resources",
+            "environs",
         }
     )
 
@@ -548,7 +567,9 @@ def _get_mcp_server_specification(
 
     resources = _get_str_tuple(mcp_server.get("resources"), "MCP Server resources")
 
-    return McpServerSpecification(tools=tools, resources=resources)
+    environs = _get_environs(mcp_server, "MCP Server environs")
+
+    return McpServerSpecification(tools=tools, resources=resources, environs=environs)
 
 
 def _validate_known_keys(

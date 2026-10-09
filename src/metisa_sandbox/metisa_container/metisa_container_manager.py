@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from metisa_common.specification_helper import get_resolved_environs
+from metisa_common.specification_helper import get_resolved_environs_for_metisa
 from metisa_common.specification_models import Capability, MetisaSpecification
 
 from ..sandbox_context import SandboxContext
@@ -31,14 +31,10 @@ def create_docker_run_arguments(
     environs: list[str] = []
 
     # Initialize the list of Docker run arguments.
-    arguments = []
-
-    # Remove the container after its workload completes
-    arguments.extend(
-        [
-            "--rm",
-        ]
-    )
+    arguments = [
+        "--name",
+        sandbox_context.workload_container_name,
+    ]
 
     # Mount the container's root filesystem as strictly read-only
     # Couple with in memory temporary writes (--tmpfs)
@@ -96,7 +92,14 @@ def create_docker_run_arguments(
         )
         if squid_proxy_url is not None:
             no_proxy_destinations = ",".join(
-                ["localhost", "127.0.0.1", "::1", "metisa-workload", "metisa-squid"]
+                [
+                    "localhost",
+                    "127.0.0.1",
+                    "::1",
+                    "metisa-workload",
+                    "metisa-squid",
+                    "metisa-mcp-server",
+                ]
             )
             environs.extend(
                 [
@@ -236,7 +239,7 @@ def create_docker_run_arguments(
         ]
     )
 
-    specified_environs = get_resolved_environs(specification)
+    specified_environs = get_resolved_environs_for_metisa(specification)
     environs.extend(specified_environs)
 
     for environ in environs:

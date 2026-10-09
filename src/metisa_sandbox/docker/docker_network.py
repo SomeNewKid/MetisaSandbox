@@ -35,6 +35,8 @@ def create_docker_network(
         args=arguments,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
 
@@ -70,7 +72,14 @@ def connect_container_to_docker_network(
         ]
     )
 
-    result = subprocess.run(args=arguments, capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        args=arguments,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
 
     if result.returncode != 0:
         output = result.stderr.strip() or result.stdout.strip()
@@ -98,6 +107,8 @@ def remove_docker_network(
         args=arguments,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
 

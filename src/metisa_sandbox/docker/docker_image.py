@@ -18,6 +18,8 @@ def docker_image_exists(
         [docker_command_location, "image", "inspect", image_reference],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
 
@@ -57,6 +59,8 @@ def build_docker_image(
         args=arguments,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
 

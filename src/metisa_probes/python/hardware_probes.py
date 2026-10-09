@@ -157,6 +157,8 @@ def printer_enumeration_command_is_denied(
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=5,
+            encoding="utf-8",
+            errors="replace",
             check=False,
         )
     except PermissionError:
