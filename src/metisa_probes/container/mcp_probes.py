@@ -20,6 +20,7 @@ _MCP_SERVER_ALIAS = "metisa-mcp-server"
 _MCP_SERVER_PORT = 8000
 _MCP_SERVER_URL = f"http://{_MCP_SERVER_ALIAS}:{_MCP_SERVER_PORT}/mcp"
 _TIMEOUT_SECONDS = 5
+_JINA_READER_TIMEOUT_SECONDS = 75
 
 
 def mcp_server_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
@@ -326,6 +327,43 @@ def test_tool_3_rejects_additional_arguments(
     return _run_mcp_probe(probe_context, probe_name, _operation)
 
 
+def read_content_from_url_returns_expected_content(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify declared Jina Reader fetches the expected example.com text via MCP."""
+    probe_name = "read_content_from_url_returns_expected_content"
+    if Capability.JINA_READER not in probe_context.specification.capabilities:
+        return ProbeResult.success(
+            f"container__mcp__{probe_name}",
+            "Jina Reader is disabled. Skipping probe.",
+        )
+
+    async def _operation(client: Client) -> str | None:
+        from mcp import types
+
+        tool_name = "read_content_from_url"
+        result = await client.call_tool(tool_name, {"url": "https://example.com"})
+        if result.is_error:
+            return f"{tool_name} returned a tool execution error."
+        text = "\n".join(
+            content.text
+            for content in result.content
+            if isinstance(content, types.TextContent)
+        )
+        if not text.strip():
+            return f"{tool_name} did not return non-empty text."
+        if "for use in documentation" not in text:
+            return f"{tool_name} did not return the expected example.com phrase."
+        return None
+
+    return _run_mcp_probe(
+        probe_context,
+        probe_name,
+        _operation,
+        timeout_seconds=_JINA_READER_TIMEOUT_SECONDS,
+    )
+
+
 def test_resource_1_is_available(probe_context: ProbeContext) -> ProbeResult:
     """Verify MCP resource discovery includes test_resource_1."""
     resource_name = "test_resource_1"
@@ -501,6 +539,8 @@ def _run_mcp_probe(
     probe_context: ProbeContext,
     name: str,
     operation: Callable[[Client], Awaitable[str | None]],
+    *,
+    timeout_seconds: float = _TIMEOUT_SECONDS,
 ) -> ProbeResult:
     probe_name = f"container__mcp__{name}"
     if Capability.MCP_CLIENT not in probe_context.specification.capabilities:
@@ -508,7 +548,7 @@ def _run_mcp_probe(
             probe_name, "MCP client is disabled. Skipping probe."
         )
     try:
-        failure = asyncio.run(_execute_operation(operation))
+        failure = asyncio.run(_execute_operation(operation, timeout_seconds))
     except Exception as error:
         traceback_lines = traceback.format_exception(error)
         details = "".join(traceback_lines)
@@ -520,19 +560,20 @@ def _run_mcp_probe(
 
 async def _execute_operation(
     operation: Callable[[Client], Awaitable[str | None]],
+    timeout_seconds: float = _TIMEOUT_SECONDS,
 ) -> str | None:
     import httpx2
     from mcp import Client
     from mcp.client.streamable_http import streamable_http_client
 
-    async with asyncio.timeout(_TIMEOUT_SECONDS):
+    async with asyncio.timeout(timeout_seconds):
         # Private-network calls must bypass the workload's internet proxy settings.
         async with httpx2.AsyncClient(
-            trust_env=False, timeout=_TIMEOUT_SECONDS
+            trust_env=False, timeout=timeout_seconds
         ) as http_client:
             transport = streamable_http_client(_MCP_SERVER_URL, http_client=http_client)
             async with Client(
-                transport, read_timeout_seconds=_TIMEOUT_SECONDS
+                transport, read_timeout_seconds=timeout_seconds
             ) as client:
                 return await operation(client)
 
@@ -558,6 +599,7 @@ MCP_PROBES = ProbeGroup(
         test_tool_3_validates_name,
         test_tool_3_rejects_non_string_name,
         test_tool_3_rejects_additional_arguments,
+        read_content_from_url_returns_expected_content,
         test_resource_1_is_available,
         test_resource_1_returns_expected_greeting,
         test_resource_2_matches_declaration,

@@ -5,6 +5,7 @@ capabilities = [
     "internet",
     "localnet",
     "mcp_client",
+    "jina_reader",
 ]
 dependencies = [
     "requests==2.34.2",
@@ -31,10 +32,17 @@ tools = [
     "test_tool_2",
     "test_tool_3",
     "get_active_items",
+    "get_title_from_url",
+    "read_content_from_url",
 ]
 resources = [
     "test_resource_2",
 ]
 environs = [
     "SANDBOX_TESTER_MARIADB_CREDENTIALS=${host:SANDBOX_TESTER_MARIADB_CREDENTIALS}",
+]
+
+[jina_reader]
+environs = [
+    "JINA_API_KEY=${host:JINA_API_KEY}",
 ]

@@ -5,8 +5,10 @@ from __future__ import annotations
 import importlib
 import json
 import os
+import traceback
 from typing import Annotated, Any, TypedDict
 
+import requests
 from pydantic import Field
 
 _MARIADB_HOST_ENVIRONMENT_VARIABLE = "MARIADB_HOST"
@@ -72,6 +74,63 @@ def get_active_items() -> str:
         return _get_active_items(maria_db_host)
     except Exception as error:
         raise RuntimeError(f"Database connection error: {error}") from error
+
+
+def get_title_from_url(
+    url: Annotated[str, Field(description="The URL endpoint.")],
+) -> str | None:
+    """Return the title of the document at the specified URL."""
+    try:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+        }
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        return _parse_html_title(response.text)
+    except Exception as error:
+        raise RuntimeError(f"Could not get title from URL: {error}") from error
+
+
+def read_content_from_url(
+    url: Annotated[str, Field(description="The URL endpoint.")],
+) -> str | None:
+    """Return plain text from a URL through the Jina Reader sidecar."""
+    reader_endpoint = "http://metisa-jina-reader:8081/"
+    headers = {
+        "Accept": "text/plain",
+        "X-Respond-With": "text",
+        "X-Engine": "browser",
+    }
+    payload = {"url": url}
+
+    try:
+        with requests.Session() as session:
+            print(f"Debug 1: '{url}'")
+            session.trust_env = False
+            response = session.post(
+                reader_endpoint,
+                data=payload,
+                headers=headers,
+                timeout=(5, 60),
+            )
+            print(f"Debug 2: {response.status_code}")
+            response.raise_for_status()
+            print("Debug 3")
+            content = response.text
+            print("Debug 4", str(len(content)))
+        return content
+    except requests.RequestException as error:
+        traceback.print_exception(error)
+        error_message = f"Jina Reader could not read the url: {error}"
+        raise RuntimeError(error_message) from error
+    except Exception as error:
+        traceback.print_exception(error)
+        error_message = f"Jina Reader could not read the url: {error}"
+        raise RuntimeError(error_message) from error
 
 
 def _get_active_items(
@@ -160,3 +219,20 @@ def _normalize_database_row(row: object) -> dict[str, object]:
         return dict(row)
 
     raise RuntimeError("MariaDB query returned an unexpected row shape.")
+
+
+def _parse_html_title(response_text: str | None) -> str:
+    if not response_text:
+        return ""
+    open_tag = "<title"
+    open_tag_start = response_text.find(open_tag)
+    if open_tag_start < 0:
+        return ""
+    open_tag_end = response_text.find(">", open_tag_start)
+    if open_tag_end < 0:
+        return ""
+    close_tag = "</title>"
+    close_tag_start = response_text.find(close_tag, open_tag_end)
+    if close_tag_start < 0:
+        return ""
+    return response_text[open_tag_end + 1 : close_tag_start].strip()

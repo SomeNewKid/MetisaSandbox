@@ -29,6 +29,8 @@ from .resources import (
 )
 from .tools import (
     get_active_items,
+    get_title_from_url,
+    read_content_from_url,
     test_tool_1,
     test_tool_2,
     test_tool_3,
@@ -111,6 +113,8 @@ TOOL_REGISTRY = _create_tool_registry(
         test_tool_2,
         test_tool_3,
         get_active_items,
+        get_title_from_url,
+        read_content_from_url,
     ],
 )
 

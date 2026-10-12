@@ -177,6 +177,12 @@ def create_squid_proxy_container(
         aliases=(_SQUID_PROXY_ALIAS,),
     )
 
+    connect_container_to_docker_network(
+        container_name=container_name,
+        network_name=sandbox_context.backend_network_name,
+        aliases=(_SQUID_PROXY_ALIAS,),
+    )
+
     start_docker_container(container_name)
     started_successfully = inspect_docker_container(container_name)
     if not started_successfully:

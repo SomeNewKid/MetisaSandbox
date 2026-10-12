@@ -44,22 +44,25 @@ def main(
 
     url = "https://example.com"
     try:
-        response = requests.get(url)
-        status_code = response.status_code
-        if status_code == 200:
-            html = response.text
-            if html:
-                title = _get_title_from_html(response.text)
-                if title:
-                    print(f"example.com page title: {title}")
-                else:
-                    print("Could not get example.com page title.")
-            else:
-                print("Received empty response.")
+        url_title, url_error = _get_url_title_directly(url)
+        if url_error:
+            print(f"URL title directly, error: {url_error}")
         else:
-            print(f"Failed to get response.  Status code: {status_code}")
+            print(f"URL title directly: '{url_title}'")
     except Exception as error:
         print("Internet connection exception", error)
+
+    try:
+        url_title = _get_url_title_from_mcp_server(url)
+        print(f"URL title from MCP Server: '{url_title}'")
+    except Exception as error:
+        print("MCP server error:", error)
+
+    try:
+        url_content = _get_url_content_from_mcp_server(url)
+        print(f"URL content from MCP Server: {url_content}")
+    except Exception as error:
+        print("MCP server error:", error)
 
     try:
         active_items = _get_active_items()
@@ -78,6 +81,26 @@ def _create_run_directory() -> Path:
     return run_directory
 
 
+def _get_url_title_directly(
+    url: str,
+) -> tuple[str, str]:
+    title: str = ""
+    error: str = ""
+    response = requests.get(url)
+    status_code = response.status_code
+    if status_code == 200:
+        html = response.text
+        if html:
+            title = _get_title_from_html(response.text)
+            if not title:
+                error = f"Could not get page title from {url}."
+        else:
+            error = "Received empty response."
+    else:
+        error = f"Failed to get response.  Status code: {status_code}"
+    return title, error
+
+
 def _get_title_from_html(
     html: str,
 ) -> str:
@@ -92,6 +115,24 @@ def _get_title_from_html(
 
 
 def _get_active_items() -> str:
+    return _get_mcp_server_tool_result("get_active_items")
+
+
+def _get_url_title_from_mcp_server(
+    url: str,
+) -> str:
+    return _get_mcp_server_tool_result("get_title_from_url", {"url": url})
+
+
+def _get_url_content_from_mcp_server(
+    url: str,
+) -> str:
+    return _get_mcp_server_tool_result("read_content_from_url", {"url": url})
+
+
+def _get_mcp_server_tool_result(
+    tool_name: str, params: dict[str, object] | None = None
+) -> str:
     url = "http://metisa-mcp-server:8000/mcp"
     timeout_seconds = 30
 
@@ -112,7 +153,8 @@ def _get_active_items() -> str:
                     transport,
                     read_timeout_seconds=timeout_seconds,
                 ) as client:
-                    return await client.call_tool("get_active_items", {})
+                    arguments = params or {}
+                    return await client.call_tool(tool_name, arguments)
 
     result = asyncio.run(_call())
 
@@ -122,7 +164,7 @@ def _get_active_items() -> str:
             for content in result.content
             if isinstance(content, types.TextContent)
         )
-        raise RuntimeError(details or "get_active_items failed.")
+        raise RuntimeError(details or f"{tool_name} failed.")
 
     if len(result.content) != 1:
         raise RuntimeError("Expected exactly one tool content block.")
@@ -130,8 +172,6 @@ def _get_active_items() -> str:
     content = result.content[0]
     if not isinstance(content, types.TextContent):
         actual_type = type(content)
-        raise RuntimeError(
-            f"Expected a text result from get_active_items. {actual_type}"
-        )
+        raise RuntimeError(f"Expected a text result from {tool_name}. {actual_type}")
 
     return content.text

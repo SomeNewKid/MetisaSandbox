@@ -7,6 +7,7 @@ import re
 from .specification_models import (
     Capability,
     HaproxySpecification,
+    JinaReaderSpecification,
     McpServerSpecification,
     MetisaSpecification,
     OllamaSidecarSpecification,
@@ -39,6 +40,11 @@ def validate_specification(
     _validate_ollama_sidecar_specification(
         specification.capabilities,
         specification.ollama_sidecar,
+    )
+
+    _validate_jina_reader_specification(
+        specification.capabilities,
+        specification.jina_reader,
     )
 
 
@@ -216,6 +222,19 @@ def _validate_ollama_sidecar_specification(
 ):
     if ollama_sidecar_specification is None:
         return
+
+
+def _validate_jina_reader_specification(
+    capabilities: frozenset[Capability],
+    jina_reader_specification: JinaReaderSpecification | None,
+):
+    if jina_reader_specification is None:
+        return
+
+    if Capability.MCP_CLIENT not in capabilities:
+        raise SpecificationValidationError(
+            '"[jina_reader]" table requires "mcp_client" capability.'
+        )
 
 
 def _is_valid_domain_name_part(

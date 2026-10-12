@@ -1,0 +1,28 @@
+FROM ghcr.io/jina-ai/reader:oss
+
+HEALTHCHECK --interval=60s --timeout=65s --start-period=60s --retries=3 \
+    CMD node -e "\
+    (async () => { \
+        const response = await fetch('http://127.0.0.1:8081/', { \
+            method: 'POST', \
+            headers: { \
+                'Content-Type': 'application/x-www-form-urlencoded', \
+                'Accept': 'text/plain', \
+                'X-Respond-With': 'text', \
+                'X-Engine': 'browser', \
+                'X-No-Cache': 'true' \
+            }, \
+            body: 'url=https%3A%2F%2Fexample.com%2F', \
+            signal: AbortSignal.timeout(55000) \
+        }); \
+        if (!response.ok) { \
+            throw new Error('Jina returned HTTP ' + response.status); \
+        } \
+        const text = await response.text(); \
+        if (!text.includes('for use in documentation')) { \
+            throw new Error('Expected page content was not returned'); \
+        } \
+    })().then(() => process.exit(0)).catch(error => { \
+        console.error(error.message); \
+        process.exit(1); \
+    });"

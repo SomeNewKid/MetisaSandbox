@@ -38,6 +38,7 @@ class MetisaSpecification:
     squid_proxy: SquidProxySpecification | None
     ollama_sidecar: OllamaSidecarSpecification | None
     mcp_server: McpServerSpecification | None
+    jina_reader: JinaReaderSpecification | None
 
 
 @dataclass(frozen=True)
@@ -77,4 +78,11 @@ class McpServerSpecification:
 
     tools: tuple[str, ...]
     resources: tuple[str, ...]
+    environs: frozenset[str]
+
+
+@dataclass(frozen=True)
+class JinaReaderSpecification:
+    """Represents the Jina Reader section of the Metisa specification."""
+
     environs: frozenset[str]

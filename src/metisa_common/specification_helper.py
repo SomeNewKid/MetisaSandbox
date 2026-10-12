@@ -14,6 +14,7 @@ from .specification_models import (
     Capability,
     HaproxyBackend,
     HaproxySpecification,
+    JinaReaderSpecification,
     McpServerSpecification,
     MetisaSpecification,
     OllamaSidecarSpecification,
@@ -168,6 +169,17 @@ def get_resolved_environs_for_mcp_server(
     return _get_resolved_environs(specification.mcp_server.environs)
 
 
+def get_resolved_environs_for_jina_reader(
+    specification: MetisaSpecification,
+) -> list[str]:
+    """Resolve environment variables specified for the MCP server workload container."""
+    if not specification.jina_reader:
+        return []
+    if not specification.jina_reader.environs:
+        return []
+    return _get_resolved_environs(specification.jina_reader.environs)
+
+
 def _get_resolved_environs(
     environs: frozenset[str],
 ) -> list[str]:
@@ -275,6 +287,7 @@ def _create_metisa_specification(
             "haproxy",
             "ollama_sidecar",
             "mcp_server",
+            "jina_reader",
         }
     )
 
@@ -289,6 +302,7 @@ def _create_metisa_specification(
     squid_proxy = _get_squid_proxy_specification(toml)
     ollama_sidecar = _get_ollama_sidecar_specification(toml)
     mcp_server = _get_mcp_server_specification(toml)
+    jina_reader = _get_jina_reader_specification(toml)
     specification = MetisaSpecification(
         agent_name=agent_name,
         capabilities=capabilities,
@@ -298,6 +312,7 @@ def _create_metisa_specification(
         squid_proxy=squid_proxy,
         ollama_sidecar=ollama_sidecar,
         mcp_server=mcp_server,
+        jina_reader=jina_reader,
     )
 
     validate_specification(specification)
@@ -570,6 +585,31 @@ def _get_mcp_server_specification(
     environs = _get_environs(mcp_server, "MCP Server environs")
 
     return McpServerSpecification(tools=tools, resources=resources, environs=environs)
+
+
+def _get_jina_reader_specification(
+    toml: dict[str, object],
+) -> JinaReaderSpecification | None:
+    jina_reader = toml.get("jina_reader")
+    if not jina_reader:
+        return None
+
+    if not isinstance(jina_reader, dict):
+        raise SpecificationValidationError(
+            "TOML specification jina_reader must be a table."
+        )
+
+    JINA_READER_KEYS = frozenset(
+        {
+            "environs",
+        }
+    )
+
+    _validate_known_keys(jina_reader, "jina_reader", JINA_READER_KEYS)
+
+    environs = _get_environs(jina_reader, "MCP Server environs")
+
+    return JinaReaderSpecification(environs=environs)
 
 
 def _validate_known_keys(

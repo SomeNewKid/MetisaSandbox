@@ -20,6 +20,9 @@ from .docker.docker_network import (
 from .haproxy_sidecar.haproxy_manager import (
     create_haproxy_container,
 )
+from .jina_reader_sidecar.jina_reader_manager import (
+    create_jina_reader_container,
+)
 from .mcp_server_sidecar.mcp_server_manager import (
     create_mcp_server_container,
 )
@@ -69,6 +72,7 @@ def run_metisa_container_workload_in_sandbox(
     )
     is_mcp_server_required = Capability.MCP_CLIENT in specification.capabilities
     is_backend_network_required = is_localnet_access_required and is_mcp_server_required
+    is_jina_reader_required = Capability.JINA_READER in specification.capabilities
 
     sandbox_context: SandboxContext | None = None
     log_file: Path | None = None
@@ -83,6 +87,7 @@ def run_metisa_container_workload_in_sandbox(
     mcp_server_container_name: str | None = None
     mcp_server_staged_source: Path | None = None
     mcp_server_ip_address: str | None = None
+    jina_reader_container_name: str | None = None
 
     if is_internet_access_required:
         squid_proxy_url = get_squid_proxy_url()
@@ -114,6 +119,12 @@ def run_metisa_container_workload_in_sandbox(
             workload_network_created = True
             print("Created private workload network.")
 
+        if is_backend_network_required:
+            print("Creating private backend network.")
+            create_docker_backend_network(sandbox_context)
+            backend_network_created = True
+            print("Created private backend network.")
+
         if is_egress_network_required:
             print("Creating egress network.")
             create_docker_egress_network(sandbox_context)
@@ -127,11 +138,12 @@ def run_metisa_container_workload_in_sandbox(
                 )
                 print("Created Squid Proxy container.")
 
-        if is_backend_network_required:
-            print("Creating private backend network.")
-            create_docker_backend_network(sandbox_context)
-            backend_network_created = True
-            print("Created private backend network.")
+        if is_jina_reader_required:
+            print("Creating Jina Reader container.")
+            jina_reader_container_name = create_jina_reader_container(
+                specification, sandbox_context, squid_proxy_url
+            )
+            print("Created Jina Reader container.")
 
         if is_mcp_server_required:
             print("Creating MCP Server container.")
@@ -190,6 +202,11 @@ def run_metisa_container_workload_in_sandbox(
                     sandbox_context,
                     cleanup_errors,
                 )
+
+                if jina_reader_container_name is not None:
+                    _stop_and_remove_jina_reader_container(
+                        sandbox_context, cleanup_errors, jina_reader_container_name
+                    )
 
                 if squid_proxy_container_name is not None:
                     _stop_and_remove_squid_proxy_container(
@@ -346,6 +363,31 @@ def _stop_and_remove_squid_proxy_container(
         )
 
 
+def _stop_and_remove_jina_reader_container(
+    sandbox_context: SandboxContext,
+    cleanup_errors: list[str],
+    jina_reader_container_name: str,
+) -> None:
+    log_folder = "jina_reader"
+    try:
+        _save_files_from_container(
+            sandbox_context,
+            jina_reader_container_name,
+            [],
+            log_folder,
+        )
+    except Exception as error:
+        cleanup_errors.append(f"Could not save Jina Reader config files: {error}")
+    finally:
+        _stop_and_remove_container(
+            sandbox_context=sandbox_context,
+            cleanup_errors=cleanup_errors,
+            container_name=jina_reader_container_name,
+            container_title="Jina Reader",
+            log_folder=log_folder,
+        )
+
+
 def _stop_and_remove_haproxy_container(
     sandbox_context: SandboxContext,
     cleanup_errors: list[str],
@@ -403,12 +445,12 @@ def _stop_and_remove_container(
     container_title: str,
     log_folder: str,
 ) -> None:
-    squid_stopped = False
+    container_stopped = False
 
     try:
         print(f"Stopping {container_title} container.")
         stop_docker_container(container_name, timeout_seconds=10)
-        squid_stopped = True
+        container_stopped = True
         print(f"Stopped {container_title} container.")
     except Exception as error:
         print(f"Could not stop {container_title} container.")
@@ -421,8 +463,8 @@ def _stop_and_remove_container(
 
     try:
         print(f"Removing {container_title} container.")
-        remove_docker_container(container_name, force=not squid_stopped)
+        remove_docker_container(container_name, force=not container_stopped)
         print(f"Removed {container_title} container.")
     except Exception as error:
-        print(f"Could not rempve {container_title} container.")
+        print(f"Could not remove {container_title} container.")
         cleanup_errors.append(f"Could not remove {container_title} container: {error}")

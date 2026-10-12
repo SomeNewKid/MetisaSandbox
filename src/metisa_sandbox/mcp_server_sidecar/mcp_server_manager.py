@@ -40,7 +40,7 @@ _MCP_SERVER_NETWORK_ALIAS = "metisa-mcp-server"
 _MCP_SERVER_PORT = 8000
 _GUEST_SOURCE_DIR = "/sandbox-source"
 _GUEST_PYTHON_VENV = "/opt/metisa-venv"
-_USE_SQUID_PROXY = False
+_USE_SQUID_PROXY = True
 
 
 def create_mcp_server_container(
@@ -232,9 +232,17 @@ def create_mcp_server_container(
         ]
     )
 
+    # Configure use of Squid Proxy
     if squid_proxy_url is not None and _USE_SQUID_PROXY:
         no_proxy_destinations = ",".join(
-            ["localhost", "127.0.0.1", "::1", "metisa-workload", "metisa-squid"]
+            [
+                "localhost",
+                "127.0.0.1",
+                "::1",
+                "metisa-workload",
+                "metisa-squid",
+                "metisa-mcp-server",
+            ]
         )
         environs.extend(
             [
