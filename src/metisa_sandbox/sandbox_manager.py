@@ -7,6 +7,9 @@ from pathlib import Path
 
 from metisa_common.specification_models import Capability, MetisaSpecification
 
+from .code_execution_sidecar.code_execution_manager import (
+    create_code_execution_container,
+)
 from .docker.docker_container import (
     copy_container_files_to_host_folder,
     get_docker_container_logs,
@@ -64,15 +67,17 @@ def run_metisa_container_workload_in_sandbox(
     workload_module: str,
 ) -> int:
     """Run the specified workload in a Docker sandbox."""
+    is_mcp_server_required = Capability.MCP_CLIENT in specification.capabilities
+    is_jina_reader_required = Capability.JINA_READER in specification.capabilities
+    is_code_execution_required = Capability.CODE_EXECUTION in specification.capabilities
+
     is_workload_network_required = Capability.NETWORK in specification.capabilities
     is_internet_access_required = Capability.INTERNET in specification.capabilities
     is_localnet_access_required = Capability.LOCALNET in specification.capabilities
+    is_backend_network_required = is_mcp_server_required
     is_egress_network_required = (
         is_internet_access_required or is_localnet_access_required
     )
-    is_mcp_server_required = Capability.MCP_CLIENT in specification.capabilities
-    is_backend_network_required = is_localnet_access_required and is_mcp_server_required
-    is_jina_reader_required = Capability.JINA_READER in specification.capabilities
 
     sandbox_context: SandboxContext | None = None
     log_file: Path | None = None
@@ -88,6 +93,7 @@ def run_metisa_container_workload_in_sandbox(
     mcp_server_staged_source: Path | None = None
     mcp_server_ip_address: str | None = None
     jina_reader_container_name: str | None = None
+    code_execution_container_name: str | None = None
 
     if is_internet_access_required:
         squid_proxy_url = get_squid_proxy_url()
@@ -144,6 +150,13 @@ def run_metisa_container_workload_in_sandbox(
                 specification, sandbox_context, squid_proxy_url
             )
             print("Created Jina Reader container.")
+
+        if is_code_execution_required:
+            print("Creating Code Execution container.")
+            code_execution_container_name = create_code_execution_container(
+                specification, sandbox_context
+            )
+            print("Created Code Execution container.")
 
         if is_mcp_server_required:
             print("Creating MCP Server container.")
@@ -206,6 +219,11 @@ def run_metisa_container_workload_in_sandbox(
                 if jina_reader_container_name is not None:
                     _stop_and_remove_jina_reader_container(
                         sandbox_context, cleanup_errors, jina_reader_container_name
+                    )
+
+                if code_execution_container_name is not None:
+                    _stop_and_remove_code_execution_container(
+                        sandbox_context, cleanup_errors, code_execution_container_name
                     )
 
                 if squid_proxy_container_name is not None:
@@ -384,6 +402,31 @@ def _stop_and_remove_jina_reader_container(
             cleanup_errors=cleanup_errors,
             container_name=jina_reader_container_name,
             container_title="Jina Reader",
+            log_folder=log_folder,
+        )
+
+
+def _stop_and_remove_code_execution_container(
+    sandbox_context: SandboxContext,
+    cleanup_errors: list[str],
+    code_execution_container_name: str,
+) -> None:
+    log_folder = "code_execution"
+    try:
+        _save_files_from_container(
+            sandbox_context,
+            code_execution_container_name,
+            [],
+            log_folder,
+        )
+    except Exception as error:
+        cleanup_errors.append(f"Could not save Code Execution config files: {error}")
+    finally:
+        _stop_and_remove_container(
+            sandbox_context=sandbox_context,
+            cleanup_errors=cleanup_errors,
+            container_name=code_execution_container_name,
+            container_title="Code Execution",
             log_folder=log_folder,
         )
 

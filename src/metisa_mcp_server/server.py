@@ -28,6 +28,7 @@ from .resources import (
     test_resource_3,
 )
 from .tools import (
+    execute_starlark_code,
     get_active_items,
     get_title_from_url,
     read_content_from_url,
@@ -115,6 +116,7 @@ TOOL_REGISTRY = _create_tool_registry(
         get_active_items,
         get_title_from_url,
         read_content_from_url,
+        execute_starlark_code,
     ],
 )
 
@@ -161,7 +163,15 @@ async def _call_tool(
     except ValidationError as error:
         raise MCPError(-32602, error.message) from error
 
-    tool_result = requsted_tool.function(**tool_arguments)
+    try:
+        tool_result = requsted_tool.function(**tool_arguments)
+    except RuntimeError as error:
+        content = types.TextContent(text=str(error))
+        return types.CallToolResult(
+            content=[content],
+            is_error=True,
+        )
+
     if not isinstance(tool_result, str):
         raise MCPError(-32602, f"Tool returned a non-string result: {tool_name}")
 

@@ -1,5 +1,78 @@
 FROM ghcr.io/jina-ai/reader:oss
 
+# Switch to the root user to perform hardening operations.
+USER root
+
+# Document ports 8080 and 8081 as the ports on which Jina Reader exposes its endpoints.
+# This does not publish the ports to the host.
+EXPOSE 8080 8081
+
+# STOPSIGNAL: Ask Docker to send Jina Reader SIGTERM when stopping the container.
+# SIGTERM: request a hard stop for Jina Reader.
+# Note that SIGTERM is Docker's default stop signal, 
+# so this line is not really needed.
+STOPSIGNAL SIGTERM
+
+# Remove Ubuntu package-management commands and metadata.
+RUN rm -f \
+       /usr/bin/apt \
+       /usr/bin/apt-get \
+       /usr/bin/dpkg \
+       /usr/bin/dpkg-query \
+    && rm -rf \
+       /var/lib/apt \
+       /var/cache/apt \
+       /var/lib/dpkg \
+       /var/log/apt
+       
+# Remove restricted administrative, namespace, persistence,
+# remote-access, and desktop-automation commands.
+RUN set -eu; \
+    for command in \
+        # bash \
+        busctl \
+        dbus-send \
+        findmnt \
+        git \
+        gpg \
+        gpg-connect-agent \
+        gpgconf \
+        journalctl \
+        loginctl \
+        mount \
+        nice \
+        nohup \
+        nsenter \
+        perl \
+        renice \
+        scp \
+        sftp \
+        setsid \
+        ssh \
+        ssh-add \
+        su \
+        systemd-run \
+        systemctl \
+        umount \
+        unshare \
+        service \
+        gdbus \
+        qdbus \
+        wmctrl \
+        xdotool \
+    ; do \
+        for directory in \
+            /bin \
+            /sbin \
+            /usr/bin \
+            /usr/sbin \
+            /usr/local/bin \
+            /usr/local/sbin \
+        ; do \
+            rm -f "${directory}/${command}"; \
+        done; \
+    done
+
 HEALTHCHECK --interval=60s --timeout=65s --start-period=60s --retries=3 \
     CMD node -e "\
     (async () => { \
@@ -26,3 +99,7 @@ HEALTHCHECK --interval=60s --timeout=65s --start-period=60s --retries=3 \
         console.error(error.message); \
         process.exit(1); \
     });"
+
+# Set the container's default runtime user to the 'jina' non-root user.
+# The 'jina' user is automatically created when installing the Jina Reader package.
+USER jina:jina

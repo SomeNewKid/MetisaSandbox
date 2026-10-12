@@ -109,7 +109,6 @@ def read_content_from_url(
 
     try:
         with requests.Session() as session:
-            print(f"Debug 1: '{url}'")
             session.trust_env = False
             response = session.post(
                 reader_endpoint,
@@ -117,20 +116,78 @@ def read_content_from_url(
                 headers=headers,
                 timeout=(5, 60),
             )
-            print(f"Debug 2: {response.status_code}")
-            response.raise_for_status()
-            print("Debug 3")
             content = response.text
-            print("Debug 4", str(len(content)))
+            response.raise_for_status()
         return content
     except requests.RequestException as error:
-        traceback.print_exception(error)
         error_message = f"Jina Reader could not read the url: {error}"
         raise RuntimeError(error_message) from error
     except Exception as error:
         traceback.print_exception(error)
         error_message = f"Jina Reader could not read the url: {error}"
         raise RuntimeError(error_message) from error
+
+
+def execute_starlark_code(
+    starlark_code: Annotated[
+        str,
+        Field(
+            description="""
+        The Starlark code to be executed, 
+        which must reside in a main() function with no parameters.
+        For example:
+        
+        def main():
+            values = [10, 20, 30]
+            total = 0
+            for value in values:
+                total += value
+            return total / len(values)
+        """
+        ),
+    ],
+) -> str | None:
+    """Return the result of executing the provided Starlark code."""
+    starlark_endpoint = "http://metisa-code-execution:8090/execute"
+    headers = {
+        "Accept": "application/json",
+    }
+    payload = {"code": starlark_code}
+
+    content: str | None = None
+
+    try:
+        with requests.Session() as session:
+            session.trust_env = False
+            response = session.post(
+                starlark_endpoint,
+                json=payload,
+                headers=headers,
+                timeout=(5, 120),
+            )
+            content = response.text
+            response.raise_for_status()
+        if not content:
+            raise RuntimeError("Starlark did not return any content.")
+        try:
+            dictionary = json.loads(content)
+        except json.JSONDecodeError as error:
+            raise RuntimeError(f"Starlark returned an error: {content}") from error
+        if not isinstance(dictionary, dict):
+            raise RuntimeError("Starlark did not return expected JSON dictionary.")
+        error_result = dictionary.get("error", None)
+        if error_result is not None:
+            raise RuntimeError(f"Starlark returned an error: {error_result}")
+        result = dictionary.get("result", None)
+        if result is None:
+            raise RuntimeError("Starlark did not return expected JSON format.")
+        if not isinstance(result, str):
+            raise RuntimeError("Starlark did not return a string result.")
+        return result
+    except Exception as error:
+        if content:
+            raise RuntimeError(f"Starlark returned an error: {content}") from error
+        raise RuntimeError(f"Starlark returned an error: {error}") from error
 
 
 def _get_active_items(

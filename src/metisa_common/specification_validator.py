@@ -6,6 +6,7 @@ import re
 
 from .specification_models import (
     Capability,
+    CodeExecutionSpecification,
     HaproxySpecification,
     JinaReaderSpecification,
     McpServerSpecification,
@@ -45,6 +46,11 @@ def validate_specification(
     _validate_jina_reader_specification(
         specification.capabilities,
         specification.jina_reader,
+    )
+
+    _validate_code_execution_specification(
+        specification.capabilities,
+        specification.code_execution,
     )
 
 
@@ -148,6 +154,18 @@ def _validate_capabilities(
                 '"mcp_client" capability requires "network" capability.'
             )
 
+    if Capability.JINA_READER in capabilities:
+        if Capability.MCP_CLIENT not in capabilities:
+            raise SpecificationValidationError(
+                '"jina_reader" capability requires "mcp_client" capability.'
+            )
+
+    if Capability.CODE_EXECUTION in capabilities:
+        if Capability.MCP_CLIENT not in capabilities:
+            raise SpecificationValidationError(
+                '"code_execution" capability requires "mcp_client" capability.'
+            )
+
 
 def _validate_squid_proxy_specification(
     capabilities: frozenset[Capability],
@@ -231,9 +249,22 @@ def _validate_jina_reader_specification(
     if jina_reader_specification is None:
         return
 
-    if Capability.MCP_CLIENT not in capabilities:
+    if Capability.JINA_READER not in capabilities:
         raise SpecificationValidationError(
-            '"[jina_reader]" table requires "mcp_client" capability.'
+            '"[jina_reader]" table requires "jina_reader" capability.'
+        )
+
+
+def _validate_code_execution_specification(
+    capabilities: frozenset[Capability],
+    code_execution_specification: CodeExecutionSpecification | None,
+):
+    if code_execution_specification is None:
+        return
+
+    if Capability.CODE_EXECUTION not in capabilities:
+        raise SpecificationValidationError(
+            '"[code_execution]" table requires "code_execution" capability.'
         )
 
 

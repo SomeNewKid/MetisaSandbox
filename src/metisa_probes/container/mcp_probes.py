@@ -364,6 +364,89 @@ def read_content_from_url_returns_expected_content(
     )
 
 
+def execute_starlark_code_returns_expected_result(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify declared Starlark execution returns the average as MCP text."""
+    probe_name = "execute_starlark_code_returns_expected_result"
+    tool_name = "execute_starlark_code"
+
+    if Capability.CODE_EXECUTION not in probe_context.specification.capabilities:
+        return ProbeResult.success(
+            f"container__mcp__{probe_name}",
+            "Code execution is disabled. Skipping probe.",
+        )
+    if Capability.MCP_CLIENT not in probe_context.specification.capabilities:
+        return ProbeResult.success(
+            f"container__mcp__{probe_name}",
+            "MCP client is disabled. Skipping probe.",
+        )
+
+    mcp_server = probe_context.specification.mcp_server
+    if mcp_server is None or tool_name not in mcp_server.tools:
+        return ProbeResult.success(
+            f"container__mcp__{probe_name}",
+            f"{tool_name} is not declared. Skipping probe.",
+        )
+
+    starlark_code = (
+        "def main():\n"
+        "    values = [10, 20, 30]\n"
+        "    total = 0\n"
+        "    for value in values:\n"
+        "        total += value\n"
+        "    return total / len(values)\n"
+    )
+    expected_result = "20.0"
+
+    async def _operation(client: Client) -> str | None:
+        from mcp import types
+
+        result = await client.call_tool(tool_name, {"starlark_code": starlark_code})
+        if result.is_error:
+            return f"{tool_name} returned a tool execution error."
+        if len(result.content) != 1:
+            return f"{tool_name} did not return exactly one content block."
+        content = result.content[0]
+        if not isinstance(content, types.TextContent):
+            return f"{tool_name} did not return a text content block."
+        if content.text != expected_result:
+            return (
+                f"{tool_name} returned {content.text!r}; expected {expected_result!r}."
+            )
+        return None
+
+    return _run_mcp_probe(probe_context, probe_name, _operation)
+
+
+def execute_starlark_code_rejects_missing_main(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify execution without main returns the sidecar's missing-main error."""
+    return _run_starlark_error_probe(
+        probe_context,
+        "execute_starlark_code_rejects_missing_main",
+        "value = 42\n",
+        "script must define main()",
+    )
+
+
+def execute_starlark_code_enforces_step_budget(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify an excessive loop returns step-budget cancellation, not a timeout."""
+    # Starlark has no while loop; this range cannot finish within the step budget.
+    starlark_code = (
+        "def main():\n    for value in range(1 << 60):\n        pass\n    return 42\n"
+    )
+    return _run_starlark_error_probe(
+        probe_context,
+        "execute_starlark_code_enforces_step_budget",
+        starlark_code,
+        "Starlark computation cancelled: too many steps",
+    )
+
+
 def test_resource_1_is_available(probe_context: ProbeContext) -> ProbeResult:
     """Verify MCP resource discovery includes test_resource_1."""
     resource_name = "test_resource_1"
@@ -535,6 +618,59 @@ def test_resource_3_matches_declaration(probe_context: ProbeContext) -> ProbeRes
     )
 
 
+def _run_starlark_error_probe(
+    probe_context: ProbeContext,
+    name: str,
+    starlark_code: str,
+    expected_error: str,
+) -> ProbeResult:
+    probe_name = f"container__mcp__{name}"
+    tool_name = "execute_starlark_code"
+    if Capability.CODE_EXECUTION not in probe_context.specification.capabilities:
+        return ProbeResult.success(
+            probe_name, "Code execution is disabled. Skipping probe."
+        )
+    if Capability.MCP_CLIENT not in probe_context.specification.capabilities:
+        return ProbeResult.success(
+            probe_name, "MCP client is disabled. Skipping probe."
+        )
+    mcp_server = probe_context.specification.mcp_server
+    if mcp_server is None or tool_name not in mcp_server.tools:
+        return ProbeResult.success(
+            probe_name, f"{tool_name} is not declared. Skipping probe."
+        )
+
+    async def _operation(client: Client) -> str | None:
+        from mcp import types
+        from mcp.shared.exceptions import MCPError
+
+        # The low-level MCP server can report tool failures as protocol errors.
+        try:
+            result = await client.call_tool(tool_name, {"starlark_code": starlark_code})
+        except MCPError as error:
+            if expected_error in error.message:
+                return None
+            return (
+                f"{tool_name} returned MCP error {error.message!r}; "
+                f"expected {expected_error!r}."
+            )
+        if not result.is_error:
+            return f"{tool_name} succeeded; expected error {expected_error!r}."
+        if len(result.content) != 1:
+            return f"{tool_name} did not return exactly one error content block."
+        content = result.content[0]
+        if not isinstance(content, types.TextContent):
+            return f"{tool_name} did not return a text error content block."
+        if expected_error not in content.text:
+            return (
+                f"{tool_name} returned error {content.text!r}; "
+                f"expected {expected_error!r}."
+            )
+        return None
+
+    return _run_mcp_probe(probe_context, name, _operation)
+
+
 def _run_mcp_probe(
     probe_context: ProbeContext,
     name: str,
@@ -600,6 +736,9 @@ MCP_PROBES = ProbeGroup(
         test_tool_3_rejects_non_string_name,
         test_tool_3_rejects_additional_arguments,
         read_content_from_url_returns_expected_content,
+        execute_starlark_code_returns_expected_result,
+        execute_starlark_code_rejects_missing_main,
+        execute_starlark_code_enforces_step_budget,
         test_resource_1_is_available,
         test_resource_1_returns_expected_greeting,
         test_resource_2_matches_declaration,

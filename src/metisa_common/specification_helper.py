@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .specification_models import (
     Capability,
+    CodeExecutionSpecification,
     HaproxyBackend,
     HaproxySpecification,
     JinaReaderSpecification,
@@ -180,6 +181,17 @@ def get_resolved_environs_for_jina_reader(
     return _get_resolved_environs(specification.jina_reader.environs)
 
 
+def get_resolved_environs_for_code_execution(
+    specification: MetisaSpecification,
+) -> list[str]:
+    """Resolve environment variables specified for the MCP server workload container."""
+    if not specification.code_execution:
+        return []
+    if not specification.code_execution.environs:
+        return []
+    return _get_resolved_environs(specification.code_execution.environs)
+
+
 def _get_resolved_environs(
     environs: frozenset[str],
 ) -> list[str]:
@@ -288,6 +300,7 @@ def _create_metisa_specification(
             "ollama_sidecar",
             "mcp_server",
             "jina_reader",
+            "code_execution",
         }
     )
 
@@ -303,6 +316,7 @@ def _create_metisa_specification(
     ollama_sidecar = _get_ollama_sidecar_specification(toml)
     mcp_server = _get_mcp_server_specification(toml)
     jina_reader = _get_jina_reader_specification(toml)
+    code_execution = _get_code_execution_specification(toml)
     specification = MetisaSpecification(
         agent_name=agent_name,
         capabilities=capabilities,
@@ -313,6 +327,7 @@ def _create_metisa_specification(
         ollama_sidecar=ollama_sidecar,
         mcp_server=mcp_server,
         jina_reader=jina_reader,
+        code_execution=code_execution,
     )
 
     validate_specification(specification)
@@ -607,9 +622,34 @@ def _get_jina_reader_specification(
 
     _validate_known_keys(jina_reader, "jina_reader", JINA_READER_KEYS)
 
-    environs = _get_environs(jina_reader, "MCP Server environs")
+    environs = _get_environs(jina_reader, "Jina Reader environs")
 
     return JinaReaderSpecification(environs=environs)
+
+
+def _get_code_execution_specification(
+    toml: dict[str, object],
+) -> CodeExecutionSpecification | None:
+    code_execution = toml.get("code_execution")
+    if not code_execution:
+        return None
+
+    if not isinstance(code_execution, dict):
+        raise SpecificationValidationError(
+            "TOML specification code_execution must be a table."
+        )
+
+    CODE_EXECUTION_KEYS = frozenset(
+        {
+            "environs",
+        }
+    )
+
+    _validate_known_keys(code_execution, "code_execution", CODE_EXECUTION_KEYS)
+
+    environs = _get_environs(code_execution, "Code Execution environs")
+
+    return CodeExecutionSpecification(environs=environs)
 
 
 def _validate_known_keys(

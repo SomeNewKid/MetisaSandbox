@@ -39,6 +39,7 @@ class MetisaSpecification:
     ollama_sidecar: OllamaSidecarSpecification | None
     mcp_server: McpServerSpecification | None
     jina_reader: JinaReaderSpecification | None
+    code_execution: CodeExecutionSpecification | None
 
 
 @dataclass(frozen=True)
@@ -84,5 +85,12 @@ class McpServerSpecification:
 @dataclass(frozen=True)
 class JinaReaderSpecification:
     """Represents the Jina Reader section of the Metisa specification."""
+
+    environs: frozenset[str]
+
+
+@dataclass(frozen=True)
+class CodeExecutionSpecification:
+    """Represents the Code Execution section of the Metisa specification."""
 
     environs: frozenset[str]

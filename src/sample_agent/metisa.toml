@@ -6,6 +6,7 @@ capabilities = [
     "localnet",
     "mcp_client",
     "jina_reader",
+    "code_execution",
 ]
 dependencies = [
     "requests==2.34.2",
@@ -34,6 +35,7 @@ tools = [
     "get_active_items",
     "get_title_from_url",
     "read_content_from_url",
+    "execute_starlark_code",
 ]
 resources = [
     "test_resource_2",

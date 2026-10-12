@@ -1,0 +1,48 @@
+# Starlark Code Execution Dockerfile
+
+# Starlark is a dialect of Python.
+# https://www.starlark-lang.org/
+
+# ---------------------------------------------------------------------------
+
+# This image may end up with installation-only components
+FROM golang:1.25 AS builder
+
+WORKDIR /app
+COPY go.mod main.go ./
+RUN go get go.starlark.net/starlark@v0.0.0-20261005163335-bcb1a1a55bf9
+RUN go mod tidy
+
+# Print the version of Starlark (useful if above is @latest)
+RUN go list -m go.starlark.net
+RUN CGO_ENABLED=0 go build -o /run-starlark-code .
+
+# ---------------------------------------------------------------------------
+
+# This image purposely copies only the needed components,
+# omitting installation-only components in the `builder`.
+FROM scratch
+
+# Keep the executable root-owned and readable/executable, but not writable.
+COPY --from=builder --chown=0:0 --chmod=0555 \
+    /run-starlark-code /run-starlark-code
+
+# Document port 8090 as the port on which the Code Execution service accepts connections.
+# This does not publish the port to the host.
+EXPOSE 8090
+
+# Set the entrypoint for the container to the compiled Starlark code executor.
+ENTRYPOINT ["/run-starlark-code"]
+
+# Healthcheck used by Docker, periodically checking Starlark's internal manager endpoint.
+# Read health status from host: docker.exe inspect <container_name>
+HEALTHCHECK \
+    --start-period=30s \
+    --start-interval=1s \
+    --interval=30s \
+    --timeout=3s \
+    --retries=3 \
+    CMD ["/run-starlark-code", "healthcheck"]
+
+# Run the service and its health checks without root privileges.
+USER 10001:10001
