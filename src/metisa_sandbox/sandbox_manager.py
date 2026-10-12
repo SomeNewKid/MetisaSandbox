@@ -14,6 +14,9 @@ from .docker.docker_container import (
     run_docker_container,
     stop_docker_container,
 )
+from .docker.docker_network import (
+    get_docker_container_ip_address,
+)
 from .haproxy_sidecar.haproxy_manager import (
     create_haproxy_container,
 )
@@ -30,10 +33,12 @@ from .sandbox_context import (
     SandboxContext,
 )
 from .sandbox_network import (
+    create_docker_backend_network,
     create_docker_egress_network,
-    create_docker_private_network,
+    create_docker_workload_network,
+    remove_docker_backend_network,
     remove_docker_egress_network,
-    remove_docker_private_network,
+    remove_docker_workload_network,
 )
 from .sandbox_workspace import (
     append_log_file,
@@ -56,18 +61,20 @@ def run_metisa_container_workload_in_sandbox(
     workload_module: str,
 ) -> int:
     """Run the specified workload in a Docker sandbox."""
-    is_private_network_required = Capability.NETWORK in specification.capabilities
+    is_workload_network_required = Capability.NETWORK in specification.capabilities
     is_internet_access_required = Capability.INTERNET in specification.capabilities
     is_localnet_access_required = Capability.LOCALNET in specification.capabilities
     is_egress_network_required = (
         is_internet_access_required or is_localnet_access_required
     )
     is_mcp_server_required = Capability.MCP_CLIENT in specification.capabilities
+    is_backend_network_required = is_localnet_access_required and is_mcp_server_required
 
     sandbox_context: SandboxContext | None = None
     log_file: Path | None = None
     metisa_staged_source: Path | None = None
-    private_network_created = False
+    workload_network_created = False
+    backend_network_created = False
     egress_network_created = False
     return_code: int | None = None
     squid_proxy_container_name: str | None = None
@@ -75,6 +82,7 @@ def run_metisa_container_workload_in_sandbox(
     haproxy_container_name: str | None = None
     mcp_server_container_name: str | None = None
     mcp_server_staged_source: Path | None = None
+    mcp_server_ip_address: str | None = None
 
     if is_internet_access_required:
         squid_proxy_url = get_squid_proxy_url()
@@ -94,17 +102,17 @@ def run_metisa_container_workload_in_sandbox(
             image_reference,
             metisa_staged_source,
             workload_module,
-            is_private_network_required,
+            is_workload_network_required,
             squid_proxy_url,
         )
 
         append_log_file(log_file, [f"Arguments: {' '.join(arguments)}"])
 
-        if is_private_network_required:
-            print("Creating private network.")
-            create_docker_private_network(sandbox_context)
-            private_network_created = True
-            print("Created private network.")
+        if is_workload_network_required:
+            print("Creating private workload network.")
+            create_docker_workload_network(sandbox_context)
+            workload_network_created = True
+            print("Created private workload network.")
 
         if is_egress_network_required:
             print("Creating egress network.")
@@ -119,21 +127,47 @@ def run_metisa_container_workload_in_sandbox(
                 )
                 print("Created Squid Proxy container.")
 
-            if is_localnet_access_required:
-                print("Creating HAProxy container.")
-                haproxy_container_name = create_haproxy_container(
-                    specification, sandbox_context
-                )
-                print("Created HAProxy container.")
+        if is_backend_network_required:
+            print("Creating private backend network.")
+            create_docker_backend_network(sandbox_context)
+            backend_network_created = True
+            print("Created private backend network.")
 
         if is_mcp_server_required:
             print("Creating MCP Server container.")
+            mcp_server_target_network_name = (
+                sandbox_context.backend_network_name
+                if is_backend_network_required
+                else sandbox_context.workload_network_name
+            )
             mcp_server_container_name, mcp_server_staged_source = (
                 create_mcp_server_container(
-                    specification, sandbox_context, squid_proxy_url
+                    specification,
+                    sandbox_context,
+                    mcp_server_target_network_name,
+                    squid_proxy_url,
                 )
             )
+            mcp_server_ip_address = get_docker_container_ip_address(
+                mcp_server_container_name,
+                mcp_server_target_network_name,
+            )
             print("Created MCP Server container.")
+
+        if is_localnet_access_required:
+            print("Creating HAProxy container.")
+            haproxy_target_network_name = (
+                sandbox_context.backend_network_name
+                if is_backend_network_required
+                else sandbox_context.workload_network_name
+            )
+            haproxy_container_name = create_haproxy_container(
+                specification,
+                sandbox_context,
+                haproxy_target_network_name,
+                mcp_server_ip_address,
+            )
+            print("Created HAProxy container.")
 
         is_interactive = Capability.INTERACTIVE in specification.capabilities
 
@@ -187,10 +221,19 @@ def run_metisa_container_workload_in_sandbox(
                         cleanup_error = f"Could not remove egress network: {error}"
                         cleanup_errors.append(cleanup_error)
 
-                if private_network_created:
+                if workload_network_created:
                     try:
                         print("Removing private network.")
-                        remove_docker_private_network(sandbox_context)
+                        remove_docker_workload_network(sandbox_context)
+                        print("Removed private network.")
+                    except Exception as error:
+                        cleanup_error = f"Could not remove private network: {error}"
+                        cleanup_errors.append(cleanup_error)
+
+                if backend_network_created:
+                    try:
+                        print("Removing private network.")
+                        remove_docker_backend_network(sandbox_context)
                         print("Removed private network.")
                     except Exception as error:
                         cleanup_error = f"Could not remove private network: {error}"
@@ -209,6 +252,7 @@ def run_metisa_container_workload_in_sandbox(
                 clean_up_run_directory(
                     sandbox_context.host_output_path,
                     sandbox_context.host_logs_path,
+                    sandbox_context.host_scratch_path,
                 )
 
                 if metisa_staged_source is not None:

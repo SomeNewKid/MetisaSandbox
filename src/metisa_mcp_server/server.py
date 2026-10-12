@@ -153,10 +153,7 @@ async def _call_tool(
     tool_arguments = params.arguments or {}
 
     try:
-        validate(
-            instance=tool_arguments,
-            schema=requsted_tool.definition.input_schema
-        )
+        validate(instance=tool_arguments, schema=requsted_tool.definition.input_schema)
     except ValidationError as error:
         raise MCPError(-32602, error.message) from error
 

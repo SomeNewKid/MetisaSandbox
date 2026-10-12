@@ -573,10 +573,14 @@ def docker_dns_resolution_works(probe_context: ProbeContext) -> ProbeResult:
 
 
 def haproxy_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
-    """Ensure a localnet-enabled workload can resolve the HAProxy alias."""
+    """Ensure a workload with direct localnet access can resolve HAProxy."""
     probe_name = "container__network__haproxy_alias_resolves"
     if Capability.LOCALNET not in probe_context.specification.capabilities:
         return ProbeResult.success(probe_name, "Localnet is disabled. Skipping probe.")
+    if Capability.MCP_CLIENT in probe_context.specification.capabilities:
+        return ProbeResult.success(
+            probe_name, "Localnet access is mediated by MCP. Skipping probe."
+        )
     try:
         addresses = _resolve_network_alias(_HAPROXY_NETWORK_ALIAS)
     except (OSError, ValueError) as error:
@@ -591,17 +595,37 @@ def haproxy_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
 
 
 def haproxy_alias_is_absent(probe_context: ProbeContext) -> ProbeResult:
-    """Ensure HAProxy has no DNS record when localnet is disabled."""
+    """Ensure HAProxy is hidden when direct workload access is not permitted."""
     probe_name = "container__network__haproxy_alias_is_absent"
     capabilities = probe_context.specification.capabilities
-    if Capability.NETWORK not in capabilities or Capability.LOCALNET in capabilities:
+    if Capability.NETWORK not in capabilities or (
+        Capability.LOCALNET in capabilities
+        and Capability.MCP_CLIENT not in capabilities
+    ):
         return ProbeResult.success(
             probe_name, "HAProxy absence check is inapplicable. Skipping probe."
         )
-    # Docker DNS availability is checked by the separate DNS probe.
     try:
         socket.getaddrinfo(_HAPROXY_NETWORK_ALIAS, None, type=socket.SOCK_STREAM)
     except socket.gaierror as error:
+        if error.errno == socket.EAI_AGAIN:
+            try:
+                workload_addresses = _resolve_network_alias(_WORKLOAD_NETWORK_ALIAS)
+            except (OSError, ValueError) as control_error:
+                return ProbeResult.failure(
+                    probe_name,
+                    f"Cannot confirm HAProxy alias unavailability because workload "
+                    f"DNS resolution failed: {control_error}",
+                )
+            if not workload_addresses:
+                return ProbeResult.failure(
+                    probe_name, "Workload DNS lookup returned no addresses."
+                )
+            return ProbeResult.success(
+                probe_name,
+                "HAProxy alias is unresolvable while the workload alias resolves; "
+                "this does not prove that no DNS record exists.",
+            )
         absent_codes = {
             socket.EAI_NONAME,
             getattr(socket, "EAI_NODATA", socket.EAI_NONAME),
@@ -616,18 +640,23 @@ def haproxy_alias_is_absent(probe_context: ProbeContext) -> ProbeResult:
             probe_name, f"HAProxy DNS lookup failed unexpectedly: {error}"
         )
     return ProbeResult.failure(
-        probe_name, "HAProxy alias resolves although localnet is disabled."
+        probe_name,
+        "HAProxy alias resolves although direct workload access is forbidden.",
     )
 
 
 def haproxy_declared_listeners_are_reachable(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """Ensure every declared HAProxy TCP frontend accepts connections."""
+    """Ensure HAProxy accepts connections when direct localnet access is permitted."""
     probe_name = "container__network__haproxy_declared_listeners_are_reachable"
     specification = probe_context.specification
     if Capability.LOCALNET not in specification.capabilities:
         return ProbeResult.success(probe_name, "Localnet is disabled. Skipping probe.")
+    if Capability.MCP_CLIENT in specification.capabilities:
+        return ProbeResult.success(
+            probe_name, "Localnet access is mediated by MCP. Skipping probe."
+        )
     if specification.haproxy is None:
         return ProbeResult.failure(probe_name, "HAProxy configuration is missing.")
     for backend in specification.haproxy.backends:
@@ -642,9 +671,99 @@ def haproxy_declared_listeners_are_reachable(
                 probe_name,
                 f"HAProxy listener {backend.listen_port} is unreachable: {errors}",
             )
-    # A TCP handshake proves frontend availability, not database availability.
+    # A TCP handshake proves frontend availability, not backend availability.
     return ProbeResult.success(
         probe_name, "All declared HAProxy TCP listeners accept connections."
+    )
+
+
+def haproxy_declared_listeners_are_unavailable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure MCP-mediated workloads cannot reach HAProxy through its alias."""
+    probe_name = "container__network__haproxy_declared_listeners_are_unavailable"
+    specification = probe_context.specification
+    capabilities = specification.capabilities
+    if (
+        Capability.LOCALNET not in capabilities
+        or Capability.MCP_CLIENT not in capabilities
+    ):
+        return ProbeResult.success(
+            probe_name, "MCP-mediated localnet access is not enabled. Skipping probe."
+        )
+    if specification.haproxy is None:
+        return ProbeResult.failure(probe_name, "HAProxy configuration is missing.")
+    if not specification.haproxy.backends:
+        return ProbeResult.success(
+            probe_name, "No HAProxy listeners are declared. Skipping probe."
+        )
+
+    unavailable_errors = {
+        errno.ECONNREFUSED,
+        errno.ETIMEDOUT,
+        errno.ENETUNREACH,
+        errno.EHOSTUNREACH,
+        errno.EACCES,
+        errno.EPERM,
+    }
+    for backend in specification.haproxy.backends:
+        try:
+            errors = _tcp_connection_errors(_HAPROXY_NETWORK_ALIAS, backend.listen_port)
+        except socket.gaierror as error:
+            if error.errno == socket.EAI_AGAIN:
+                try:
+                    workload_addresses = _resolve_network_alias(_WORKLOAD_NETWORK_ALIAS)
+                except (OSError, ValueError) as control_error:
+                    return ProbeResult.failure(
+                        probe_name,
+                        f"Cannot confirm HAProxy listener unavailability because "
+                        f"workload DNS resolution failed: {control_error}",
+                    )
+                if not workload_addresses:
+                    return ProbeResult.failure(
+                        probe_name, "Workload DNS lookup returned no addresses."
+                    )
+                return ProbeResult.success(
+                    probe_name,
+                    "HAProxy listeners are unavailable through the unresolvable alias "
+                    "while the workload alias resolves; "
+                    "IP-level isolation was not tested.",
+                )
+            absent_codes = {
+                socket.EAI_NONAME,
+                getattr(socket, "EAI_NODATA", socket.EAI_NONAME),
+            }
+            if error.errno in absent_codes:
+                return ProbeResult.success(
+                    probe_name,
+                    "HAProxy listeners are unavailable through the absent alias; "
+                    "IP-level isolation was not tested.",
+                )
+            return ProbeResult.failure(
+                probe_name, f"HAProxy DNS lookup failed unexpectedly: {error}"
+            )
+        except OSError as error:
+            return ProbeResult.failure(
+                probe_name, f"HAProxy listener lookup failed unexpectedly: {error}"
+            )
+        if not errors:
+            return ProbeResult.failure(
+                probe_name,
+                f"HAProxy listener {backend.listen_port} is workload-accessible.",
+            )
+        if any(
+            not isinstance(error, TimeoutError)
+            and error.errno not in unavailable_errors
+            for error in errors
+        ):
+            return ProbeResult.failure(
+                probe_name,
+                f"HAProxy listener {backend.listen_port} failed unexpectedly: {errors}",
+            )
+    return ProbeResult.success(
+        probe_name,
+        "All declared HAProxy listeners reject workload connections through the alias; "
+        "this does not distinguish Python guards from network isolation.",
     )
 
 
@@ -656,6 +775,10 @@ def haproxy_undeclared_listener_is_unavailable(
     specification = probe_context.specification
     if Capability.LOCALNET not in specification.capabilities:
         return ProbeResult.success(probe_name, "Localnet is disabled. Skipping probe.")
+    if Capability.MCP_CLIENT in specification.capabilities:
+        return ProbeResult.success(
+            probe_name, "Localnet access is mediated by MCP. Skipping probe."
+        )
     if specification.haproxy is None:
         return ProbeResult.failure(probe_name, "HAProxy configuration is missing.")
     declared_ports = {backend.listen_port for backend in specification.haproxy.backends}
@@ -676,6 +799,10 @@ def haproxy_health_endpoint_is_private(probe_context: ProbeContext) -> ProbeResu
     specification = probe_context.specification
     if Capability.LOCALNET not in specification.capabilities:
         return ProbeResult.success(probe_name, "Localnet is disabled. Skipping probe.")
+    if Capability.MCP_CLIENT in specification.capabilities:
+        return ProbeResult.success(
+            probe_name, "Localnet access is mediated by MCP. Skipping probe."
+        )
     if specification.haproxy is None:
         return ProbeResult.failure(probe_name, "HAProxy configuration is missing.")
     if any(
@@ -823,6 +950,7 @@ NETWORK_PROBES = ProbeGroup(
         haproxy_alias_resolves,
         haproxy_alias_is_absent,
         haproxy_declared_listeners_are_reachable,
+        haproxy_declared_listeners_are_unavailable,
         haproxy_undeclared_listener_is_unavailable,
         haproxy_health_endpoint_is_private,
         workload_has_no_default_route,

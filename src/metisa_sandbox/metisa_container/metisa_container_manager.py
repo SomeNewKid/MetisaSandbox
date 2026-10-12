@@ -85,7 +85,7 @@ def create_docker_run_arguments(
         arguments.extend(
             [
                 "--network",
-                sandbox_context.private_network_name,
+                sandbox_context.workload_network_name,
                 "--network-alias",
                 "metisa-workload",
             ]

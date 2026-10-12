@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-import os
 import asyncio
-import httpx2
-from mcp import Client, types
-from mcp.client.streamable_http import streamable_http_client
+import os
 from datetime import datetime
 from pathlib import Path
 
+import httpx2
 import requests
+from mcp import Client, types
+from mcp.client.streamable_http import streamable_http_client
 
 IS_INTERACTIVE = False
 
@@ -101,7 +101,7 @@ def _get_active_items() -> str:
             test_env = False
 
             async with httpx2.AsyncClient(
-                trust_env=test_env, 
+                trust_env=test_env,
                 timeout=timeout_seconds,
             ) as http_client:
                 transport = streamable_http_client(

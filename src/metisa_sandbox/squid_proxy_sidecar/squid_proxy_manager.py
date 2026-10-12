@@ -173,7 +173,7 @@ def create_squid_proxy_container(
 
     connect_container_to_docker_network(
         container_name=container_name,
-        network_name=sandbox_context.private_network_name,
+        network_name=sandbox_context.workload_network_name,
         aliases=(_SQUID_PROXY_ALIAS,),
     )
 

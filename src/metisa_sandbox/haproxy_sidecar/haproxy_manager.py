@@ -35,10 +35,20 @@ _HAPROXY_IMAGE_NAME = "metisa-haproxy"
 def create_haproxy_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
+    target_network_name: str,
+    mcp_server_ip_address: str | None,
 ) -> str:
     """Create the HAProxy container and connect it to the Docker networks."""
     image_name = _ensure_haproxy_image_exists(specification)
     container_name = _create_haproxy_container_name(sandbox_context.run_identifier)
+
+    haproxy_cfg_file = os.path.join(sandbox_context.host_scratch_path, "haproxy.cfg")
+    haproxy_cfg_contents = _create_haproxy_cfg(specification, mcp_server_ip_address)
+    with open(haproxy_cfg_file, "w", encoding="utf-8") as file:
+        file.write(haproxy_cfg_contents)
+
+    if not Path(haproxy_cfg_file).exists():
+        raise RuntimeError("Could not create haproxy.cfg file for HAProxy.")
 
     arguments = [
         "--name",
@@ -46,6 +56,15 @@ def create_haproxy_container(
         "--network",
         sandbox_context.egress_network_name,
     ]
+
+    # If MCP Server is deployed, overwrite the haproxy.cfg
+    if mcp_server_ip_address is not None:
+        arguments.extend(
+            [
+                "--mount",
+                f"type=bind,source={haproxy_cfg_file},target=/etc/haproxy/haproxy.cfg,readonly",
+            ]
+        )
 
     # Mount the container's root filesystem as strictly read-only
     # Couple with in memory temporary writes (--tmpfs)
@@ -175,7 +194,7 @@ def create_haproxy_container(
 
     connect_container_to_docker_network(
         container_name=container_name,
-        network_name=sandbox_context.private_network_name,
+        network_name=target_network_name,
         aliases=(_HAPROXY_ALIAS,),
     )
 
@@ -293,6 +312,7 @@ def _generate_image_tag(
 #
 def _create_haproxy_cfg(
     specification: MetisaSpecification,
+    mcp_server_ip_address: str | None = None,
 ) -> str:
     if not specification.haproxy:
         return ""
@@ -348,22 +368,34 @@ def _create_haproxy_cfg(
     )
 
     for backend in backends:
-        instructions.append(
-            textwrap.dedent(
-                f"""
-            frontend listener_{backend.listen_port}
-                bind ipv4@metisa-haproxy:{backend.listen_port}
-                mode tcp
-                log global
-                option tcplog             
-                default_backend destination_{backend.listen_port}
+        listener_instructions = [
+            f"frontend listener_{backend.listen_port}",
+            f"    bind ipv4@metisa-haproxy:{backend.listen_port}",
+            "    mode tcp",
+            "    log global",
+            "    option tcplog",
+        ]
 
-            backend destination_{backend.listen_port}
-                mode tcp
-                server database {backend.host}:{backend.port} check
-            """
-            ).strip()
+        if mcp_server_ip_address is not None:
+            listener_instructions.extend(
+                [
+                    f"    acl mcp_client src {mcp_server_ip_address}",
+                    "    tcp-request connection reject unless mcp_client",
+                ]
+            )
+
+        listener_instructions.extend(
+            [
+                f"    default_backend destination_{backend.listen_port}",
+                "",
+                f"backend destination_{backend.listen_port}",
+                "    mode tcp",
+                f"    server database {backend.host}:{backend.port} check",
+            ]
         )
+
+        listener_configuration = "\n".join(listener_instructions)
+        instructions.append(listener_configuration)
 
     final_linefeed_required_by_haproxy = "\n"
     return "\n\n".join(instructions) + final_linefeed_required_by_haproxy

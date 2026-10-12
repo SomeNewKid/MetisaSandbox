@@ -12,20 +12,24 @@ from .sandbox_context import SandboxContext
 def create_sandbox_context() -> SandboxContext:
     """Create a sandbox context."""
     run_identifier, host_run_directory = _create_run_identifier_and_directory()
-    workload_container_name = f"metisa-workload-{run_identifier}"
-    private_network_name = f"metisa-private-{run_identifier}"
-    egress_network_name = f"metisa-egress-{run_identifier}"
+    workload_container_name = f"metisa-container-workload-{run_identifier}"
+    workload_network_name = f"metisa-network-workload-{run_identifier}"
+    backend_network_name = f"metisa-network-backend-{run_identifier}"
+    egress_network_name = f"metisa-network-egress-{run_identifier}"
     host_output_path = _create_output_directory(host_run_directory, "output")
     host_logs_path = _create_logs_directory(host_run_directory, ".logs")
+    host_scratch_path = _create_scratch_directory(host_run_directory, ".scratch")
 
     return SandboxContext(
         run_identifier=run_identifier,
         workload_container_name=workload_container_name,
-        private_network_name=private_network_name,
+        workload_network_name=workload_network_name,
+        backend_network_name=backend_network_name,
         egress_network_name=egress_network_name,
         host_run_path=host_run_directory,
         host_output_path=host_output_path,
         host_logs_path=host_logs_path,
+        host_scratch_path=host_scratch_path,
     )
 
 
@@ -63,6 +67,7 @@ def append_log_file(
 def clean_up_run_directory(
     host_output_directory: Path,
     host_logs_directory: Path,
+    host_scratch_directory: Path,
 ) -> None:
     """Clean up the run directory, preserving log files."""
     output_logs_dir = host_output_directory / ".logs"
@@ -83,6 +88,8 @@ def clean_up_run_directory(
             shutil.move(source_path, destination_path)
 
         shutil.rmtree(output_logs_dir)
+
+    shutil.rmtree(host_scratch_directory)
 
 
 def _create_run_identifier_and_directory() -> tuple[str, Path]:
@@ -125,3 +132,12 @@ def _create_logs_directory(
     logs_directory = host_run_directory / logs_dir_name
     logs_directory.mkdir(parents=True, exist_ok=False)
     return logs_directory
+
+
+def _create_scratch_directory(
+    host_run_directory: Path,
+    scratch_dir_name: str,
+) -> Path:
+    scratch_directory = host_run_directory / scratch_dir_name
+    scratch_directory.mkdir(parents=True, exist_ok=False)
+    return scratch_directory

@@ -56,7 +56,7 @@ def test_tool_3(
 
 
 def get_active_items() -> str:
-
+    """Return the active items from the database."""
     try:
         username, _ = _read_mariadb_credentials()
         if not username:

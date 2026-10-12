@@ -13,9 +13,11 @@ class SandboxContext:
     run_identifier: str
     workload_container_name: str
 
-    private_network_name: str
+    workload_network_name: str
+    backend_network_name: str
     egress_network_name: str
 
     host_run_path: Path
     host_output_path: Path
     host_logs_path: Path
+    host_scratch_path: Path

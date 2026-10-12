@@ -47,7 +47,11 @@ def main(
         raise SystemExit(f"Usage: python -m metisa_sandbox {example}")
 
     specification_path = get_workload_specification_path(workload_module)
-    specification = load_specification(specification_path)
+    try:
+        specification = load_specification(specification_path)
+    except Exception as error:
+        print_error(f"Failed to load specification: {error}")
+        return 1
 
     image_name = get_workload_image_name()
     image_tag = get_image_tag(specification)
