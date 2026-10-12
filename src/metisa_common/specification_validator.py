@@ -148,22 +148,22 @@ def _validate_capabilities(
                 '"localnet" capability requires "network" capability.'
             )
 
-    if Capability.MCP_CLIENT in capabilities:
+    if Capability.MCP_SERVER in capabilities:
         if Capability.NETWORK not in capabilities:
             raise SpecificationValidationError(
-                '"mcp_client" capability requires "network" capability.'
+                '"mcp_server" capability requires "network" capability.'
             )
 
     if Capability.JINA_READER in capabilities:
-        if Capability.MCP_CLIENT not in capabilities:
+        if Capability.MCP_SERVER not in capabilities:
             raise SpecificationValidationError(
-                '"jina_reader" capability requires "mcp_client" capability.'
+                '"jina_reader" capability requires "mcp_server" capability.'
             )
 
     if Capability.CODE_EXECUTION in capabilities:
-        if Capability.MCP_CLIENT not in capabilities:
+        if Capability.MCP_SERVER not in capabilities:
             raise SpecificationValidationError(
-                '"code_execution" capability requires "mcp_client" capability.'
+                '"code_execution" capability requires "mcp_server" capability.'
             )
 
 
@@ -228,9 +228,9 @@ def _validate_mcp_server_specification(
     if mcp_server_specification is None:
         return
 
-    if Capability.MCP_CLIENT not in capabilities:
+    if Capability.MCP_SERVER not in capabilities:
         raise SpecificationValidationError(
-            '"[mcp_server]" table requires "mcp_client" capability.'
+            '"[mcp_server]" table requires "mcp_server" capability.'
         )
 
 

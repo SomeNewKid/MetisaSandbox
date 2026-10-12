@@ -67,7 +67,7 @@ def run_metisa_container_workload_in_sandbox(
     workload_module: str,
 ) -> int:
     """Run the specified workload in a Docker sandbox."""
-    is_mcp_server_required = Capability.MCP_CLIENT in specification.capabilities
+    is_mcp_server_required = Capability.MCP_SERVER in specification.capabilities
     is_jina_reader_required = Capability.JINA_READER in specification.capabilities
     is_code_execution_required = Capability.CODE_EXECUTION in specification.capabilities
 

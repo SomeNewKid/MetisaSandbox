@@ -4,7 +4,7 @@ capabilities = [
     "network",
     "internet",
     "localnet",
-    "mcp_client",
+    "mcp_server",
     "jina_reader",
     "code_execution",
 ]

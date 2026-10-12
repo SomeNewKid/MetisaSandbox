@@ -11,7 +11,7 @@ from metisa_common.specification_models import SpecificationValidationError
 def test_missing_code_execution_table() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_client", "code_execution"]
+        capabilities = ["network", "mcp_server", "code_execution"]
     """
     specification = parse_specification(toml)
     assert specification.code_execution is None
@@ -20,7 +20,7 @@ def test_missing_code_execution_table() -> None:
 def test_code_execution_missing_environs() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_client", "code_execution"]
+        capabilities = ["network", "mcp_server", "code_execution"]
 
         [code_execution]
     """
@@ -31,7 +31,7 @@ def test_code_execution_missing_environs() -> None:
 def test_code_execution_invalid_if_no_network_capability() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["mcp_client", "code_execution"]
+        capabilities = ["mcp_server", "code_execution"]
 
         [code_execution]
         environs = []
@@ -40,7 +40,7 @@ def test_code_execution_invalid_if_no_network_capability() -> None:
         _ = parse_specification(toml)
 
 
-def test_code_execution_invalid_if_no_mcp_client_capability() -> None:
+def test_code_execution_invalid_if_no_mcp_server_capability() -> None:
     toml = """
         agent_name = "sample_agent"
         capabilities = ["network", "code_execution"]
@@ -55,7 +55,7 @@ def test_code_execution_invalid_if_no_mcp_client_capability() -> None:
 def test_code_execution_invalid_if_no_code_execution_capability() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_client"]
+        capabilities = ["network", "mcp_server"]
 
         [code_execution]
         environs = []
@@ -68,7 +68,7 @@ def test_code_execution_invalid_if_no_code_execution_capability() -> None:
 def test_code_execution_with_unknown_key(key: str) -> None:
     toml = f"""
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_client", "code_execution"]
+        capabilities = ["network", "mcp_server", "code_execution"]
 
         [code_execution]
         {key} = []
@@ -80,7 +80,7 @@ def test_code_execution_with_unknown_key(key: str) -> None:
 def test_code_execution_empty_environs() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_client", "code_execution"]
+        capabilities = ["network", "mcp_server", "code_execution"]
 
         [code_execution]
         environs = []
@@ -93,7 +93,7 @@ def test_code_execution_empty_environs() -> None:
 def test_code_execution_valid_environs() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_client", "code_execution"]
+        capabilities = ["network", "mcp_server", "code_execution"]
         environs = ["WORKLOAD=value"]
 
         [mcp_server]
@@ -136,7 +136,7 @@ def test_code_execution_valid_environs() -> None:
 def test_code_execution_environs_with_invalid_item(item: str) -> None:
     toml = f"""
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_client", "code_execution"]
+        capabilities = ["network", "mcp_server", "code_execution"]
 
         [code_execution]
         environs = ["VALID=value", {item}, "ALSO_VALID=value"]

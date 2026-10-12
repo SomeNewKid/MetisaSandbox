@@ -14,7 +14,7 @@ class Capability(StrEnum):
     NETWORK = "network"
     INTERNET = "internet"
     LOCALNET = "localnet"
-    MCP_CLIENT = "mcp_client"
+    MCP_SERVER = "mcp_server"
     JINA_READER = "jina_reader"
     CODE_EXECUTION = "code_execution"
     OLLAMA = "ollama"

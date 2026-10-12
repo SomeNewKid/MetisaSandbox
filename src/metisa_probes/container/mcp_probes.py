@@ -26,7 +26,7 @@ _JINA_READER_TIMEOUT_SECONDS = 75
 def mcp_server_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
     """Verify the MCP sidecar alias resolves to non-loopback addresses."""
     probe_name = "container__mcp__mcp_server_alias_resolves"
-    if Capability.MCP_CLIENT not in probe_context.specification.capabilities:
+    if Capability.MCP_SERVER not in probe_context.specification.capabilities:
         return ProbeResult.success(
             probe_name, "MCP client is disabled. Skipping probe."
         )
@@ -376,7 +376,7 @@ def execute_starlark_code_returns_expected_result(
             f"container__mcp__{probe_name}",
             "Code execution is disabled. Skipping probe.",
         )
-    if Capability.MCP_CLIENT not in probe_context.specification.capabilities:
+    if Capability.MCP_SERVER not in probe_context.specification.capabilities:
         return ProbeResult.success(
             f"container__mcp__{probe_name}",
             "MCP client is disabled. Skipping probe.",
@@ -630,7 +630,7 @@ def _run_starlark_error_probe(
         return ProbeResult.success(
             probe_name, "Code execution is disabled. Skipping probe."
         )
-    if Capability.MCP_CLIENT not in probe_context.specification.capabilities:
+    if Capability.MCP_SERVER not in probe_context.specification.capabilities:
         return ProbeResult.success(
             probe_name, "MCP client is disabled. Skipping probe."
         )
@@ -679,7 +679,7 @@ def _run_mcp_probe(
     timeout_seconds: float = _TIMEOUT_SECONDS,
 ) -> ProbeResult:
     probe_name = f"container__mcp__{name}"
-    if Capability.MCP_CLIENT not in probe_context.specification.capabilities:
+    if Capability.MCP_SERVER not in probe_context.specification.capabilities:
         return ProbeResult.success(
             probe_name, "MCP client is disabled. Skipping probe."
         )

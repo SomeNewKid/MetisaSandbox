@@ -577,7 +577,7 @@ def haproxy_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
     probe_name = "container__network__haproxy_alias_resolves"
     if Capability.LOCALNET not in probe_context.specification.capabilities:
         return ProbeResult.success(probe_name, "Localnet is disabled. Skipping probe.")
-    if Capability.MCP_CLIENT in probe_context.specification.capabilities:
+    if Capability.MCP_SERVER in probe_context.specification.capabilities:
         return ProbeResult.success(
             probe_name, "Localnet access is mediated by MCP. Skipping probe."
         )
@@ -600,7 +600,7 @@ def haproxy_alias_is_absent(probe_context: ProbeContext) -> ProbeResult:
     capabilities = probe_context.specification.capabilities
     if Capability.NETWORK not in capabilities or (
         Capability.LOCALNET in capabilities
-        and Capability.MCP_CLIENT not in capabilities
+        and Capability.MCP_SERVER not in capabilities
     ):
         return ProbeResult.success(
             probe_name, "HAProxy absence check is inapplicable. Skipping probe."
@@ -653,7 +653,7 @@ def haproxy_declared_listeners_are_reachable(
     specification = probe_context.specification
     if Capability.LOCALNET not in specification.capabilities:
         return ProbeResult.success(probe_name, "Localnet is disabled. Skipping probe.")
-    if Capability.MCP_CLIENT in specification.capabilities:
+    if Capability.MCP_SERVER in specification.capabilities:
         return ProbeResult.success(
             probe_name, "Localnet access is mediated by MCP. Skipping probe."
         )
@@ -686,7 +686,7 @@ def haproxy_declared_listeners_are_unavailable(
     capabilities = specification.capabilities
     if (
         Capability.LOCALNET not in capabilities
-        or Capability.MCP_CLIENT not in capabilities
+        or Capability.MCP_SERVER not in capabilities
     ):
         return ProbeResult.success(
             probe_name, "MCP-mediated localnet access is not enabled. Skipping probe."
@@ -775,7 +775,7 @@ def haproxy_undeclared_listener_is_unavailable(
     specification = probe_context.specification
     if Capability.LOCALNET not in specification.capabilities:
         return ProbeResult.success(probe_name, "Localnet is disabled. Skipping probe.")
-    if Capability.MCP_CLIENT in specification.capabilities:
+    if Capability.MCP_SERVER in specification.capabilities:
         return ProbeResult.success(
             probe_name, "Localnet access is mediated by MCP. Skipping probe."
         )
@@ -799,7 +799,7 @@ def haproxy_health_endpoint_is_private(probe_context: ProbeContext) -> ProbeResu
     specification = probe_context.specification
     if Capability.LOCALNET not in specification.capabilities:
         return ProbeResult.success(probe_name, "Localnet is disabled. Skipping probe.")
-    if Capability.MCP_CLIENT in specification.capabilities:
+    if Capability.MCP_SERVER in specification.capabilities:
         return ProbeResult.success(
             probe_name, "Localnet access is mediated by MCP. Skipping probe."
         )

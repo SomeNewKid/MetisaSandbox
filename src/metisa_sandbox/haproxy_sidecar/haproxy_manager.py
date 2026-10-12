@@ -379,8 +379,8 @@ def _create_haproxy_cfg(
         if mcp_server_ip_address is not None:
             listener_instructions.extend(
                 [
-                    f"    acl mcp_client src {mcp_server_ip_address}",
-                    "    tcp-request connection reject unless mcp_client",
+                    f"    acl mcp_server src {mcp_server_ip_address}",
+                    "    tcp-request connection reject unless mcp_server",
                 ]
             )
 
