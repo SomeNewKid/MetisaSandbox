@@ -17,7 +17,7 @@ class Capability(StrEnum):
     MCP_SERVER = "mcp_server"
     JINA_READER = "jina_reader"
     CODE_EXECUTION = "code_execution"
-    OLLAMA = "ollama"
+    LLM_SERVER = "llm_server"
     PLAYWRIGHT_CHROMIUM = "playwright_chromium"
     OPENAI = "openai"
 
@@ -36,7 +36,7 @@ class MetisaSpecification:
     environs: frozenset[str]
     haproxy: HaproxySpecification | None
     squid_proxy: SquidProxySpecification | None
-    ollama_sidecar: OllamaSidecarSpecification | None
+    llm_server: LlmServerSpecification | None
     mcp_server: McpServerSpecification | None
     jina_reader: JinaReaderSpecification | None
     code_execution: CodeExecutionSpecification | None
@@ -67,10 +67,20 @@ class SquidProxySpecification:
 
 
 @dataclass(frozen=True)
-class OllamaSidecarSpecification:
-    """Represents the Ollama Sidecar section of the Metisa specification."""
+class LlmServerSpecification:
+    """Represents the LLM Server section of the Metisa specification."""
 
-    models: tuple[str, ...]
+    models: tuple[LlmModel, ...]
+
+
+@dataclass(frozen=True)
+class LlmModel:
+    """Represents a large language model."""
+
+    alias: str
+    repo: str
+    revision: str
+    filename: str
 
 
 @dataclass(frozen=True)

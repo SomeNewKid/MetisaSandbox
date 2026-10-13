@@ -148,7 +148,9 @@ def inspect_docker_container(
         container_name,
     ]
 
-    deadline = time.monotonic() + 30
+    # Jina Reader can be very slow to start.
+    # LLM Servers can be very slow to start.
+    deadline = time.monotonic() + 360
     attempt = 1
 
     while time.monotonic() < deadline:
@@ -173,7 +175,7 @@ def inspect_docker_container(
         if state_health_status == "unhealthy":
             return False
 
-        time.sleep(attempt * 0.25)
+        time.sleep(attempt * 1)
         attempt += 1
 
     return False

@@ -13,6 +13,7 @@ from .container.docker_probes import DOCKER_PROBES
 from .container.environment_probes import ENVIRONMENT_PROBES
 from .container.filesystem_probes import FILESYSTEM_PROBES
 from .container.identity_probes import IDENTITY_PROBES
+from .container.llm_probes import LLM_PROBES
 from .container.mcp_probes import MCP_PROBES
 from .container.network_probes import NETWORK_PROBES
 from .container.system_command_probes import SYSTEM_COMMAND_PROBES
@@ -65,6 +66,7 @@ def main(
         IDENTITY_PROBES,
         NETWORK_PROBES,
         MCP_PROBES,
+        LLM_PROBES,
         SYSTEM_COMMAND_PROBES,
         SYSTEM_PACKAGE_PROBES,
         LANDLOCK_PROBES,

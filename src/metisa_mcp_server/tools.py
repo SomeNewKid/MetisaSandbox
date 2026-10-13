@@ -107,9 +107,11 @@ def read_content_from_url(
     }
     payload = {"url": url}
 
+    trust_env = False  # Private-network requests must bypass the internet proxy.
+
     try:
         with requests.Session() as session:
-            session.trust_env = False
+            session.trust_env = trust_env
             response = session.post(
                 reader_endpoint,
                 data=payload,
@@ -156,9 +158,11 @@ def execute_starlark_code(
 
     content: str | None = None
 
+    trust_env = False  # Private-network requests must bypass the internet proxy.
+
     try:
         with requests.Session() as session:
-            session.trust_env = False
+            session.trust_env = trust_env
             response = session.post(
                 starlark_endpoint,
                 json=payload,

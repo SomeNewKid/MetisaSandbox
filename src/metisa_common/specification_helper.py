@@ -16,9 +16,10 @@ from .specification_models import (
     HaproxyBackend,
     HaproxySpecification,
     JinaReaderSpecification,
+    LlmModel,
+    LlmServerSpecification,
     McpServerSpecification,
     MetisaSpecification,
-    OllamaSidecarSpecification,
     SpecificationValidationError,
     SquidProxySpecification,
 )
@@ -118,6 +119,32 @@ def dependency_is_valid(
         return False
     match = re.fullmatch(r"([a-zA-Z0-9_-]+)(==|>=|~=)([0-9]+(?:\.[0-9]+)*)", dependency)
     return match is not None
+
+
+def alias_is_valid(
+    alias: str,
+) -> bool:
+    """Validate if a string is a valid within a network alias or hostname."""
+    # Based on RFC 1123 (DNS-compatible service discovery)
+    # but not an RFC 1123 validator.
+    if not alias or not isinstance(alias, str):
+        return False
+
+    if len(alias) > 52:  # normally limit is 253, but use here is a short alias
+        return False
+
+    # Ensure it's not a plain IPv4 address to avoid routing confusion
+    if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", alias):
+        return False
+
+    # Regex rule per label (RFC 1123):
+    # - Must be between 1 and 63 characters long
+    # - Can contain lowercase/uppercase letters, digits, and hyphens
+    # - Must start and end with an alphanumeric character (letter or digit)
+    if not re.match(r"^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$", alias):
+        return False
+
+    return True
 
 
 # Example in a `metisa.toml` file:
@@ -297,7 +324,7 @@ def _create_metisa_specification(
         {
             "squid_proxy",
             "haproxy",
-            "ollama_sidecar",
+            "llm_server",
             "mcp_server",
             "jina_reader",
             "code_execution",
@@ -313,7 +340,7 @@ def _create_metisa_specification(
     environs = _get_environs(toml, "TOML specification environs")
     haproxy = _get_haproxy_specfication(toml)
     squid_proxy = _get_squid_proxy_specification(toml)
-    ollama_sidecar = _get_ollama_sidecar_specification(toml)
+    llm_server = _get_llm_server_specification(toml)
     mcp_server = _get_mcp_server_specification(toml)
     jina_reader = _get_jina_reader_specification(toml)
     code_execution = _get_code_execution_specification(toml)
@@ -324,7 +351,7 @@ def _create_metisa_specification(
         environs=environs,
         haproxy=haproxy,
         squid_proxy=squid_proxy,
-        ollama_sidecar=ollama_sidecar,
+        llm_server=llm_server,
         mcp_server=mcp_server,
         jina_reader=jina_reader,
         code_execution=code_execution,
@@ -454,7 +481,7 @@ def _get_haproxy_specfication(
 
         for raw_backend in raw_backends:
             if not isinstance(raw_backend, dict):
-                error = "HAProxy backends must be an array of ojects"
+                error = "HAProxy backends must be an array of objects"
                 raise SpecificationValidationError(error)
 
             backend = _get_haproxy_backend(raw_backend)
@@ -545,30 +572,99 @@ def _get_squid_proxy_specification(
     )
 
 
-def _get_ollama_sidecar_specification(
+def _get_llm_server_specification(
     toml: dict[str, object],
-) -> OllamaSidecarSpecification | None:
+) -> LlmServerSpecification | None:
 
-    ollama_sidecar = toml.get("ollama_sidecar")
-    if not ollama_sidecar:
+    llm_server = toml.get("llm_server")
+    if not llm_server:
         return None
 
-    if not isinstance(ollama_sidecar, dict):
+    if not isinstance(llm_server, dict):
         raise SpecificationValidationError(
-            "TOML specification ollama_sidecar must be a table."
+            "TOML specification llm_server must be a table."
         )
 
-    OLLAMA_KEYS = frozenset(
+    LLM_SERVER_KEYS = frozenset(
         {
             "models",
         }
     )
 
-    _validate_known_keys(ollama_sidecar, "ollama_sidecar", OLLAMA_KEYS)
+    _validate_known_keys(llm_server, "llm_server", LLM_SERVER_KEYS)
 
-    models = _get_str_tuple(ollama_sidecar["models"], "Ollama models")
+    models: list[LlmModel] = []
 
-    return OllamaSidecarSpecification(models=models)
+    raw_models = llm_server.get("models", [])
+    if raw_models is not None:
+        if isinstance(raw_models, str):
+            raise SpecificationValidationError("LLM server models must be an array.")
+        if not isinstance(raw_models, list):
+            raise SpecificationValidationError("LLM server models must be an array.")
+
+        for raw_model in raw_models:
+            if not isinstance(raw_model, dict):
+                error = "LLM server model must be an array of objects."
+                raise SpecificationValidationError(error)
+
+            model = _get_llm_model(raw_model)
+            if model in models:
+                error = (
+                    "Duplicate LLM server model: "
+                    f"repo={model.repo}, "
+                    f"revision={model.revision}, "
+                    f"filename={model.filename}."
+                )
+                raise SpecificationValidationError(error)
+
+            if any(existing.alias == model.alias for existing in models):
+                error = f"Duplicate LLM server model alias: '{model.alias}'"
+                raise SpecificationValidationError(error)
+
+            models.append(model)
+
+    return LlmServerSpecification(models=tuple(models))
+
+
+def _get_llm_model(
+    definition: dict[str, object],
+) -> LlmModel:
+    alias = definition.get("alias")
+    if not alias:
+        error = "LLM model must specify an alias."
+        raise SpecificationValidationError(error)
+    if not isinstance(alias, str):
+        error = "LLM model must specify a string alias."
+        raise SpecificationValidationError(error)
+    if not alias_is_valid(alias):
+        error = f"LLM model alias not valid: '{alias}'."
+        raise SpecificationValidationError(error)
+
+    repo = definition.get("repo")
+    if not repo:
+        error = "LLM model must specify a repo."
+        raise SpecificationValidationError(error)
+    if not isinstance(repo, str):
+        error = "LLM model must specify a string repo."
+        raise SpecificationValidationError(error)
+
+    revision = definition.get("revision")
+    if not revision:
+        error = "LLM model must specify a revision."
+        raise SpecificationValidationError(error)
+    if not isinstance(revision, str):
+        error = "LLM model must specify a string revision."
+        raise SpecificationValidationError(error)
+
+    filename = definition.get("filename")
+    if not filename:
+        error = "LLM model must specify a filename."
+        raise SpecificationValidationError(error)
+    if not isinstance(filename, str):
+        error = "LLM model must specify a string filename."
+        raise SpecificationValidationError(error)
+
+    return LlmModel(alias, repo, revision, filename)
 
 
 def _get_mcp_server_specification(

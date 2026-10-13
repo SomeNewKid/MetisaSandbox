@@ -1,0 +1,7 @@
+FROM ghcr.io/ggml-org/llama.cpp:server
+
+# The following is inherited from the base image.
+# HEALTHCHECK
+
+# The following is inherited from the base image.
+# ENTRYPOINT ["/app/llama-server"]

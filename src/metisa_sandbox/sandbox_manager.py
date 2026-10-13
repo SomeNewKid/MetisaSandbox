@@ -26,6 +26,10 @@ from .haproxy_sidecar.haproxy_manager import (
 from .jina_reader_sidecar.jina_reader_manager import (
     create_jina_reader_container,
 )
+from .llm_server_sidecar.llm_server_manager import (
+    LLM_CONTAINER_NAME_PREFIX,
+    create_llm_server_containers,
+)
 from .mcp_server_sidecar.mcp_server_manager import (
     create_mcp_server_container,
 )
@@ -70,6 +74,7 @@ def run_metisa_container_workload_in_sandbox(
     is_mcp_server_required = Capability.MCP_SERVER in specification.capabilities
     is_jina_reader_required = Capability.JINA_READER in specification.capabilities
     is_code_execution_required = Capability.CODE_EXECUTION in specification.capabilities
+    is_llm_server_required = Capability.LLM_SERVER in specification.capabilities
 
     is_workload_network_required = Capability.NETWORK in specification.capabilities
     is_internet_access_required = Capability.INTERNET in specification.capabilities
@@ -94,6 +99,7 @@ def run_metisa_container_workload_in_sandbox(
     mcp_server_ip_address: str | None = None
     jina_reader_container_name: str | None = None
     code_execution_container_name: str | None = None
+    llm_server_container_names: list[str] = []
 
     if is_internet_access_required:
         squid_proxy_url = get_squid_proxy_url()
@@ -143,6 +149,13 @@ def run_metisa_container_workload_in_sandbox(
                     specification, sandbox_context
                 )
                 print("Created Squid Proxy container.")
+
+        if is_llm_server_required:
+            print("Creating LLM Server containers.")
+            llm_server_container_names = create_llm_server_containers(
+                specification, sandbox_context
+            )
+            print("Created LLM Server containers.")
 
         if is_jina_reader_required:
             print("Creating Jina Reader container.")
@@ -215,6 +228,12 @@ def run_metisa_container_workload_in_sandbox(
                     sandbox_context,
                     cleanup_errors,
                 )
+
+                if llm_server_container_names:
+                    for llm_server_container_name in llm_server_container_names:
+                        _stop_and_remove_llm_server_container(
+                            sandbox_context, cleanup_errors, llm_server_container_name
+                        )
 
                 if jina_reader_container_name is not None:
                     _stop_and_remove_jina_reader_container(
@@ -402,6 +421,34 @@ def _stop_and_remove_jina_reader_container(
             cleanup_errors=cleanup_errors,
             container_name=jina_reader_container_name,
             container_title="Jina Reader",
+            log_folder=log_folder,
+        )
+
+
+def _stop_and_remove_llm_server_container(
+    sandbox_context: SandboxContext,
+    cleanup_errors: list[str],
+    llm_server_container_name: str,
+) -> None:
+    model_name = llm_server_container_name.removeprefix(LLM_CONTAINER_NAME_PREFIX)
+    model_name = model_name.removeprefix(sandbox_context.run_identifier)
+    model_name = model_name.lstrip("-")
+    log_folder = f"llm_{model_name}"
+    try:
+        _save_files_from_container(
+            sandbox_context,
+            llm_server_container_name,
+            [],
+            log_folder,
+        )
+    except Exception as error:
+        cleanup_errors.append(f"Could not save LLM {model_name} config files: {error}")
+    finally:
+        _stop_and_remove_container(
+            sandbox_context=sandbox_context,
+            cleanup_errors=cleanup_errors,
+            container_name=llm_server_container_name,
+            container_title="LLM Server",
             log_folder=log_folder,
         )
 

@@ -124,6 +124,7 @@ def create_code_execution_container(
             image_name,
         ]
     )
+
     create_docker_container(arguments)
 
     start_docker_container(container_name)

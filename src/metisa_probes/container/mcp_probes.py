@@ -705,7 +705,8 @@ async def _execute_operation(
     async with asyncio.timeout(timeout_seconds):
         # Private-network calls must bypass the workload's internet proxy settings.
         async with httpx2.AsyncClient(
-            trust_env=False, timeout=timeout_seconds
+            trust_env=False,  # Private-network requests must bypass the internet proxy.
+            timeout=timeout_seconds,
         ) as http_client:
             transport = streamable_http_client(_MCP_SERVER_URL, http_client=http_client)
             async with Client(

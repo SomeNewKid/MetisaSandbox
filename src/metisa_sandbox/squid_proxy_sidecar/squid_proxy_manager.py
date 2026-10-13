@@ -169,6 +169,7 @@ def create_squid_proxy_container(
             image_name,
         ]
     )
+
     create_docker_container(arguments)
 
     connect_container_to_docker_network(

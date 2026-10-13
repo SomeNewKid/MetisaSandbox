@@ -166,6 +166,14 @@ def create_jina_reader_container(
         ]
     )
 
+    # Mount temporary (in memory) filesystems.
+    arguments.extend(
+        [
+            "--tmpfs",
+            "/home/jina:rw,size=64m,nosuid,nodev,noexec,mode=0700,uid=1001,gid=997",
+        ]
+    )
+
     # Configure use of Squid Proxy
     if squid_proxy_url is not None and _USE_SQUID_PROXY:
         no_proxy_destinations = ",".join(
@@ -206,6 +214,7 @@ def create_jina_reader_container(
             image_name,
         ]
     )
+
     create_docker_container(arguments)
 
     start_docker_container(container_name)

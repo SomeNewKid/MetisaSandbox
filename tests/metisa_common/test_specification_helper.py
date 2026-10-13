@@ -4,7 +4,11 @@ import re
 
 import pytest
 
-from metisa_common.specification_helper import get_image_tag, parse_specification
+from metisa_common.specification_helper import (
+    alias_is_valid,
+    get_image_tag,
+    parse_specification,
+)
 from metisa_common.specification_models import SpecificationValidationError
 
 
@@ -346,3 +350,31 @@ def _get_image_tag_from_toml(toml: str) -> str:
 
 def _assert_valid_image_tag(image_tag: str) -> None:
     assert re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", image_tag)
+
+
+@pytest.mark.parametrize(
+    "alias",
+    [
+        "web-service",
+        "123service",
+        "service123",
+    ],
+)
+def test_alias_is_valid_with_valid_values(alias: str) -> None:
+    assert alias_is_valid(alias)
+
+
+@pytest.mark.parametrize(
+    "alias",
+    [
+        "web_service",  # INVALID: Underscores break DNS resolution
+        "web-",
+        "-web",
+        "web service",
+        "Web-Service",  # INVLIAD: Uppercase not valid for our use of alias
+        "192.168.1.1",
+        "a" * 53,
+    ],
+)
+def test_alias_is_valid_with_invalid_values(alias: str) -> None:
+    assert not alias_is_valid(alias)

@@ -70,6 +70,22 @@ def main(
     except Exception as error:
         print("MCP server error:", error)
 
+    prompt_for_llm = "Explain Docker networks in two sentences."
+
+    try:
+        print("To Granite:", prompt_for_llm)
+        answer_from_llm = _get_granite_response("granite-4-1b", prompt_for_llm)
+        print("From Granite:", answer_from_llm)
+    except Exception as error:
+        print("Granite error:", error)
+
+    try:
+        print("To Qwen:", prompt_for_llm)
+        answer_from_llm = _get_qwen_response("qwen-3-small", prompt_for_llm)
+        print("From Qwen:", answer_from_llm)
+    except Exception as error:
+        print("Qwen error:", error)
+
     return 0
 
 
@@ -139,10 +155,10 @@ def _get_mcp_server_tool_result(
     async def _call() -> types.CallToolResult:
         async with asyncio.timeout(timeout_seconds):
             # private-network traffic cannot use workload's internet proxy
-            test_env = False
+            trust_env = False
 
             async with httpx2.AsyncClient(
-                trust_env=test_env,
+                trust_env=trust_env,
                 timeout=timeout_seconds,
             ) as http_client:
                 transport = streamable_http_client(
@@ -175,3 +191,78 @@ def _get_mcp_server_tool_result(
         raise RuntimeError(f"Expected a text result from {tool_name}. {actual_type}")
 
     return content.text
+
+
+def _get_granite_response(
+    llm_alias: str,
+    prompt: str,
+) -> str:
+    with requests.Session() as session:
+        # Private-network requests must bypass the internet proxy.
+        session.trust_env = False
+
+        try:
+            response = session.post(
+                f"http://metisa-llm-{llm_alias}:8080/v1/chat/completions",
+                json={
+                    "model": llm_alias,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt,
+                        },
+                    ],
+                    "max_tokens": 128,
+                    "stream": False,
+                },
+                timeout=(5, 600),
+            )
+            response.raise_for_status()
+            result = response.json()
+            answer = result["choices"][0]["message"]["content"]
+            return answer
+        except (requests.RequestException, ValueError, KeyError, IndexError) as error:
+            raise RuntimeError(
+                f"LLM request to '{llm_alias}' failed:", error
+            ) from error
+
+
+def _get_qwen_response(
+    llm_alias: str,
+    prompt: str,
+) -> str:
+    with requests.Session() as session:
+        # Private-network requests must bypass the internet proxy.
+        session.trust_env = False
+
+        try:
+            response = session.post(
+                f"http://metisa-llm-{llm_alias}:8080/v1/chat/completions",
+                json={
+                    "model": llm_alias,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt,
+                        },
+                    ],
+                    "chat_template_kwargs": {"enable_thinking": False},
+                    "max_tokens": 128,
+                    "stream": False,
+                },
+                timeout=(5, 600),
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            choice = result["choices"][0]
+
+            # print("Qwen message:", choice["message"])
+            # print("Qwen finish reason:", choice.get("finish_reason"))
+            # print("Qwen usage:", result.get("usage"))
+
+            return choice["message"]["content"]
+        except (requests.RequestException, ValueError, KeyError, IndexError) as error:
+            raise RuntimeError(
+                f"LLM request to '{llm_alias}' failed:", error
+            ) from error

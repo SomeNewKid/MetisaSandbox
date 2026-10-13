@@ -9,9 +9,9 @@ from .specification_models import (
     CodeExecutionSpecification,
     HaproxySpecification,
     JinaReaderSpecification,
+    LlmServerSpecification,
     McpServerSpecification,
     MetisaSpecification,
-    OllamaSidecarSpecification,
     SpecificationValidationError,
     SquidProxySpecification,
 )
@@ -38,9 +38,9 @@ def validate_specification(
         specification.mcp_server,
     )
 
-    _validate_ollama_sidecar_specification(
+    _validate_llm_server_specification(
         specification.capabilities,
-        specification.ollama_sidecar,
+        specification.llm_server,
     )
 
     _validate_jina_reader_specification(
@@ -234,11 +234,11 @@ def _validate_mcp_server_specification(
         )
 
 
-def _validate_ollama_sidecar_specification(
+def _validate_llm_server_specification(
     capabilities: frozenset[Capability],
-    ollama_sidecar_specification: OllamaSidecarSpecification | None,
+    llm_server_specification: LlmServerSpecification | None,
 ):
-    if ollama_sidecar_specification is None:
+    if llm_server_specification is None:
         return
 
 
