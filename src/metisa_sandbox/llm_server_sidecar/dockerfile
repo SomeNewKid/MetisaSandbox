@@ -1,7 +1,89 @@
 FROM ghcr.io/ggml-org/llama.cpp:server
 
+# Document port 8080 as the port on which the LLM server exposes its API endpoint.
+# This does not publish the port to the host.
+EXPOSE 8080
+
+# STOPSIGNAL: Ask Docker to send the LLM server SIGTERM when stopping the container.
+# SIGTERM: request a hard stop for the LLM server. (SIGUSR1 for a graceful shutdown.)
+# Note that SIGTERM is Docker's default stop signal, 
+# so this line is not really needed.
+STOPSIGNAL SIGTERM
+
+# Create a dedicated runtime account without a login shell or home directory.
+RUN groupadd --system llm \
+    && useradd --system \
+        --gid llm \
+        --no-create-home \
+        --home-dir /nonexistent \
+        --shell /usr/sbin/nologin \
+        llm
+
+# Remove Ubuntu package-management commands and metadata.
+RUN rm -f \
+       /usr/bin/apt \
+       /usr/bin/apt-get \
+       /usr/bin/dpkg \
+       /usr/bin/dpkg-query \
+    && rm -rf \
+       /var/lib/apt \
+       /var/cache/apt \
+       /var/lib/dpkg \
+       /var/log/apt
+       
+# Remove restricted administrative, namespace, persistence,
+# remote-access, and desktop-automation commands.
+RUN set -eu; \
+    for command in \
+        bash \
+        busctl \
+        dbus-send \
+        findmnt \
+        git \
+        gpg \
+        gpg-connect-agent \
+        gpgconf \
+        journalctl \
+        loginctl \
+        mount \
+        nice \
+        nohup \
+        nsenter \
+        perl \
+        renice \
+        scp \
+        sftp \
+        setsid \
+        ssh \
+        ssh-add \
+        su \
+        systemd-run \
+        systemctl \
+        umount \
+        unshare \
+        service \
+        gdbus \
+        qdbus \
+        wmctrl \
+        xdotool \
+    ; do \
+        for directory in \
+            /bin \
+            /sbin \
+            /usr/bin \
+            /usr/sbin \
+            /usr/local/bin \
+            /usr/local/sbin \
+        ; do \
+            rm -f "${directory}/${command}"; \
+        done; \
+    done
+
 # The following is inherited from the base image.
 # HEALTHCHECK
 
 # The following is inherited from the base image.
 # ENTRYPOINT ["/app/llama-server"]
+
+# Run the server and healthcheck as the non-root account.
+USER llm:llm

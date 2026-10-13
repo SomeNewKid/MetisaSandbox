@@ -202,6 +202,27 @@ def get_docker_container_logs(
     return result.stdout, result.stderr
 
 
+def get_docker_container_inspection(
+    container_name: str,
+) -> str:
+    """Get the inspection data for the named Docker container."""
+    docker_command_location = get_docker_command_location()
+
+    command = [
+        docker_command_location,
+        "container",
+        "inspect",
+        container_name,
+    ]
+
+    result = _run_command(
+        command,
+        f"Could not inspect container '{container_name}'",
+    )
+
+    return result.stdout
+
+
 def execute_docker_command(
     arguments: Sequence[str],
 ) -> tuple[int, str]:

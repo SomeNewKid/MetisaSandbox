@@ -193,6 +193,7 @@ def create_mcp_server_container(
     )
 
     # Set the file size limits for the container.
+    # (Applies to file writes, not to existing files.)
     arguments.extend(
         [
             "--ulimit",

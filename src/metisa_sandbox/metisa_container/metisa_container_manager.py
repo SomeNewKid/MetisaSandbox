@@ -224,6 +224,7 @@ def create_docker_run_arguments(
     )
 
     # Set the file size limits for the container.
+    # (Applies to file writes, not to existing files.)
     arguments.extend(
         [
             "--ulimit",

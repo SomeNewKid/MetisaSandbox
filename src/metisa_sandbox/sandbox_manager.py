@@ -12,6 +12,7 @@ from .code_execution_sidecar.code_execution_manager import (
 )
 from .docker.docker_container import (
     copy_container_files_to_host_folder,
+    get_docker_container_inspection,
     get_docker_container_logs,
     remove_docker_container,
     run_docker_container,
@@ -362,6 +363,16 @@ def _save_files_from_container(
     )
 
 
+def _save_container_inspection(
+    sandbox_context: SandboxContext,
+    container_name: str,
+    target_dir_name: str,
+) -> None:
+    inspection = get_docker_container_inspection(container_name)
+    target_dir = sandbox_context.host_logs_path / target_dir_name
+    _save_log_file(target_dir / "inspect.json", inspection)
+
+
 def _stop_and_remove_metisa_workload_container(
     sandbox_context: SandboxContext,
     cleanup_errors: list[str],
@@ -535,6 +546,15 @@ def _stop_and_remove_container(
     container_title: str,
     log_folder: str,
 ) -> None:
+    try:
+        _save_container_inspection(
+            sandbox_context,
+            container_name,
+            log_folder,
+        )
+    except Exception as error:
+        cleanup_errors.append(f"Could not save {container_title} inspection: {error}")
+
     container_stopped = False
 
     try:

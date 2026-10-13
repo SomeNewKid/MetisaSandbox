@@ -44,6 +44,8 @@ def main(
 
     url = "https://example.com"
     try:
+        print()
+        print("-" * 30)
         url_title, url_error = _get_url_title_directly(url)
         if url_error:
             print(f"URL title directly, error: {url_error}")
@@ -53,18 +55,24 @@ def main(
         print("Internet connection exception", error)
 
     try:
+        print()
+        print("-" * 30)
         url_title = _get_url_title_from_mcp_server(url)
         print(f"URL title from MCP Server: '{url_title}'")
     except Exception as error:
         print("MCP server error:", error)
 
     try:
+        print()
+        print("-" * 30)
         url_content = _get_url_content_from_mcp_server(url)
         print(f"URL content from MCP Server: {url_content}")
     except Exception as error:
         print("MCP server error:", error)
 
     try:
+        print()
+        print("-" * 30)
         active_items = _get_active_items()
         print("Database records from MCP server:", active_items)
     except Exception as error:
@@ -73,6 +81,8 @@ def main(
     prompt_for_llm = "Explain Docker networks in two sentences."
 
     try:
+        print()
+        print("-" * 30)
         print("To Granite:", prompt_for_llm)
         answer_from_llm = _get_granite_response("granite-4-1b", prompt_for_llm)
         print("From Granite:", answer_from_llm)
@@ -80,12 +90,17 @@ def main(
         print("Granite error:", error)
 
     try:
+        print()
+        print("-" * 30)
         print("To Qwen:", prompt_for_llm)
         answer_from_llm = _get_qwen_response("qwen-3-small", prompt_for_llm)
         print("From Qwen:", answer_from_llm)
     except Exception as error:
         print("Qwen error:", error)
 
+    print()
+    print("-" * 30)
+    
     return 0
 
 
