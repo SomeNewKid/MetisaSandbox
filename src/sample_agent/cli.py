@@ -12,7 +12,21 @@ import requests
 from mcp import Client, types
 from mcp.client.streamable_http import streamable_http_client
 
-IS_INTERACTIVE = False
+from metisa_common.specification_helper import (
+    load_specification,
+)
+from metisa_common.specification_models import (
+    Capability,
+    MetisaSpecification,
+)
+
+root_directory = Path(__file__).parent
+metisa_json_path = root_directory / "metisa.toml"
+if not metisa_json_path.is_file():
+    raise FileNotFoundError("Sample Agent missing a metisa.toml file.")
+specification: MetisaSpecification = load_specification(metisa_json_path)
+
+IS_INTERACTIVE = Capability.INTERACTIVE in specification.capabilities
 
 
 def main(
@@ -43,64 +57,71 @@ def main(
     print(f"Wrote answer to {answer_path}")
 
     url = "https://example.com"
-    try:
-        print()
-        print("-" * 30)
-        url_title, url_error = _get_url_title_directly(url)
-        if url_error:
-            print(f"URL title directly, error: {url_error}")
-        else:
-            print(f"URL title directly: '{url_title}'")
-    except Exception as error:
-        print("Internet connection exception", error)
 
-    try:
-        print()
-        print("-" * 30)
-        url_title = _get_url_title_from_mcp_server(url)
-        print(f"URL title from MCP Server: '{url_title}'")
-    except Exception as error:
-        print("MCP server error:", error)
+    if Capability.INTERNET in specification.capabilities:
+        try:
+            print()
+            print("-" * 30)
+            url_title, url_error = _get_url_title_directly(url)
+            if url_error:
+                print(f"URL title directly, error: {url_error}")
+            else:
+                print(f"URL title directly: '{url_title}'")
+        except Exception as error:
+            print("Internet connection exception", error)
 
-    try:
-        print()
-        print("-" * 30)
-        url_content = _get_url_content_from_mcp_server(url)
-        print(f"URL content from MCP Server: {url_content}")
-    except Exception as error:
-        print("MCP server error:", error)
+    if Capability.MCP_SERVER in specification.capabilities:
+        if Capability.INTERNET in specification.capabilities:
+            try:
+                print()
+                print("-" * 30)
+                url_title = _get_url_title_from_mcp_server(url)
+                print(f"URL title from MCP Server: '{url_title}'")
+            except Exception as error:
+                print("MCP server error:", error)
 
-    try:
-        print()
-        print("-" * 30)
-        active_items = _get_active_items()
-        print("Database records from MCP server:", active_items)
-    except Exception as error:
-        print("MCP server error:", error)
+            if Capability.JINA_READER in specification.capabilities:
+                try:
+                    print()
+                    print("-" * 30)
+                    url_content = _get_url_content_from_mcp_server(url)
+                    print(f"URL content from MCP Server: {url_content}")
+                except Exception as error:
+                    print("MCP server error:", error)
 
-    prompt_for_llm = "Explain Docker networks in two sentences."
+        if Capability.LOCALNET in specification.capabilities:
+            try:
+                print()
+                print("-" * 30)
+                active_items = _get_active_items()
+                print("Database records from MCP server:", active_items)
+            except Exception as error:
+                print("MCP server error:", error)
 
-    try:
-        print()
-        print("-" * 30)
-        print("To Granite:", prompt_for_llm)
-        answer_from_llm = _get_granite_response("granite-4-1b", prompt_for_llm)
-        print("From Granite:", answer_from_llm)
-    except Exception as error:
-        print("Granite error:", error)
+    if Capability.LLM_SERVER in specification.capabilities:
+        prompt_for_llm = "Explain Docker networks in two sentences."
 
-    try:
-        print()
-        print("-" * 30)
-        print("To Qwen:", prompt_for_llm)
-        answer_from_llm = _get_qwen_response("qwen-3-small", prompt_for_llm)
-        print("From Qwen:", answer_from_llm)
-    except Exception as error:
-        print("Qwen error:", error)
+        try:
+            print()
+            print("-" * 30)
+            print("To Granite:", prompt_for_llm)
+            answer_from_llm = _get_granite_response("granite-4-1b", prompt_for_llm)
+            print("From Granite:", answer_from_llm)
+        except Exception as error:
+            print("Granite error:", error)
+
+        try:
+            print()
+            print("-" * 30)
+            print("To Qwen:", prompt_for_llm)
+            answer_from_llm = _get_qwen_response("qwen-3-small", prompt_for_llm)
+            print("From Qwen:", answer_from_llm)
+        except Exception as error:
+            print("Qwen error:", error)
 
     print()
     print("-" * 30)
-    
+
     return 0
 
 

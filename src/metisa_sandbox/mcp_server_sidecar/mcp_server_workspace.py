@@ -7,10 +7,7 @@ from pathlib import Path
 from ..sandbox_context import SandboxContext
 from ..utilities.workspace_helper import copy_directories_into_staged
 
-LANDLOCK_MODULE_NAME = "metisa_landlock"
 MCP_SERVER_MODULE_NAME = "metisa_mcp_server"
-
-_COMMON_MODULE_NAME = "metisa_common"
 
 
 def create_staged_source_directory(
@@ -25,8 +22,6 @@ def create_staged_source_directory(
         local_source_path,
         staged_source_path,
         [
-            LANDLOCK_MODULE_NAME,
-            _COMMON_MODULE_NAME,
             MCP_SERVER_MODULE_NAME,
         ],
     )

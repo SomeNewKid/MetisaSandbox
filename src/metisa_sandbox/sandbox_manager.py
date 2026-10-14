@@ -40,6 +40,9 @@ from .metisa_container.metisa_container_manager import (
 from .metisa_container.metisa_container_workspace import (
     create_staged_source_directory,
 )
+from .prompt_guard_sidecar.prompt_guard_manager import (
+    create_prompt_guard_container,
+)
 from .sandbox_context import (
     SandboxContext,
 )
@@ -64,6 +67,9 @@ from .squid_proxy_sidecar.squid_proxy_manager import (
 from .utilities.workspace_helper import (
     clean_up_staged_source,
 )
+
+_LOG_INSPECTION_FILES = False
+_ACKNOWLEDGE_INSPECTION_FILES_HAVE_SENSITIVE_DATA = False
 
 
 def run_metisa_container_workload_in_sandbox(
@@ -101,6 +107,8 @@ def run_metisa_container_workload_in_sandbox(
     jina_reader_container_name: str | None = None
     code_execution_container_name: str | None = None
     llm_server_container_names: list[str] = []
+    prompt_guard_container_name: str | None = None
+    prompt_guard_staged_source: Path | None = None
 
     if is_internet_access_required:
         squid_proxy_url = get_squid_proxy_url()
@@ -193,6 +201,13 @@ def run_metisa_container_workload_in_sandbox(
             )
             print("Created MCP Server container.")
 
+        if is_mcp_server_required:
+            print("Creating Prompt Guard container.")
+            prompt_guard_container_name, prompt_guard_staged_source = (
+                create_prompt_guard_container(specification, sandbox_context)
+            )
+            print("Created Prompt Guard container.")
+
         if is_localnet_access_required:
             print("Creating HAProxy container.")
             haproxy_target_network_name = (
@@ -267,6 +282,13 @@ def run_metisa_container_workload_in_sandbox(
                         mcp_server_container_name,
                     )
 
+                if prompt_guard_container_name is not None:
+                    _stop_and_remove_prompt_guard_container(
+                        sandbox_context,
+                        cleanup_errors,
+                        prompt_guard_container_name,
+                    )
+
                 if egress_network_created:
                     try:
                         print("Removing egress network.")
@@ -315,6 +337,9 @@ def run_metisa_container_workload_in_sandbox(
 
                 if mcp_server_staged_source is not None:
                     clean_up_staged_source(mcp_server_staged_source)
+
+                if prompt_guard_staged_source is not None:
+                    clean_up_staged_source(prompt_guard_staged_source)
 
                 if log_file is not None and return_code is not None:
                     append_log_file(log_file, [f"Return code: {return_code}"])
@@ -528,7 +553,7 @@ def _stop_and_remove_mcp_server_container(
             log_folder,
         )
     except Exception as error:
-        cleanup_errors.append(f"Could not save HAProxy config files: {error}")
+        cleanup_errors.append(f"Could not save MCP Server config files: {error}")
     finally:
         _stop_and_remove_container(
             sandbox_context=sandbox_context,
@@ -539,6 +564,31 @@ def _stop_and_remove_mcp_server_container(
         )
 
 
+def _stop_and_remove_prompt_guard_container(
+    sandbox_context: SandboxContext,
+    cleanup_errors: list[str],
+    prompt_guard_container_name: str,
+) -> None:
+    log_folder = "prompt_guard"
+    try:
+        _save_files_from_container(
+            sandbox_context,
+            prompt_guard_container_name,
+            [],
+            log_folder,
+        )
+    except Exception as error:
+        cleanup_errors.append(f"Could not save Prompt Guard config files: {error}")
+    finally:
+        _stop_and_remove_container(
+            sandbox_context=sandbox_context,
+            cleanup_errors=cleanup_errors,
+            container_name=prompt_guard_container_name,
+            container_title="Prompt Guard",
+            log_folder="prompt_guard",
+        )
+
+
 def _stop_and_remove_container(
     sandbox_context: SandboxContext,
     cleanup_errors: list[str],
@@ -546,14 +596,16 @@ def _stop_and_remove_container(
     container_title: str,
     log_folder: str,
 ) -> None:
-    try:
-        _save_container_inspection(
-            sandbox_context,
-            container_name,
-            log_folder,
-        )
-    except Exception as error:
-        cleanup_errors.append(f"Could not save {container_title} inspection: {error}")
+    if _LOG_INSPECTION_FILES and _ACKNOWLEDGE_INSPECTION_FILES_HAVE_SENSITIVE_DATA:
+        try:
+            _save_container_inspection(
+                sandbox_context,
+                container_name,
+                log_folder,
+            )
+        except Exception as error:
+            error_message = f"Could not save {container_title} inspection: {error}"
+            cleanup_errors.append(error_message)
 
     container_stopped = False
 

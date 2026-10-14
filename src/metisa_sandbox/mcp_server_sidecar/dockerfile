@@ -122,17 +122,7 @@ RUN --mount=type=bind,source=remove_python_packaging.py,target=/tmp/remove_pytho
 COPY --chmod=0444 metisa-source.pth \
      /opt/metisa-venv/lib/python3.12/site-packages/metisa-source.pth
 
-# Copy the custom sitecustomize module into the virtual environment,
-# within its site-packages directory.
-# Python runtime discovers it automatically during startup.
-# (This must occur after the trusted build-time operations have finished.)
-COPY --chmod=0444 sitecustomize.py \
-     /opt/metisa-venv/lib/python3.12/site-packages/sitecustomize.py
-
-COPY --chmod=0444 sitecustomize.py \
-     /usr/local/lib/python3.12/site-packages/sitecustomize.py
-
-# Healthcheck used by Docker, periodically checking HAProxy's health endpoint.
+# Healthcheck used by Docker, periodically checking MCP Serverss health endpoint.
 # Read health status from host: docker.exe inspect <container_name>
 HEALTHCHECK \
     --start-period=30s \

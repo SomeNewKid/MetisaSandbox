@@ -18,6 +18,7 @@ class Capability(StrEnum):
     JINA_READER = "jina_reader"
     CODE_EXECUTION = "code_execution"
     LLM_SERVER = "llm_server"
+    PROMPT_GUARD = "prompt_guard"
     PLAYWRIGHT_CHROMIUM = "playwright_chromium"
     OPENAI = "openai"
 

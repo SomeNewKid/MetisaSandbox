@@ -6,6 +6,7 @@ dependencies = [
     "requests==2.34.2",
     "pymysql==1.2.3",
     "mcp==2.3.0",
+    "unidecode==1.4.0",
 ]
 
 [project.scripts]

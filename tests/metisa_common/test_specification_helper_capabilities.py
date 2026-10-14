@@ -42,14 +42,224 @@ def test_capabilities_with_unsupported_value() -> None:
         _ = parse_specification(toml)
 
 
-def test_valid_capabilities() -> None:
+def test_network_capability() -> None:
     toml = """
         agent_name="sample_agent"
         capabilities = ["network"]
     """
     specification = parse_specification(toml)
     assert len(specification.capabilities) == 1
+    assert Capability.INTERACTIVE not in specification.capabilities
     assert Capability.NETWORK in specification.capabilities
+    assert Capability.INTERNET not in specification.capabilities
+    assert Capability.LOCALNET not in specification.capabilities
+    assert Capability.MCP_SERVER not in specification.capabilities
+    assert Capability.JINA_READER not in specification.capabilities
+    assert Capability.CODE_EXECUTION not in specification.capabilities
+    assert Capability.LLM_SERVER not in specification.capabilities
+    assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
+    assert Capability.OPENAI not in specification.capabilities
+
+
+def test_interactive_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["interactive"]
+    """
+    specification = parse_specification(toml)
+    assert len(specification.capabilities) == 1
+    assert Capability.INTERACTIVE in specification.capabilities
+    assert Capability.NETWORK not in specification.capabilities
+    assert Capability.INTERNET not in specification.capabilities
+    assert Capability.LOCALNET not in specification.capabilities
+    assert Capability.MCP_SERVER not in specification.capabilities
+    assert Capability.JINA_READER not in specification.capabilities
+    assert Capability.CODE_EXECUTION not in specification.capabilities
+    assert Capability.LLM_SERVER not in specification.capabilities
+    assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
+    assert Capability.OPENAI not in specification.capabilities
+
+
+def test_internet_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["network", "internet"]
+    """
+    specification = parse_specification(toml)
+    assert len(specification.capabilities) == 2
+    assert Capability.INTERACTIVE not in specification.capabilities
+    assert Capability.NETWORK in specification.capabilities
+    assert Capability.INTERNET in specification.capabilities
+    assert Capability.LOCALNET not in specification.capabilities
+    assert Capability.MCP_SERVER not in specification.capabilities
+    assert Capability.JINA_READER not in specification.capabilities
+    assert Capability.CODE_EXECUTION not in specification.capabilities
+    assert Capability.LLM_SERVER not in specification.capabilities
+    assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
+    assert Capability.OPENAI not in specification.capabilities
+
+
+def test_localnet_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["network", "localnet"]
+    """
+    specification = parse_specification(toml)
+    assert len(specification.capabilities) == 2
+    assert Capability.INTERACTIVE not in specification.capabilities
+    assert Capability.NETWORK in specification.capabilities
+    assert Capability.INTERNET not in specification.capabilities
+    assert Capability.LOCALNET in specification.capabilities
+    assert Capability.MCP_SERVER not in specification.capabilities
+    assert Capability.JINA_READER not in specification.capabilities
+    assert Capability.CODE_EXECUTION not in specification.capabilities
+    assert Capability.LLM_SERVER not in specification.capabilities
+    assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
+    assert Capability.OPENAI not in specification.capabilities
+
+
+def test_mcp_server_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["network", "mcp_server"]
+    """
+    specification = parse_specification(toml)
+    assert len(specification.capabilities) == 2
+    assert Capability.INTERACTIVE not in specification.capabilities
+    assert Capability.NETWORK in specification.capabilities
+    assert Capability.INTERNET not in specification.capabilities
+    assert Capability.LOCALNET not in specification.capabilities
+    assert Capability.MCP_SERVER in specification.capabilities
+    assert Capability.JINA_READER not in specification.capabilities
+    assert Capability.CODE_EXECUTION not in specification.capabilities
+    assert Capability.LLM_SERVER not in specification.capabilities
+    assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
+    assert Capability.OPENAI not in specification.capabilities
+
+
+def test_jina_reader_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["network", "mcp_server", "jina_reader"]
+    """
+    specification = parse_specification(toml)
+    assert len(specification.capabilities) == 3
+    assert Capability.INTERACTIVE not in specification.capabilities
+    assert Capability.NETWORK in specification.capabilities
+    assert Capability.INTERNET not in specification.capabilities
+    assert Capability.LOCALNET not in specification.capabilities
+    assert Capability.MCP_SERVER in specification.capabilities
+    assert Capability.JINA_READER in specification.capabilities
+    assert Capability.CODE_EXECUTION not in specification.capabilities
+    assert Capability.LLM_SERVER not in specification.capabilities
+    assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
+    assert Capability.OPENAI not in specification.capabilities
+
+
+def test_code_execution_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["network", "mcp_server", "code_execution"]
+    """
+    specification = parse_specification(toml)
+    assert len(specification.capabilities) == 3
+    assert Capability.INTERACTIVE not in specification.capabilities
+    assert Capability.NETWORK in specification.capabilities
+    assert Capability.INTERNET not in specification.capabilities
+    assert Capability.LOCALNET not in specification.capabilities
+    assert Capability.MCP_SERVER in specification.capabilities
+    assert Capability.JINA_READER not in specification.capabilities
+    assert Capability.CODE_EXECUTION in specification.capabilities
+    assert Capability.LLM_SERVER not in specification.capabilities
+    assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
+    assert Capability.OPENAI not in specification.capabilities
+
+
+def test_llm_server_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["llm_server"]
+    """
+    specification = parse_specification(toml)
+    assert len(specification.capabilities) == 1
+    assert Capability.INTERACTIVE not in specification.capabilities
+    assert Capability.NETWORK not in specification.capabilities
+    assert Capability.INTERNET not in specification.capabilities
+    assert Capability.LOCALNET not in specification.capabilities
+    assert Capability.MCP_SERVER not in specification.capabilities
+    assert Capability.JINA_READER not in specification.capabilities
+    assert Capability.CODE_EXECUTION not in specification.capabilities
+    assert Capability.LLM_SERVER in specification.capabilities
+    assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
+    assert Capability.OPENAI not in specification.capabilities
+
+
+def test_prompt_guard_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["prompt_guard"]
+    """
+    specification = parse_specification(toml)
+    assert len(specification.capabilities) == 1
+    assert Capability.INTERACTIVE not in specification.capabilities
+    assert Capability.NETWORK not in specification.capabilities
+    assert Capability.INTERNET not in specification.capabilities
+    assert Capability.LOCALNET not in specification.capabilities
+    assert Capability.MCP_SERVER not in specification.capabilities
+    assert Capability.JINA_READER not in specification.capabilities
+    assert Capability.CODE_EXECUTION not in specification.capabilities
+    assert Capability.LLM_SERVER not in specification.capabilities
+    assert Capability.PROMPT_GUARD in specification.capabilities
+    assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
+    assert Capability.OPENAI not in specification.capabilities
+
+
+def test_playwright_chromium_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["playwright_chromium"]
+    """
+    specification = parse_specification(toml)
+    assert len(specification.capabilities) == 1
+    assert Capability.INTERACTIVE not in specification.capabilities
+    assert Capability.NETWORK not in specification.capabilities
+    assert Capability.INTERNET not in specification.capabilities
+    assert Capability.LOCALNET not in specification.capabilities
+    assert Capability.MCP_SERVER not in specification.capabilities
+    assert Capability.JINA_READER not in specification.capabilities
+    assert Capability.CODE_EXECUTION not in specification.capabilities
+    assert Capability.LLM_SERVER not in specification.capabilities
+    assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.PLAYWRIGHT_CHROMIUM in specification.capabilities
+    assert Capability.OPENAI not in specification.capabilities
+
+
+def test_openai_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["openai"]
+    """
+    specification = parse_specification(toml)
+    assert len(specification.capabilities) == 1
+    assert Capability.INTERACTIVE not in specification.capabilities
+    assert Capability.NETWORK not in specification.capabilities
+    assert Capability.INTERNET not in specification.capabilities
+    assert Capability.LOCALNET not in specification.capabilities
+    assert Capability.MCP_SERVER not in specification.capabilities
+    assert Capability.JINA_READER not in specification.capabilities
+    assert Capability.CODE_EXECUTION not in specification.capabilities
+    assert Capability.LLM_SERVER not in specification.capabilities
+    assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
+    assert Capability.OPENAI in specification.capabilities
 
 
 def test_specification_with_unknown_key() -> None:

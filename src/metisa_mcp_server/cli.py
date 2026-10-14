@@ -8,7 +8,7 @@ import sys
 def main(
     argv: list[str] | None = None,
 ) -> int:
-    """Run the Metisa probes."""
+    """Run the MCP Server."""
     args = sys.argv[1:] if argv is None else argv
     if not args:
         print("Error: no tool or resource argument.", file=sys.stderr)
