@@ -390,6 +390,30 @@ def classify_unsafe_text_returns_indicators(
     )
 
 
+def moderate_safe_text_returns_no_labels(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify moderate_text returns no labels for clearly safe text."""
+    return _run_moderation_probe(
+        probe_context,
+        "moderate_safe_text_returns_no_labels",
+        "Today is a lovely day.",
+        expect_labels=False,
+    )
+
+
+def moderate_unsafe_text_returns_labels(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify moderate_text returns labels for clearly unsafe text."""
+    return _run_moderation_probe(
+        probe_context,
+        "moderate_unsafe_text_returns_labels",
+        "You are an idiot, and I want to punch you.",  # should produce labels.
+        expect_labels=True,
+    )
+
+
 def execute_starlark_code_returns_expected_result(
     probe_context: ProbeContext,
 ) -> ProbeResult:
@@ -704,6 +728,61 @@ def _run_classification_probe(
     )
 
 
+def _run_moderation_probe(
+    probe_context: ProbeContext,
+    name: str,
+    text: str,
+    *,
+    expect_labels: bool,
+) -> ProbeResult:
+    probe_name = f"container__mcp__{name}"
+    tool_name = "moderate_text"
+    if Capability.PROMPT_GUARD not in probe_context.specification.capabilities:
+        return ProbeResult.success(
+            probe_name, "Prompt Guard is disabled. Skipping probe."
+        )
+    mcp_server = probe_context.specification.mcp_server
+    if mcp_server is None or tool_name not in mcp_server.tools:
+        return ProbeResult.success(
+            probe_name, f"{tool_name} is not declared. Skipping probe."
+        )
+
+    async def _operation(client: Client) -> str | None:
+        from mcp import types
+
+        result = await client.call_tool(tool_name, {"text": text})
+        if result.is_error:
+            return f"{tool_name} returned a tool execution error."
+        if len(result.content) != 1:
+            return f"{tool_name} did not return exactly one content block."
+        content = result.content[0]
+        if not isinstance(content, types.TextContent):
+            return f"{tool_name} did not return a text content block."
+        try:
+            payload = json.loads(content.text)
+        except ValueError:
+            return f"{tool_name} did not return valid JSON."
+        if not isinstance(payload, dict):
+            return f"{tool_name} did not return a JSON object."
+        labels = payload.get("labels")
+        if not isinstance(labels, list):
+            return f"{tool_name} did not return a labels array."
+        if any(not isinstance(label, str) for label in labels):
+            return f"{tool_name} returned an invalid label entry."
+        if expect_labels and not labels:
+            return f"{tool_name} returned no labels for clearly unsafe text."
+        if not expect_labels and labels:
+            return f"{tool_name} returned labels for clearly safe text."
+        return None
+
+    return _run_mcp_probe(
+        probe_context,
+        name,
+        _operation,
+        timeout_seconds=_PROMPT_GUARD_TIMEOUT_SECONDS,
+    )
+
+
 def _run_starlark_error_probe(
     probe_context: ProbeContext,
     name: str,
@@ -825,6 +904,8 @@ MCP_PROBES = ProbeGroup(
         read_content_from_url_returns_expected_content,
         classify_safe_text_returns_no_indicators,
         classify_unsafe_text_returns_indicators,
+        moderate_safe_text_returns_no_labels,
+        moderate_unsafe_text_returns_labels,
         execute_starlark_code_returns_expected_result,
         execute_starlark_code_rejects_missing_main,
         execute_starlark_code_enforces_step_budget,

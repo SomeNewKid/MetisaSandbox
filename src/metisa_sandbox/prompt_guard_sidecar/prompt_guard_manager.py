@@ -64,24 +64,47 @@ def create_prompt_guard_container(
         ]
     )
 
-    # Mount the necessary models.
-    local_model_path = (
+    # Mount the Meta LLaMA model.
+    local_llama_path = (
         Path(r"C:\Git\__Models")
         / "meta-llama"
         / "Llama-Prompt-Guard-2-22M"
         / "11614a155199674a0a95e6602d6ab0417b790ed0"
     )
-    if not local_model_path.is_dir():
-        raise FileNotFoundError(f"Model files not found at {local_model_path}")
-    local_model_location = str(local_model_path)
-    container_model_location = "/models/llama-prompt-guard"
+    if not local_llama_path.is_dir():
+        raise FileNotFoundError(f"Model files not found at {local_llama_path}")
+    local_llama_location = str(local_llama_path)
+    container_llama_location = "/models/llama-prompt-guard"
     arguments.extend(
         [
             "--mount",
             (
                 "type=bind,"
-                f"source={local_model_location},"
-                f"target={container_model_location},"
+                f"source={local_llama_location},"
+                f"target={container_llama_location},"
+                "readonly"
+            ),
+        ]
+    )
+
+    # Mount the Koala model.
+    local_koala_path = (
+        Path(r"C:\Git\__Models")
+        / "KoalaAI"
+        / "Text-Moderation"
+        / "838ade0edb66dcffc5532d08ff6ed5c899abfb5c"
+    )
+    if not local_koala_path.is_dir():
+        raise FileNotFoundError(f"Model files not found at {local_koala_path}")
+    local_koala_location = str(local_koala_path)
+    container_koala_location = "/models/koala-text-moderation"
+    arguments.extend(
+        [
+            "--mount",
+            (
+                "type=bind,"
+                f"source={local_koala_location},"
+                f"target={container_koala_location},"
                 "readonly"
             ),
         ]

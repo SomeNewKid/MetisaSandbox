@@ -32,6 +32,7 @@ from .tools import (
     execute_starlark_code,
     get_active_items,
     get_title_from_url,
+    moderate_text,
     read_content_from_url,
     test_tool_1,
     test_tool_2,
@@ -119,6 +120,7 @@ TOOL_REGISTRY = _create_tool_registry(
         read_content_from_url,
         execute_starlark_code,
         classify_text,
+        moderate_text,
     ],
 )
 

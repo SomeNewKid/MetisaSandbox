@@ -9,7 +9,6 @@ import torch
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
-    PreTrainedTokenizer,
     TextClassificationPipeline,
 )
 
@@ -30,14 +29,16 @@ def get_indicators(
 
     with _CLASSIFIER_LOCK:
         classifier = _get_classifier()
-        if (not classifier.model 
-            or not classifier.model.config 
-            or not classifier.model.config.id2label):
+        if (
+            not classifier.model
+            or not classifier.model.config
+            or not classifier.model.config.id2label
+        ):
             raise RuntimeError("Classifier model not available.")
 
         tokenizer = classifier.tokenizer
         if tokenizer is None:
-            raise ValueError("Classifier tokenizer not available")
+            raise ValueError("Classifier tokenizer not available.")
 
         encoded = tokenizer(
             text,
@@ -56,7 +57,7 @@ def get_indicators(
                 model_inputs = {}
                 for name in tokenizer.model_input_names:
                     if name in encoded:
-                        chunk_tensor = encoded[name][index:index+1]
+                        chunk_tensor = encoded[name][index : index + 1]
                         model_inputs[name] = chunk_tensor.to(classifier.device)
 
                 output = classifier.model(**model_inputs)

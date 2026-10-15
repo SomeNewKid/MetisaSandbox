@@ -160,8 +160,42 @@ def classify_text(
         return content
     except Exception as error:
         if content:
-            raise RuntimeError(f"Prompt Guard return an error: {content}") from error
-        raise RuntimeError(f"Prompt Guard return an error: {error}") from error
+            raise RuntimeError(f"Prompt Guard returned an error: {content}") from error
+        raise RuntimeError(f"Prompt Guard returned an error: {error}") from error
+
+
+def moderate_text(
+    text: Annotated[str, Field(description="The text to moderate")],
+) -> str | None:
+    """Return the classificatin of the provided text."""
+    prompt_guard_endpoint = "http://metisa-prompt-guard:8000/moderate"
+    headers = {
+        "Accept": "application/json",
+    }
+    payload = {"text": text}
+
+    content: str | None = None
+
+    trust_env = False  # Private-network requests must bypass the internet proxy.
+
+    try:
+        with requests.Session() as session:
+            session.trust_env = trust_env
+            response = session.post(
+                prompt_guard_endpoint,
+                json=payload,
+                headers=headers,
+                timeout=(5, 240),
+            )
+            content = response.text
+            response.raise_for_status()
+        if not content:
+            raise RuntimeError("Prompt Guard did not return any content")
+        return content
+    except Exception as error:
+        if content:
+            raise RuntimeError(f"Prompt Guard returned an error: {content}") from error
+        raise RuntimeError(f"Prompt Guard returned an error: {error}") from error
 
 
 def execute_starlark_code(

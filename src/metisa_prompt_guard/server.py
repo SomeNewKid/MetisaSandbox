@@ -5,7 +5,9 @@ from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .checker import run_checks
-from .meta_llama import initialize_classifier
+from .koala_moderation import initialize_classifier as initialize_koala_classifier
+from .meta_llama import initialize_classifier as initialize_llama_classifier
+from .moderator import get_labels
 
 _MAX_REQUEST_BYTES = 1024 * 1024  # 1 MiB
 _CODE_200_OK = 200
@@ -31,7 +33,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:
-        if self.path != "/classify":
+        if self.path != "/classify" and self.path != "/moderate":
             self.send_error(_CODE_404_NOT_FOUND)
             return
 
@@ -83,16 +85,30 @@ class _RequestHandler(BaseHTTPRequestHandler):
             self.send_error(_CODE_400_BAD_REQUEST, "'text' must be a string")
             return
 
-        try:
-            indicators = run_checks(text)
-        except ExceptionGroup:
-            self.send_error(_CODE_500_INTERNAL_SERVER_ERROR, "Classification failed")
+        if self.path == "/classify":
+            try:
+                indicators = run_checks(text)
+            except Exception:
+                self.send_error(
+                    _CODE_500_INTERNAL_SERVER_ERROR, "Classification failed"
+                )
+                return
+
+            result = {"indicators": [asdict(item) for item in indicators]}
+            response_text = json.dumps(result)
+        elif self.path == "/moderate":
+            try:
+                labels = get_labels(text)
+            except Exception:
+                self.send_error(_CODE_500_INTERNAL_SERVER_ERROR, "Labeling failed")
+                return
+            result = {"labels": [label for label in labels]}
+            response_text = json.dumps(result)
+        else:
+            self.send_error(_CODE_404_NOT_FOUND)
             return
 
-        result = {"indicators": [asdict(item) for item in indicators]}
-        response_text = json.dumps(result)
         body = response_text.encode("utf-8")
-
         self.send_response(_CODE_200_OK)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -102,7 +118,8 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     """Run the HTTP server until it is stopped."""
-    initialize_classifier()
+    initialize_llama_classifier()
+    initialize_koala_classifier()
 
     with ThreadingHTTPServer(("0.0.0.0", 8000), _RequestHandler) as server:
         server.serve_forever()
