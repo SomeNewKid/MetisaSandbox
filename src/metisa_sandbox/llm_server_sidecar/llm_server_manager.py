@@ -82,7 +82,12 @@ def _create_llm_server_container(
     arguments.extend(
         [
             "--mount",
-            f"type=bind,source={local_model_location},target={container_model_location},readonly",
+            (
+                "type=bind,"
+                f"source={local_model_location},"
+                f"target={container_model_location},"
+                "readonly"
+            ),
         ]
     )
 

@@ -64,6 +64,29 @@ def create_prompt_guard_container(
         ]
     )
 
+    # Mount the necessary models.
+    local_model_path = (
+        Path(r"C:\Git\__Models")
+        / "meta-llama"
+        / "Llama-Prompt-Guard-2-22M"
+        / "11614a155199674a0a95e6602d6ab0417b790ed0"
+    )
+    if not local_model_path.is_dir():
+        raise FileNotFoundError(f"Model files not found at {local_model_path}")
+    local_model_location = str(local_model_path)
+    container_model_location = "/models/llama-prompt-guard"
+    arguments.extend(
+        [
+            "--mount",
+            (
+                "type=bind,"
+                f"source={local_model_location},"
+                f"target={container_model_location},"
+                "readonly"
+            ),
+        ]
+    )
+
     # Set the working directory for the container.
     arguments.extend(
         [
@@ -72,18 +95,138 @@ def create_prompt_guard_container(
         ]
     )
 
+    # Mount temporary (in memory) filesystems.
+    arguments.extend(
+        [
+            "--tmpfs",
+            "/tmp:rw,size=64m,nosuid,nodev,noexec",
+        ]
+    )
+
+    # Mount the container's root filesystem as strictly read-only
+    # Couple with in memory temporary writes (--tmpfs)
+    # or with read-write mounted volumes (-volume /host/path:/volume:rw).
+    arguments.extend(
+        [
+            "--read-only",
+        ]
+    )
+
+    # Linux control groups, or cgroups, organize processes and
+    # enforce resource accounting and limits such as:
+    # - Memory usage
+    # - CPU allocation
+    # - Process counts
+    # - I/O limits
+    # Docker already places each container into one or more cgroups.
+    # A cgroup namespace controls how much of that cgroup hierarchy a process can see.
+    arguments.extend(
+        [
+            "--cgroupns",
+            "private",
+        ]
+    )
+
+    # Allow the container more time to start.
+    # The model is loaded eagerly, which can take some time.
+    arguments.extend(
+        [
+            "--health-start-period",
+            "360s",
+        ]
+    )
+
+    # Executing another program cannot grant the process privileges
+    # it did not already have.  It prevents privilege escalation through:
+    # Set-user-ID,
+    # Set-group-ID,
+    # Executables with Linux file capabilities.
+    arguments.extend(
+        [
+            "--security-opt",
+            "no-new-privileges=true",
+        ]
+    )
+
+    # Drop all Linux capabilities for the container.
+    # https://man7.org/linux/man-pages/man7/capabilities.7.html
+    # Docker already excludes more dangerous capabilities such as
+    # SYS_ADMIN, NET_ADMIN, SYS_PTRACE, and SYS_MODULE by default.
+    arguments.extend(["--cap-drop", "ALL"])
+
+    # Without --init, the command supplied after the image
+    # becomes PID 1 inside the container.
+    # PID 1 has special responsibilities on Linux.
+    # In particular, it inherits orphaned descendant processes and
+    # must collect, or “reap,” processes that have exited.
+    # Ordinary applications are not always designed to perform that role correctly.
+    # With --init, Docker inserts its small docker-init process as PID 1.
+    arguments.extend(
+        [
+            "--init",  # correctly reaps exited and orphaned processes.
+            "--pids-limit",  # Bounds how many processes the container may have at once
+            "64",
+        ]
+    )
+
+    # Set CPU limits for the container.
+    arguments.extend(
+        [
+            "--cpus",
+            "2",
+        ]
+    )
+
+    # Set memory limits for the container.
+    arguments.extend(
+        [
+            "--memory",
+            "3g",
+            "--memory-swap",  # no additional swap beyond the memory limit
+            "3g",
+        ]
+    )
+
+    # Set the open file descriptor limits for the container.
+    # A file descriptor is a small non-negative integer that
+    # a Unix process uses as a handle to an open operating-system resource.
+    # Limiting descriptors protects against accidental or hostile resource exhaustion.
+    arguments.extend(
+        [
+            "--ulimit",
+            "nofile=512:512",
+        ]
+    )
+
+    # Set the per-user process limits for the container.
+    arguments.extend(
+        [
+            "--ulimit",
+            "nproc=64:64",
+        ]
+    )
+
+    # Set the file size limits for the container.
+    arguments.extend(
+        [
+            "--ulimit",
+            "fsize=1048576:1048576",
+        ]
+    )
+
+    # Require privileges when binding ports below 1024.
+    arguments.extend(
+        [
+            "--sysctl",
+            "net.ipv4.ip_unprivileged_port_start=1024",
+        ]
+    )
+
     # Run as the guardian user
     uid = 10001  # guardian user
     gid = 10001  # guardian group
     arguments.extend(
         ["--user", f"{uid}:{gid}"],
-    )
-
-    # Set environment variables for the container.
-    environs.extend(
-        [
-            "METISA_RUNTIME_ROLE=landlock",
-        ]
     )
 
     for environ in environs:
@@ -107,6 +250,7 @@ def create_prompt_guard_container(
             f"{_GUEST_PYTHON_VENV}/bin/python",
             "-I",  # Run the Python interpreter in isolated, no-bytecode mode
             "-B",  # Don't write .pyc files on import
+            "-u",  # makes stdout and stderr unbuffered
             "-m",
             f"{PROMPT_GUARD_MODULE_NAME}.server",
         ]

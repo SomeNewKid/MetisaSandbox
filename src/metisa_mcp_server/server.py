@@ -28,6 +28,7 @@ from .resources import (
     test_resource_3,
 )
 from .tools import (
+    classify_text,
     execute_starlark_code,
     get_active_items,
     get_title_from_url,
@@ -117,6 +118,7 @@ TOOL_REGISTRY = _create_tool_registry(
         get_title_from_url,
         read_content_from_url,
         execute_starlark_code,
+        classify_text,
     ],
 )
 

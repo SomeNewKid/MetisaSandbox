@@ -23,7 +23,7 @@ from ..sandbox_context import SandboxContext
 
 _IMAGE_FORMAT_VERSION = 1
 _JINA_READER_ALIAS = "metisa-jina-reader"
-_JINA_READER_IMAGE_NAME = "metisa-jina-reader-proxy"
+_JINA_READER_IMAGE_NAME = "metisa-jina-reader"
 _USE_SQUID_PROXY = True
 
 

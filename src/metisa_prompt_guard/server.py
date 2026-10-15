@@ -5,8 +5,9 @@ from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .checker import run_checks
+from .meta_llama import initialize_classifier
 
-_MAX_REQUEST_BYTES = 1024 * 1024 # 1 MiB
+_MAX_REQUEST_BYTES = 1024 * 1024  # 1 MiB
 _CODE_200_OK = 200
 _CODE_400_BAD_REQUEST = 400
 _CODE_404_NOT_FOUND = 404
@@ -35,19 +36,18 @@ class _RequestHandler(BaseHTTPRequestHandler):
             return
 
         if self.headers.get_content_type() != "application/json":
-            self.send_error(_CODE_415_UNSUPPORTED_MEDIA_TYPE, 
-                            "Expected application/json")
+            self.send_error(
+                _CODE_415_UNSUPPORTED_MEDIA_TYPE, "Expected application/json"
+            )
             return
 
         if self.headers.get("Transfer-Encoding") is not None:
-            self.send_error(_CODE_400_BAD_REQUEST, 
-                            "Transfer-Encoding is not supported")
+            self.send_error(_CODE_400_BAD_REQUEST, "Transfer-Encoding is not supported")
             return
 
         length_header = self.headers.get("Content-Length")
         if length_header is None:
-            self.send_error(_CODE_411_LENGTH_REQUIRED, 
-                            "Content-Length is required")
+            self.send_error(_CODE_411_LENGTH_REQUIRED, "Content-Length is required")
             return
 
         try:
@@ -61,8 +61,9 @@ class _RequestHandler(BaseHTTPRequestHandler):
             return
 
         if length > _MAX_REQUEST_BYTES:
-            self.send_error(_CODE_413_CONTENT_TOO_LARGE_413, 
-                            "Request body is too large")
+            self.send_error(
+                _CODE_413_CONTENT_TOO_LARGE_413, "Request body is too large"
+            )
             return
 
         raw_body = self.rfile.read(length)
@@ -73,7 +74,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
             self.send_error(_CODE_400_BAD_REQUEST, "Expected valid UTF-8 JSON")
             return
 
-        if not isinstance(payload,dict):
+        if not isinstance(payload, dict):
             self.send_error(_CODE_400_BAD_REQUEST, "Expected a JSON object")
             return
 
@@ -84,7 +85,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
         try:
             indicators = run_checks(text)
-        except Exception:
+        except ExceptionGroup:
             self.send_error(_CODE_500_INTERNAL_SERVER_ERROR, "Classification failed")
             return
 
@@ -101,6 +102,8 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     """Run the HTTP server until it is stopped."""
+    initialize_classifier()
+
     with ThreadingHTTPServer(("0.0.0.0", 8000), _RequestHandler) as server:
         server.serve_forever()
 

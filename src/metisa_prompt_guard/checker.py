@@ -10,11 +10,12 @@ from .checks.direct_prompt_injections import (
     has_attempt_to_reveal_system_prompt_in_normalized_words,
 )
 from .helper import get_normalized_words
+from .meta_llama import get_indicators
 from .models import Indicator
 
 CheckFunction = Callable[[Sequence[str]], Indicator | None]
 
-_CHECKS: tuple[CheckFunction, ...] = (
+_HEURISTIC_CHECKS: tuple[CheckFunction, ...] = (
     has_attempt_to_change_authority_in_normalized_words,
     has_attempt_to_ignore_instructions_in_normalized_words,
     has_attempt_to_reveal_system_prompt_in_normalized_words,
@@ -22,6 +23,24 @@ _CHECKS: tuple[CheckFunction, ...] = (
 
 
 def run_checks(
+    text: str,
+    *,
+    run_meta_llama_checks: bool = True,  # disable Meta LLaMA checks for unit testing
+) -> tuple[Indicator, ...]:
+    """Run heuristic checks on the provided text."""
+    indicators: list[Indicator] = []
+    try:
+        indicators.extend(_run_heuristic_checks(text))
+        if run_meta_llama_checks:
+            indicators.extend(get_indicators(text))
+    except Exception as error:
+        # Ensure that, if an error occurs, we don't return an empty list of indicators,
+        # which would incorrectly indicate that no issues were found.
+        indicators.append(Indicator("checker_exception", f"{error}"))
+    return tuple(indicators)
+
+
+def _run_heuristic_checks(
     text: str,
 ) -> tuple[Indicator, ...]:
     """Run heuristic checks on the provided text."""
@@ -40,7 +59,7 @@ def _run_checks_on_chunk(
     indicators: list[Indicator] = []
 
     if words_in_chunk:
-        for check in _CHECKS:
+        for check in _HEURISTIC_CHECKS:
             indicator = check(words_in_chunk)
             if indicator is not None:
                 indicators.append(indicator)

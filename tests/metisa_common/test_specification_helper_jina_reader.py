@@ -11,7 +11,7 @@ from metisa_common.specification_models import SpecificationValidationError
 def test_missing_jina_reader_table() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_server", "jina_reader"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "jina_reader"]
     """
     specification = parse_specification(toml)
     assert specification.jina_reader is None
@@ -20,7 +20,7 @@ def test_missing_jina_reader_table() -> None:
 def test_jina_reader_missing_environs() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_server", "jina_reader"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "jina_reader"]
 
         [jina_reader]
     """
@@ -31,7 +31,7 @@ def test_jina_reader_missing_environs() -> None:
 def test_jina_reader_invalid_if_no_network_capability() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["mcp_server", "jina_reader"]
+        capabilities = ["mcp_server", "prompt_guard", "jina_reader"]
 
         [jina_reader]
         environs = []
@@ -43,7 +43,7 @@ def test_jina_reader_invalid_if_no_network_capability() -> None:
 def test_jina_reader_invalid_if_no_mcp_server_capability() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "jina_reader"]
+        capabilities = ["network", "prompt_guard", "jina_reader"]
 
         [jina_reader]
         environs = []
@@ -55,7 +55,7 @@ def test_jina_reader_invalid_if_no_mcp_server_capability() -> None:
 def test_jina_reader_invalid_if_no_jina_reader_capability() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network"]
+        capabilities = ["network", "prompt_guard"]
 
         [jina_reader]
         environs = []
@@ -68,7 +68,7 @@ def test_jina_reader_invalid_if_no_jina_reader_capability() -> None:
 def test_jina_reader_with_unknown_key(key: str) -> None:
     toml = f"""
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_server", "jina_reader"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "jina_reader"]
 
         [jina_reader]
         {key} = []
@@ -80,7 +80,7 @@ def test_jina_reader_with_unknown_key(key: str) -> None:
 def test_jina_reader_empty_environs() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_server", "jina_reader"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "jina_reader"]
 
         [jina_reader]
         environs = []
@@ -93,7 +93,7 @@ def test_jina_reader_empty_environs() -> None:
 def test_jina_reader_valid_environs() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_server", "jina_reader"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "jina_reader"]
         environs = ["WORKLOAD=value"]
 
         [mcp_server]
@@ -136,7 +136,7 @@ def test_jina_reader_valid_environs() -> None:
 def test_jina_reader_environs_with_invalid_item(item: str) -> None:
     toml = f"""
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_server", "jina_reader"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "jina_reader"]
 
         [jina_reader]
         environs = ["VALID=value", {item}, "ALSO_VALID=value"]

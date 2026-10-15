@@ -153,6 +153,10 @@ def _validate_capabilities(
             raise SpecificationValidationError(
                 '"mcp_server" capability requires "network" capability.'
             )
+        if Capability.PROMPT_GUARD not in capabilities:
+            raise SpecificationValidationError(
+                '"mcp_server" capability requires "prompt_guard" capability.'
+            )
 
     if Capability.JINA_READER in capabilities:
         if Capability.MCP_SERVER not in capabilities:

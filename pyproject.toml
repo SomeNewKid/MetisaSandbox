@@ -7,6 +7,9 @@ dependencies = [
     "pymysql==1.2.3",
     "mcp==2.3.0",
     "unidecode==1.4.0",
+    "accelerate==1.15.0",
+    "torch==2.14.1",
+    "transformers==5.19.0",
 ]
 
 [project.scripts]

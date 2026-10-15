@@ -62,7 +62,12 @@ def create_haproxy_container(
         arguments.extend(
             [
                 "--mount",
-                f"type=bind,source={haproxy_cfg_file},target=/etc/haproxy/haproxy.cfg,readonly",
+                (
+                    "type=bind,"
+                    f"source={haproxy_cfg_file},"
+                    "target=/etc/haproxy/haproxy.cfg,"
+                    "readonly"
+                ),
             ]
         )
 

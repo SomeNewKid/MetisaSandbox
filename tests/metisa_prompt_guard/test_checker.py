@@ -17,7 +17,7 @@ from metisa_prompt_guard.checker import (
 def test_run_checks_on_safe_content(
     content: str,
 ):
-    indicators = run_checks(content)
+    indicators = run_checks(content, run_meta_llama_checks=False)
     assert indicators is not None
     assert len(indicators) == 0
 
@@ -38,7 +38,7 @@ def test_run_checks_on_safe_content(
 def test_run_checks_on_attempts_to_ignore_instructions(
     content: str,
 ):
-    indicators = run_checks(content)
+    indicators = run_checks(content, run_meta_llama_checks=False)
     assert indicators is not None
     assert len(indicators) > 0
 
@@ -59,7 +59,7 @@ def test_run_checks_on_attempts_to_ignore_instructions(
 def test_run_checks_on_attempts_to_change_authority(
     content: str,
 ):
-    indicators = run_checks(content)
+    indicators = run_checks(content, run_meta_llama_checks=False)
     assert indicators is not None
     assert len(indicators) > 0
 
@@ -80,6 +80,6 @@ def test_run_checks_on_attempts_to_change_authority(
 def test_run_checks_on_attempts_to_reveal_system_prompt(
     content: str,
 ):
-    indicators = run_checks(content)
+    indicators = run_checks(content, run_meta_llama_checks=False)
     assert indicators is not None
     assert len(indicators) > 0

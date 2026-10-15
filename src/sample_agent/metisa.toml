@@ -38,6 +38,7 @@ tools = [
     "get_title_from_url",
     "read_content_from_url",
     "execute_starlark_code",
+    "classify_text",
 ]
 resources = [
     "test_resource_2",
