@@ -16,6 +16,7 @@ from .specification_models import (
     HaproxyBackend,
     HaproxySpecification,
     JinaReaderSpecification,
+    LlmBrokerSpecification,
     LlmModel,
     LlmServerSpecification,
     McpServerSpecification,
@@ -189,7 +190,7 @@ def get_resolved_environs_for_metisa(
 def get_resolved_environs_for_mcp_server(
     specification: MetisaSpecification,
 ) -> list[str]:
-    """Resolve environment variables specified for the MCP server workload container."""
+    """Resolve environment variables specified for the MCP server container."""
     if not specification.mcp_server:
         return []
     if not specification.mcp_server.environs:
@@ -197,10 +198,21 @@ def get_resolved_environs_for_mcp_server(
     return _get_resolved_environs(specification.mcp_server.environs)
 
 
+def get_resolved_environs_for_llm_broker(
+    specification: MetisaSpecification,
+) -> list[str]:
+    """Resolve environment variables specified for the LLM Broker container."""
+    if not specification.llm_broker:
+        return []
+    if not specification.llm_broker.environs:
+        return []
+    return _get_resolved_environs(specification.llm_broker.environs)
+
+
 def get_resolved_environs_for_jina_reader(
     specification: MetisaSpecification,
 ) -> list[str]:
-    """Resolve environment variables specified for the MCP server workload container."""
+    """Resolve environment variables specified for the Jina Reader container."""
     if not specification.jina_reader:
         return []
     if not specification.jina_reader.environs:
@@ -211,7 +223,7 @@ def get_resolved_environs_for_jina_reader(
 def get_resolved_environs_for_code_execution(
     specification: MetisaSpecification,
 ) -> list[str]:
-    """Resolve environment variables specified for the MCP server workload container."""
+    """Resolve environment variables specified for the Code Execution container."""
     if not specification.code_execution:
         return []
     if not specification.code_execution.environs:
@@ -324,6 +336,7 @@ def _create_metisa_specification(
         {
             "squid_proxy",
             "haproxy",
+            "llm_broker",
             "llm_server",
             "mcp_server",
             "jina_reader",
@@ -341,6 +354,7 @@ def _create_metisa_specification(
     haproxy = _get_haproxy_specfication(toml)
     squid_proxy = _get_squid_proxy_specification(toml)
     llm_server = _get_llm_server_specification(toml)
+    llm_broker = _get_llm_broker_specification(toml)
     mcp_server = _get_mcp_server_specification(toml)
     jina_reader = _get_jina_reader_specification(toml)
     code_execution = _get_code_execution_specification(toml)
@@ -352,6 +366,7 @@ def _create_metisa_specification(
         haproxy=haproxy,
         squid_proxy=squid_proxy,
         llm_server=llm_server,
+        llm_broker=llm_broker,
         mcp_server=mcp_server,
         jina_reader=jina_reader,
         code_execution=code_execution,
@@ -696,6 +711,31 @@ def _get_mcp_server_specification(
     environs = _get_environs(mcp_server, "MCP Server environs")
 
     return McpServerSpecification(tools=tools, resources=resources, environs=environs)
+
+
+def _get_llm_broker_specification(
+    toml: dict[str, object],
+) -> LlmBrokerSpecification | None:
+    llm_broker = toml.get("llm_broker")
+    if not llm_broker:
+        return None
+
+    if not isinstance(llm_broker, dict):
+        raise SpecificationValidationError(
+            "TOML specification llm_broker must be a table."
+        )
+
+    MCP_SERVER_KEYS = frozenset(
+        {
+            "environs",
+        }
+    )
+
+    _validate_known_keys(llm_broker, "mcp_server", MCP_SERVER_KEYS)
+
+    environs = _get_environs(llm_broker, "MCP Server environs")
+
+    return LlmBrokerSpecification(environs=environs)
 
 
 def _get_jina_reader_specification(

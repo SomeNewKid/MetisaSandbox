@@ -178,11 +178,11 @@ def test_code_execution_capability() -> None:
 def test_llm_server_capability() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["llm_server"]
+        capabilities = ["llm_server", "network"]
     """
     specification = parse_specification(toml)
     assert Capability.INTERACTIVE not in specification.capabilities
-    assert Capability.NETWORK not in specification.capabilities
+    assert Capability.NETWORK in specification.capabilities
     assert Capability.INTERNET not in specification.capabilities
     assert Capability.LOCALNET not in specification.capabilities
     assert Capability.MCP_SERVER not in specification.capabilities

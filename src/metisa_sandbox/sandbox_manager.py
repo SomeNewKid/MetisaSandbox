@@ -27,6 +27,9 @@ from .haproxy_sidecar.haproxy_manager import (
 from .jina_reader_sidecar.jina_reader_manager import (
     create_jina_reader_container,
 )
+from .llm_broker_sidecar.llm_broker_manager import (
+    create_llm_broker_container,
+)
 from .llm_server_sidecar.llm_server_manager import (
     LLM_CONTAINER_NAME_PREFIX,
     create_llm_server_containers,
@@ -55,9 +58,7 @@ from .sandbox_network import (
     remove_docker_workload_network,
 )
 from .sandbox_workspace import (
-    append_log_file,
     clean_up_run_directory,
-    create_log_file,
     create_sandbox_context,
 )
 from .squid_proxy_sidecar.squid_proxy_manager import (
@@ -81,6 +82,7 @@ def run_metisa_container_workload_in_sandbox(
     is_mcp_server_required = Capability.MCP_SERVER in specification.capabilities
     is_jina_reader_required = Capability.JINA_READER in specification.capabilities
     is_code_execution_required = Capability.CODE_EXECUTION in specification.capabilities
+    is_llm_broker_required = Capability.LLM_BROKER in specification.capabilities
     is_llm_server_required = Capability.LLM_SERVER in specification.capabilities
 
     is_workload_network_required = Capability.NETWORK in specification.capabilities
@@ -92,7 +94,6 @@ def run_metisa_container_workload_in_sandbox(
     )
 
     sandbox_context: SandboxContext | None = None
-    log_file: Path | None = None
     metisa_staged_source: Path | None = None
     workload_network_created = False
     backend_network_created = False
@@ -106,6 +107,8 @@ def run_metisa_container_workload_in_sandbox(
     mcp_server_ip_address: str | None = None
     jina_reader_container_name: str | None = None
     code_execution_container_name: str | None = None
+    llm_broker_container_name: str | None = None
+    llm_broker_staged_source: Path | None = None
     llm_server_container_names: list[str] = []
     prompt_guard_container_name: str | None = None
     prompt_guard_staged_source: Path | None = None
@@ -115,8 +118,6 @@ def run_metisa_container_workload_in_sandbox(
 
     try:
         sandbox_context = create_sandbox_context()
-
-        log_file = create_log_file(sandbox_context, image_reference)
 
         metisa_staged_source = create_staged_source_directory(
             sandbox_context, workload_module
@@ -131,8 +132,6 @@ def run_metisa_container_workload_in_sandbox(
             is_workload_network_required,
             squid_proxy_url,
         )
-
-        append_log_file(log_file, [f"Arguments: {' '.join(arguments)}"])
 
         if is_workload_network_required:
             print("Creating private workload network.")
@@ -159,6 +158,15 @@ def run_metisa_container_workload_in_sandbox(
                 )
                 print("Created Squid Proxy container.")
 
+        if is_llm_broker_required:
+            print("Creating LLM Broker container.")
+            llm_broker_container_name, llm_broker_staged_source = (
+                create_llm_broker_container(
+                    specification, sandbox_context, squid_proxy_url
+                )
+            )
+            print("Created LLM Broker container.")
+
         if is_llm_server_required:
             print("Creating LLM Server containers.")
             llm_server_container_names = create_llm_server_containers(
@@ -182,22 +190,16 @@ def run_metisa_container_workload_in_sandbox(
 
         if is_mcp_server_required:
             print("Creating MCP Server container.")
-            mcp_server_target_network_name = (
-                sandbox_context.backend_network_name
-                if is_backend_network_required
-                else sandbox_context.workload_network_name
-            )
             mcp_server_container_name, mcp_server_staged_source = (
                 create_mcp_server_container(
                     specification,
                     sandbox_context,
-                    mcp_server_target_network_name,
                     squid_proxy_url,
                 )
             )
             mcp_server_ip_address = get_docker_container_ip_address(
                 mcp_server_container_name,
-                mcp_server_target_network_name,
+                sandbox_context.backend_network_name,
             )
             print("Created MCP Server container.")
 
@@ -229,9 +231,8 @@ def run_metisa_container_workload_in_sandbox(
 
         return return_code
 
-    except Exception as error:
-        if log_file is not None:
-            append_log_file(log_file, [f"Error: {error}"])
+    except Exception:
+        # no longer logging the error
         raise
 
     finally:
@@ -244,6 +245,13 @@ def run_metisa_container_workload_in_sandbox(
                     sandbox_context,
                     cleanup_errors,
                 )
+
+                if llm_broker_container_name is not None:
+                    _stop_and_remove_llm_broker_container(
+                        sandbox_context,
+                        cleanup_errors,
+                        llm_broker_container_name,
+                    )
 
                 if llm_server_container_names:
                     for llm_server_container_name in llm_server_container_names:
@@ -317,13 +325,7 @@ def run_metisa_container_workload_in_sandbox(
                         cleanup_errors.append(cleanup_error)
 
                 for cleanup_error in cleanup_errors:
-                    try:
-                        if log_file is not None:
-                            append_log_file(log_file, [cleanup_error])
-                        else:
-                            print(cleanup_error, file=sys.stderr)
-                    except Exception:
-                        print(cleanup_error, file=sys.stderr)
+                    print(cleanup_error, file=sys.stderr)
 
             finally:
                 clean_up_run_directory(
@@ -335,14 +337,14 @@ def run_metisa_container_workload_in_sandbox(
                 if metisa_staged_source is not None:
                     clean_up_staged_source(metisa_staged_source)
 
+                if llm_broker_staged_source is not None:
+                    clean_up_staged_source(llm_broker_staged_source)
+
                 if mcp_server_staged_source is not None:
                     clean_up_staged_source(mcp_server_staged_source)
 
                 if prompt_guard_staged_source is not None:
                     clean_up_staged_source(prompt_guard_staged_source)
-
-                if log_file is not None and return_code is not None:
-                    append_log_file(log_file, [f"Return code: {return_code}"])
 
                 print("Cleaned up environment.")
 
@@ -561,6 +563,31 @@ def _stop_and_remove_mcp_server_container(
             container_name=mcp_server_container_name,
             container_title="MCP Server",
             log_folder="mcp_server",
+        )
+
+
+def _stop_and_remove_llm_broker_container(
+    sandbox_context: SandboxContext,
+    cleanup_errors: list[str],
+    llm_broker_container_name: str,
+) -> None:
+    log_folder = "llm_broker"
+    try:
+        _save_files_from_container(
+            sandbox_context,
+            llm_broker_container_name,
+            ["/sandbox-source/metisa.json"],
+            log_folder,
+        )
+    except Exception as error:
+        cleanup_errors.append(f"Could not save LLM Broker config files: {error}")
+    finally:
+        _stop_and_remove_container(
+            sandbox_context=sandbox_context,
+            cleanup_errors=cleanup_errors,
+            container_name=llm_broker_container_name,
+            container_title="LLM Broker",
+            log_folder="llm_broker",
         )
 
 

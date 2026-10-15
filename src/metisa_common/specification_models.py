@@ -15,6 +15,7 @@ class Capability(StrEnum):
     INTERNET = "internet"
     LOCALNET = "localnet"
     MCP_SERVER = "mcp_server"
+    LLM_BROKER = "llm_broker"
     JINA_READER = "jina_reader"
     CODE_EXECUTION = "code_execution"
     LLM_SERVER = "llm_server"
@@ -38,6 +39,7 @@ class MetisaSpecification:
     haproxy: HaproxySpecification | None
     squid_proxy: SquidProxySpecification | None
     llm_server: LlmServerSpecification | None
+    llm_broker: LlmBrokerSpecification | None
     mcp_server: McpServerSpecification | None
     jina_reader: JinaReaderSpecification | None
     code_execution: CodeExecutionSpecification | None
@@ -90,6 +92,13 @@ class McpServerSpecification:
 
     tools: tuple[str, ...]
     resources: tuple[str, ...]
+    environs: frozenset[str]
+
+
+@dataclass(frozen=True)
+class LlmBrokerSpecification:
+    """Represents the LLM Broker section of the Metisa specification."""
+
     environs: frozenset[str]
 
 

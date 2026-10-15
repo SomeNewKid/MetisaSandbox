@@ -9,6 +9,7 @@ from .specification_models import (
     CodeExecutionSpecification,
     HaproxySpecification,
     JinaReaderSpecification,
+    LlmBrokerSpecification,
     LlmServerSpecification,
     McpServerSpecification,
     MetisaSpecification,
@@ -41,6 +42,11 @@ def validate_specification(
     _validate_llm_server_specification(
         specification.capabilities,
         specification.llm_server,
+    )
+
+    _validate_llm_broker_specification(
+        specification.capabilities,
+        specification.llm_broker,
     )
 
     _validate_jina_reader_specification(
@@ -170,6 +176,22 @@ def _validate_capabilities(
                 '"code_execution" capability requires "mcp_server" capability.'
             )
 
+    if Capability.LLM_SERVER in capabilities:
+        if Capability.NETWORK not in capabilities:
+            raise SpecificationValidationError(
+                '"llm_server" capability requires "network" capability.'
+            )
+
+    if Capability.LLM_BROKER in capabilities:
+        if Capability.NETWORK not in capabilities:
+            raise SpecificationValidationError(
+                '"llm_broker" capability requires "network" capability.'
+            )
+        if Capability.PROMPT_GUARD not in capabilities:
+            raise SpecificationValidationError(
+                '"llm_broker" capability requires "prompt_guard" capability.'
+            )
+
 
 def _validate_squid_proxy_specification(
     capabilities: frozenset[Capability],
@@ -235,6 +257,19 @@ def _validate_mcp_server_specification(
     if Capability.MCP_SERVER not in capabilities:
         raise SpecificationValidationError(
             '"[mcp_server]" table requires "mcp_server" capability.'
+        )
+
+
+def _validate_llm_broker_specification(
+    capabilities: frozenset[Capability],
+    llm_broker_specification: LlmBrokerSpecification | None,
+):
+    if llm_broker_specification is None:
+        return
+
+    if Capability.LLM_BROKER not in capabilities:
+        raise SpecificationValidationError(
+            '"[llm_broker]" table requires "llm_broker" capability.'
         )
 
 

@@ -62,7 +62,7 @@ def _create_llm_server_container(
         "--name",
         container_name,
         "--network",
-        sandbox_context.workload_network_name,
+        sandbox_context.backend_network_name,
         "--network-alias",
         container_alias,
     ]

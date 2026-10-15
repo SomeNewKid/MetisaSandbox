@@ -33,37 +33,6 @@ def create_sandbox_context() -> SandboxContext:
     )
 
 
-def create_log_file(
-    sandbox_context: SandboxContext,
-    image_reference: str,
-) -> Path:
-    """Create a log file for the sandbox context."""
-    metisa_logs_dir = sandbox_context.host_logs_path / "metisa"
-    metisa_logs_dir.mkdir(parents=True, exist_ok=True)
-
-    log_file = metisa_logs_dir / "docker.txt"
-
-    with log_file.open("w", encoding="utf-8") as file:
-        file.write("Running Docker container\n")
-
-        file.write("Image: ")
-        file.write(image_reference)
-        file.write("\n")
-
-    return log_file
-
-
-def append_log_file(
-    log_file: Path,
-    messages: list[str],
-) -> None:
-    """Append messages to the specified log file."""
-    with log_file.open("a", encoding="utf-8") as file:
-        for message in messages:
-            file.write(message)
-            file.write("\n")
-
-
 def clean_up_run_directory(
     host_output_directory: Path,
     host_logs_directory: Path,

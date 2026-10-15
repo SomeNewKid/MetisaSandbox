@@ -46,7 +46,6 @@ _USE_SQUID_PROXY = True
 def create_mcp_server_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-    target_network_name: str,
     squid_proxy_url: str | None,
 ) -> tuple[str, Path]:
     """Create the MCP Server container and connect it to the Docker network."""
@@ -72,16 +71,8 @@ def create_mcp_server_container(
         "--name",
         container_name,
         "--network",
-        target_network_name,
+        sandbox_context.backend_network_name,
     ]
-
-    if target_network_name == sandbox_context.workload_network_name:
-        arguments.extend(
-            [
-                "--network-alias",
-                _MCP_SERVER_NETWORK_ALIAS,
-            ]
-        )
 
     # Mount the container's root filesystem as strictly read-only
     # Couple with in memory temporary writes (--tmpfs)
@@ -256,13 +247,6 @@ def create_mcp_server_container(
             ]
         )
 
-    # Set environment variables for the container.
-    environs.extend(
-        [
-            "METISA_RUNTIME_ROLE=landlock",
-        ]
-    )
-
     specified_environs = get_resolved_environs_for_mcp_server(specification)
     environs.extend(specified_environs)
 
@@ -299,12 +283,11 @@ def create_mcp_server_container(
 
     create_docker_container(arguments)
 
-    if target_network_name != sandbox_context.workload_network_name:
-        connect_container_to_docker_network(
-            container_name=container_name,
-            network_name=sandbox_context.workload_network_name,
-            aliases=(_MCP_SERVER_NETWORK_ALIAS,),
-        )
+    connect_container_to_docker_network(
+        container_name=container_name,
+        network_name=sandbox_context.workload_network_name,
+        aliases=(_MCP_SERVER_NETWORK_ALIAS,),
+    )
 
     start_docker_container(container_name)
     started_successfully = inspect_docker_container(container_name)

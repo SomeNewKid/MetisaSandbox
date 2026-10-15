@@ -1,4 +1,4 @@
-"""Probes for declared local LLM server sidecars."""
+"""Probe declared local LLM models through the LLM Broker."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import asyncio
 import ipaddress
 import json
 import socket
+import urllib.parse
 import urllib.request
 from collections.abc import Callable
 
@@ -13,29 +14,46 @@ from metisa_common.specification_models import Capability, LlmModel
 
 from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
-_LLM_SERVER_ALIAS_PREFIX = "metisa-llm-"
-_LLM_SERVER_PORT = 8080
+_LLM_BROKER_ALIAS = "metisa-llm-broker"
+_LLM_BROKER_PORT = 8000
+_LLM_BROKER_URL = f"http://{_LLM_BROKER_ALIAS}:{_LLM_BROKER_PORT}"
 _TIMEOUT_SECONDS = 5
 
 
-def llm_server_aliases_resolve(probe_context: ProbeContext) -> ProbeResult:
-    """Verify every declared LLM alias resolves to non-loopback addresses."""
-    return _run_llm_probe(probe_context, "aliases_resolve", _check_alias)
+def llm_broker_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
+    """Verify the broker alias resolves to non-loopback addresses."""
+    probe_name = "container__llm__broker_alias_resolves"
+    if Capability.LLM_BROKER not in probe_context.specification.capabilities:
+        return ProbeResult.success(
+            probe_name, "LLM broker capability is disabled. Skipping probe."
+        )
+
+    try:
+        addresses = asyncio.run(_resolve_alias())
+        if not addresses:
+            return ProbeResult.failure(probe_name, "Broker alias did not resolve.")
+        if any(ipaddress.ip_address(address).is_loopback for address in addresses):
+            return ProbeResult.failure(
+                probe_name, "Broker alias resolved to a loopback address."
+            )
+    except Exception as error:
+        return ProbeResult.failure(
+            probe_name, f"Broker alias resolution failed: {error}"
+        )
+
+    return ProbeResult.success(
+        probe_name, "Broker alias resolves to sidecar addresses."
+    )
 
 
 def llm_servers_are_ready(probe_context: ProbeContext) -> ProbeResult:
-    """Verify every declared LLM server reports readiness without inference."""
+    """Verify the broker reports readiness for every declared local model."""
     return _run_llm_probe(probe_context, "servers_are_ready", _check_readiness)
 
 
 def llm_models_are_available(probe_context: ProbeContext) -> ProbeResult:
-    """Verify every server advertises its declared model alias."""
+    """Verify the broker advertises every declared local model alias."""
     return _run_llm_probe(probe_context, "models_are_available", _check_model)
-
-
-def llm_tokenizers_are_available(probe_context: ProbeContext) -> ProbeResult:
-    """Verify every declared model tokenizes text without generating a response."""
-    return _run_llm_probe(probe_context, "tokenizers_are_available", _check_tokenizer)
 
 
 def _run_llm_probe(
@@ -48,6 +66,11 @@ def _run_llm_probe(
     if Capability.LLM_SERVER not in specification.capabilities:
         return ProbeResult.success(
             probe_name, "LLM server capability is disabled. Skipping probe."
+        )
+
+    if Capability.LLM_BROKER not in specification.capabilities:
+        return ProbeResult.failure(
+            probe_name, "Local LLM model probes require the LLM broker capability."
         )
 
     llm_server = specification.llm_server
@@ -63,8 +86,7 @@ def _run_llm_probe(
         except Exception as error:
             failure = f"{type(error).__name__}: {error}"
         if failure is not None:
-            server_url = _get_server_url(model)
-            failures.append(f"{model.alias} ({server_url}): {failure}")
+            failures.append(f"{model.alias} ({_LLM_BROKER_URL}): {failure}")
 
     if failures:
         return ProbeResult.failure(probe_name, "; ".join(failures))
@@ -73,74 +95,49 @@ def _run_llm_probe(
     )
 
 
-def _get_server_url(model: LlmModel) -> str:
-    return f"http://{_LLM_SERVER_ALIAS_PREFIX}{model.alias}:{_LLM_SERVER_PORT}"
-
-
-def _check_alias(model: LlmModel) -> str | None:
-    addresses = asyncio.run(_resolve_alias(model))
-    if not addresses:
-        return "Network alias did not resolve to any addresses."
-    if any(ipaddress.ip_address(address).is_loopback for address in addresses):
-        return "Network alias resolved to a loopback address."
-    return None
-
-
-async def _resolve_alias(model: LlmModel) -> set[str]:
-    network_alias = f"{_LLM_SERVER_ALIAS_PREFIX}{model.alias}"
+async def _resolve_alias() -> set[str]:
     async with asyncio.timeout(_TIMEOUT_SECONDS):
         loop = asyncio.get_running_loop()
         addresses = await loop.getaddrinfo(
-            network_alias, _LLM_SERVER_PORT, type=socket.SOCK_STREAM
+            _LLM_BROKER_ALIAS, _LLM_BROKER_PORT, type=socket.SOCK_STREAM
         )
     return {str(address[4][0]) for address in addresses}
 
 
 def _check_readiness(model: LlmModel) -> str | None:
-    response = _request_json(model, "/health")
+    model_alias = urllib.parse.quote(model.alias, safe="")
+    response = _request_json(f"/health/{model_alias}")
     if response.get("status") != "ok":
-        return "Health endpoint did not report status 'ok'."
+        return "Broker model health endpoint did not report status 'ok'."
+    if response.get("model") != model.alias:
+        return f"Broker model health response did not match alias {model.alias!r}."
     return None
 
 
 def _check_model(model: LlmModel) -> str | None:
-    response = _request_json(model, "/v1/models")
+    response = _request_json("/v1/models")
     models = response.get("data")
-    if not isinstance(models, list) or len(models) != 1:
-        return "Model listing did not contain exactly one model."
-    advertised_model = models[0]
-    if not isinstance(advertised_model, dict):
-        return "Model listing contained an invalid model object."
-    if advertised_model.get("id") != model.alias:
-        return f"Model listing did not advertise expected alias {model.alias!r}."
-    return None
-
-
-def _check_tokenizer(model: LlmModel) -> str | None:
-    response = _request_json(
-        model, "/tokenize", {"content": "Hello", "add_special": False}
-    )
-    tokens = response.get("tokens")
-    if not isinstance(tokens, list) or not tokens:
-        return "Tokenizer did not return a non-empty token array."
-    if any(type(token) is not int or token < 0 for token in tokens):
-        return "Tokenizer returned invalid token IDs."
+    if not isinstance(models, list):
+        return "Broker model listing did not contain a model array."
+    advertised_aliases: set[str] = set()
+    for advertised_model in models:
+        if not isinstance(advertised_model, dict):
+            return "Broker model listing contained an invalid model object."
+        alias = advertised_model.get("id")
+        if not isinstance(alias, str) or not alias:
+            return "Broker model listing contained an invalid model identifier."
+        advertised_aliases.add(alias)
+    if model.alias not in advertised_aliases:
+        return f"Broker model listing did not advertise expected alias {model.alias!r}."
     return None
 
 
 def _request_json(
-    model: LlmModel,
     endpoint: str,
-    payload: dict[str, object] | None = None,
 ) -> dict[str, object]:
-    server_url = _get_server_url(model)
-    url = f"{server_url}{endpoint}"
+    url = f"{_LLM_BROKER_URL}{endpoint}"
     headers = {"Accept": "application/json"}
-    data = None
-    if payload is not None:
-        data = json.dumps(payload).encode("utf-8")
-        headers["Content-Type"] = "application/json"
-    request = urllib.request.Request(url, data=data, headers=headers)
+    request = urllib.request.Request(url, headers=headers)
     # Internal sidecar requests must bypass the workload's internet proxies.
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     with opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
@@ -156,9 +153,8 @@ def _request_json(
 LLM_PROBES = ProbeGroup(
     name="llm",
     probes=(
-        llm_server_aliases_resolve,
+        llm_broker_alias_resolves,
         llm_servers_are_ready,
         llm_models_are_available,
-        llm_tokenizers_are_available,
     ),
 )
