@@ -5,15 +5,19 @@ from __future__ import annotations
 from functools import cache
 from threading import Lock
 
+import torch
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
+    PreTrainedTokenizer,
     TextClassificationPipeline,
 )
 
 from .models import Indicator
 
 _MODEL_LOCATION = "/models/llama-prompt-guard"
+_MAX_TOKENS = 512
+_OVERLAP_TOKENS = 128
 _CLASSIFIER_LOCK = Lock()
 
 
@@ -21,38 +25,59 @@ def get_indicators(
     text: str,
 ) -> tuple[Indicator, ...]:
     """Return indicators resulting from classification by Llama Prompt Guard."""
-    indicators: list[Indicator] = []
+    if not text.strip():
+        return ()
 
     with _CLASSIFIER_LOCK:
         classifier = _get_classifier()
-        classification: list[dict[str, object]] = classifier(text)
+        if (not classifier.model 
+            or not classifier.model.config 
+            or not classifier.model.config.id2label):
+            raise RuntimeError("Classifier model not available.")
 
-    indicators.extend(_get_indicators(classification))
+        tokenizer = classifier.tokenizer
+        if tokenizer is None:
+            raise ValueError("Classifier tokenizer not available")
 
-    return tuple(indicators)
+        encoded = tokenizer(
+            text,
+            max_length=_MAX_TOKENS,
+            stride=_OVERLAP_TOKENS,
+            truncation=True,
+            return_overflowing_tokens=True,
+            padding=True,
+            return_tensors="pt",
+        )
+
+        number_of_chunks = encoded["input_ids"].shape[0]
+
+        with torch.inference_mode():
+            for index in range(number_of_chunks):
+                model_inputs = {}
+                for name in tokenizer.model_input_names:
+                    if name in encoded:
+                        chunk_tensor = encoded[name][index:index+1]
+                        model_inputs[name] = chunk_tensor.to(classifier.device)
+
+                output = classifier.model(**model_inputs)
+                predicted_class = output.logits.argmax(dim=-1).item()
+                label = classifier.model.config.id2label[predicted_class]
+
+                if label == "MALICIOUS":
+                    return (
+                        Indicator(
+                            "meta_llama_prompt_guard",
+                            "The text was classified as having malicious content.",
+                        ),
+                    )
+
+    return ()
 
 
 def initialize_classifier() -> None:
     """Initialize the classifier by loading the model and tokenizer into memory."""
     with _CLASSIFIER_LOCK:
         _ = _get_classifier()
-
-
-def _get_indicators(
-    classification: list[dict[str, object]],
-) -> tuple[Indicator, ...]:
-    indicators: list[Indicator] = []
-
-    for item in classification:
-        label = item.get("label")
-        if label == "MALICIOUS":
-            indicator = Indicator(
-                "meta_llama_prompt_guard",
-                "The text was classified as having malicious content.",
-            )
-            indicators.append(indicator)
-
-    return tuple(indicators)
 
 
 @cache

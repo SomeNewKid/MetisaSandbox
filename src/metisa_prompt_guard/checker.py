@@ -36,8 +36,24 @@ def run_checks(
     except Exception as error:
         # Ensure that, if an error occurs, we don't return an empty list of indicators,
         # which would incorrectly indicate that no issues were found.
+        print("Exception occurred:", str(error))
         indicators.append(Indicator("checker_exception", f"{error}"))
+    _print_result(text, indicators)
     return tuple(indicators)
+
+
+def _print_result(
+    text: str,
+    indicators: list[Indicator],
+) -> None:
+    print('-' * 30)
+    text_summary = text if len(text) < 200 else text[:200]
+    print("Text:", text_summary)
+    if not indicators:
+        print("(No indicators)")
+        return
+    for indicator in indicators:
+        print(f"{indicator.check_id}:", indicator.explanation)
 
 
 def _run_heuristic_checks(
