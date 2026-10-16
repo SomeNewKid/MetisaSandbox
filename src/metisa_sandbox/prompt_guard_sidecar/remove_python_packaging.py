@@ -58,13 +58,16 @@ def _get_python_search_paths() -> set[Path]:
 def _get_removal_patterns() -> tuple[str, ...]:
     patterns: list[str] = list(_PACKAGE_NAMES)
 
-    for distribution_name in _METADATA_NAMES:
+    all_names = set(_PACKAGE_NAMES)
+    all_names.update(_METADATA_NAMES)
+
+    for name in sorted(all_names):
         normalized_names = {
-            distribution_name,
-            distribution_name.replace("_", "-"),
+            name,
+            name.replace("_", "-"),
         }
 
-        for normalized_name in normalized_names:
+        for normalized_name in sorted(normalized_names):
             patterns.append(f"{normalized_name}-*.dist-info")
             patterns.append(f"{normalized_name}-*.egg-info")
 

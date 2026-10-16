@@ -7,7 +7,7 @@ from pathlib import Path
 from metisa_common.specification_helper import get_resolved_environs_for_metisa
 from metisa_common.specification_models import Capability, MetisaSpecification
 
-from ..sandbox_context import SandboxContext
+from ..sandbox_models import SandboxContext
 from .metisa_container_workspace import LANDLOCK_MODULE_NAME
 
 _GUEST_SOURCE_DIR = "/sandbox-source"

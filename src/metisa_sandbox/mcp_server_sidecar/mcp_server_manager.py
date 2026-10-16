@@ -28,7 +28,7 @@ from ..docker.docker_image import (
 from ..docker.docker_network import (
     connect_container_to_docker_network,
 )
-from ..sandbox_context import SandboxContext
+from ..sandbox_models import SandboxContext
 from .mcp_server_workspace import (
     MCP_SERVER_MODULE_NAME,
     create_staged_source_directory,

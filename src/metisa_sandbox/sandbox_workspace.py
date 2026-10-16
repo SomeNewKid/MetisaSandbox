@@ -6,7 +6,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from .sandbox_context import SandboxContext
+from .sandbox_models import SandboxContext
 
 
 def create_sandbox_context() -> SandboxContext:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .docker.docker_network import create_docker_network, remove_docker_network
-from .sandbox_context import SandboxContext
+from .sandbox_models import SandboxContext
 
 # -----------------------------------------------------------------------------------
 #

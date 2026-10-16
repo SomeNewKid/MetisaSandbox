@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..sandbox_context import SandboxContext
+from ..sandbox_models import SandboxContext
 from ..utilities.workspace_helper import copy_directories_into_staged
 
 PROMPT_GUARD_MODULE_NAME = "metisa_prompt_guard"

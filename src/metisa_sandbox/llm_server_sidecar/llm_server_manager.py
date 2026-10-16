@@ -18,7 +18,7 @@ from ..docker.docker_image import (
     build_docker_image,
     docker_image_exists,
 )
-from ..sandbox_context import SandboxContext
+from ..sandbox_models import SandboxContext
 
 LLM_CONTAINER_ALIAS_PREFIX = "metisa-llm-"
 LLM_CONTAINER_NAME_PREFIX = "llm-server-"

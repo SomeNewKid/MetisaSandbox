@@ -22,7 +22,7 @@ from ..docker.docker_image import (
     build_docker_image,
     docker_image_exists,
 )
-from ..sandbox_context import SandboxContext
+from ..sandbox_models import SandboxContext
 from .prompt_guard_workspace import (
     PROMPT_GUARD_MODULE_NAME,
     create_staged_source_directory,

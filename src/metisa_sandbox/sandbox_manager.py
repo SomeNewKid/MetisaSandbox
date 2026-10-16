@@ -46,7 +46,7 @@ from .metisa_container.metisa_container_workspace import (
 from .prompt_guard_sidecar.prompt_guard_manager import (
     create_prompt_guard_container,
 )
-from .sandbox_context import (
+from .sandbox_models import (
     SandboxContext,
 )
 from .sandbox_network import (

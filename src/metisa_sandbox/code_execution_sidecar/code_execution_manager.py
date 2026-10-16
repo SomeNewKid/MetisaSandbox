@@ -19,7 +19,7 @@ from ..docker.docker_image import (
     build_docker_image,
     docker_image_exists,
 )
-from ..sandbox_context import SandboxContext
+from ..sandbox_models import SandboxContext
 
 _IMAGE_FORMAT_VERSION = 1
 _CODE_EXECUTION_ALIAS = "metisa-code-execution"

@@ -24,7 +24,7 @@ from ..docker.docker_image import (
 from ..docker.docker_network import (
     connect_container_to_docker_network,
 )
-from ..sandbox_context import SandboxContext
+from ..sandbox_models import SandboxContext
 
 _IMAGE_FORMAT_VERSION = 1
 _HAPROXY_ALIAS = "metisa-haproxy"
