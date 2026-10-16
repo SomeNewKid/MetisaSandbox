@@ -6,6 +6,7 @@ import asyncio
 import os
 from datetime import datetime
 from pathlib import Path
+from textwrap import dedent
 
 import httpx2
 import requests
@@ -178,6 +179,47 @@ def main(
         except Exception as error:
             print("Qwen response error:", error)
 
+    if Capability.LLM_BROKER in specification.capabilities:
+        prompt_for_llm = "Explain Docker networks in two sentences."
+
+        try:
+            print(flush=True)
+            print("-" * 30)
+            print("To GPT:", prompt_for_llm)
+            print(flush=True)
+            llm_chat_completion = _get_granite_chat_completion("gpt-4o", prompt_for_llm)
+            print("From GPT (chat completion):", llm_chat_completion)
+        except Exception as error:
+            print("GPT chat error:", error)
+
+        try:
+            print(flush=True)
+            llm_response = _get_llm_response("gpt-4o", prompt_for_llm)
+            print("From GPT (response):", llm_response)
+        except Exception as error:
+            print("GPT response error:", error)
+
+    if Capability.CODE_EXECUTION in specification.capabilities:
+        try:
+            print(flush=True)
+            print("-" * 30)
+            print("Executing code snippet...")
+            code_execution_result = _execute_code(
+                dedent(
+                    """
+                def main():
+                    values = [10, 20, 30]
+                    total = 0
+                    for value in values:
+                        total += value
+                    return total / len(values)
+                """
+                )
+            )
+            print("Code execution result:", code_execution_result)
+        except Exception as error:
+            print("Code execution error:", error)
+
     print(flush=True)
     print("-" * 30)
 
@@ -251,6 +293,12 @@ def _get_url_content_from_mcp_server(
     url: str,
 ) -> str:
     return _get_mcp_server_tool_result("read_content_from_url", {"url": url})
+
+
+def _execute_code(
+    code: str,
+) -> str:
+    return _get_mcp_server_tool_result("execute_starlark_code", {"starlark_code": code})
 
 
 def _get_mcp_server_tool_result(

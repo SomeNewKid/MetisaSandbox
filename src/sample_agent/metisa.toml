@@ -23,6 +23,7 @@ environs = [
 [squid_proxy]
 allowed_domains = [
   ".example.com",
+  ".openai.com",
 ]
 allowed_ip_addresses = []
 
@@ -61,4 +62,13 @@ models = [
 ]
 
 [llm_broker]
-environs = []
+environs = [
+    "OPENAI_API_KEY=${host:OPENAI_API_KEY}",
+]
+local_models = [
+    "granite-4-1b",
+    "qwen-3-small",
+]
+online_models = [
+    "gpt-4o",
+]

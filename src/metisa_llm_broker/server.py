@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import http.client
 import json
+import os
 from pathlib import Path
 
 from starlette.applications import Starlette
@@ -24,17 +25,28 @@ with metisa_json_file.open("r", encoding="utf-8") as file:
 if not isinstance(metisa_json, dict):
     raise RuntimeError("Invalid Metisa JSON file.")
 
-models = metisa_json.get("models")
-if not isinstance(models, list):
-    raise RuntimeError("Metisa JSON models must be an array.")
+local_models = metisa_json.get("local_models")
+if not isinstance(local_models, list):
+    raise RuntimeError("Metisa JSON local_models must be an array.")
 
-for alias in models:
+for alias in local_models:
     if not isinstance(alias, str) or not alias:
         raise RuntimeError("Metisa JSON model aliases must be non-empty strings.")
 
-_MODEL_ALIASES = frozenset(models)
+online_models = metisa_json.get("online_models")
+if not isinstance(online_models, list):
+    raise RuntimeError("Metisa JSON online_models must be an array.")
+
+for alias in online_models:
+    if not isinstance(alias, str) or not alias:
+        raise RuntimeError("Metisa JSON model aliases must be non-empty strings.")
+
+_LOCAL_MODEL_ALIASES = frozenset(local_models)
+_ONLINE_MODEL_ALIASES = frozenset(online_models)
 _LLM_SERVER_PREFIX = "metisa-llm-"
 _LLM_SERVER_PORT = 8080
+_SQUID_PROXY_HOST = "metisa-squid"
+_SQUID_PROXY_PORT = 3128
 _HEALTH_TIMEOUT_SECONDS = 30
 _MAX_HEALTH_RESPONSE_BYTES = 64 * 1024
 
@@ -94,7 +106,17 @@ def _model_health(
 ) -> JSONResponse:
     model_alias = request.path_params["alias"]
 
-    if model_alias not in _MODEL_ALIASES:
+    if model_alias not in _LOCAL_MODEL_ALIASES:
+        if model_alias in _ONLINE_MODEL_ALIASES:
+            return JSONResponse(
+                {
+                    "model": model_alias,
+                    "error": (
+                        "Online model aliases are not supported for health checks."
+                    ),
+                },
+                status_code=400,
+            )
         return JSONResponse(
             {"model": model_alias, "error": "Unknown model alias."},
             status_code=404,
@@ -161,7 +183,7 @@ async def _v1_models(
     _request: Request,
 ) -> JSONResponse:
     data = []
-    for alias in _MODEL_ALIASES:
+    for alias in _LOCAL_MODEL_ALIASES | _ONLINE_MODEL_ALIASES:
         data.append(
             {
                 "id": alias,
@@ -204,7 +226,7 @@ async def _v1_chat_completions(
     if not isinstance(model_alias, str) or not model_alias:
         return _chat_error("model must be a non-empty string.", 400)
 
-    if model_alias not in _MODEL_ALIASES:
+    if model_alias not in _LOCAL_MODEL_ALIASES | _ONLINE_MODEL_ALIASES:
         return _chat_error("Unknown model alias.", 404)
 
     allowed_fields = _CHAT_REQUEST_FIELDS | _LLAMA_CPP_REQUEST_FIELDS
@@ -249,38 +271,37 @@ async def _v1_chat_completions(
 
     try:
         serialized_payload = json.dumps(payload, allow_nan=False)
-        upstream_body = serialized_payload.encode("utf-8")
+        downstream_body = serialized_payload.encode("utf-8")
     except ValueError:
         return _chat_error("Request contains invalid JSON values.", 400)
 
     return await run_in_threadpool(
-        _get_upstream_chat_completion_response,
+        _get_downstream_chat_completion_response,
         model_alias,
-        upstream_body,
+        downstream_body,
     )
 
 
-def _get_upstream_chat_completion_response(
+def _get_downstream_chat_completion_response(
     model_alias: str,
-    upstream_body: bytes,
+    downstream_body: bytes,
 ) -> JSONResponse:
-    hostname = f"{_LLM_SERVER_PREFIX}{model_alias}"
-    connection = http.client.HTTPConnection(
-        hostname,
-        _LLM_SERVER_PORT,
-        timeout=_CHAT_TIMEOUT_SECONDS,
-    )
+    connection = _create_connection(model_alias, _CHAT_TIMEOUT_SECONDS)
 
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
     }
 
+    authorization_bearer = _get_authorization_bearer(model_alias)
+    if authorization_bearer is not None:
+        headers["Authorization"] = f"Bearer {authorization_bearer}"
+
     try:
         connection.request(
             "POST",
             "/v1/chat/completions",
-            body=upstream_body,
+            body=downstream_body,
             headers=headers,
         )
         response = connection.getresponse()
@@ -350,7 +371,7 @@ async def _v1_responses(request: Request) -> JSONResponse:
     if not isinstance(model_alias, str) or not model_alias:
         return _chat_error("model must be a non-empty string.", 400)
 
-    if model_alias not in _MODEL_ALIASES:
+    if model_alias not in _LOCAL_MODEL_ALIASES | _ONLINE_MODEL_ALIASES:
         return _chat_error("Unknown model alias.", 404)
 
     unknown_fields = payload.keys() - _RESPONSES_REQUEST_FIELDS
@@ -386,38 +407,37 @@ async def _v1_responses(request: Request) -> JSONResponse:
 
     try:
         serialized_payload = json.dumps(payload, allow_nan=False)
-        upstream_body = serialized_payload.encode("utf-8")
+        downstream_body = serialized_payload.encode("utf-8")
     except ValueError:
         return _chat_error("Request contains invalid JSON values.", 400)
 
     return await run_in_threadpool(
-        _get_upstream_responses_response,
+        _get_downstream_responses_response,
         model_alias,
-        upstream_body,
+        downstream_body,
     )
 
 
-def _get_upstream_responses_response(
+def _get_downstream_responses_response(
     model_alias: str,
-    upstream_body: bytes,
+    downstream_body: bytes,
 ) -> JSONResponse:
-    hostname = f"{_LLM_SERVER_PREFIX}{model_alias}"
-    connection = http.client.HTTPConnection(
-        hostname,
-        _LLM_SERVER_PORT,
-        timeout=_RESPONSES_TIMEOUT_SECONDS,
-    )
+    connection = _create_connection(model_alias, _RESPONSES_TIMEOUT_SECONDS)
 
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
     }
 
+    authorization_bearer = _get_authorization_bearer(model_alias)
+    if authorization_bearer is not None:
+        headers["Authorization"] = f"Bearer {authorization_bearer}"
+
     try:
         connection.request(
             "POST",
             "/v1/responses",
-            body=upstream_body,
+            body=downstream_body,
             headers=headers,
         )
         response = connection.getresponse()
@@ -533,6 +553,63 @@ def _validate_chat_template_kwargs(
         return "Unsupported chat template options."
 
     return None
+
+
+def _create_connection(
+    model_alias: str,
+    timeout_seconds: int,
+) -> http.client.HTTPConnection:
+    if model_alias in _LOCAL_MODEL_ALIASES:
+        return http.client.HTTPConnection(
+            f"{_LLM_SERVER_PREFIX}{model_alias}",
+            _LLM_SERVER_PORT,
+            timeout=timeout_seconds,
+        )
+
+    # http.client does not automatically use HTTP_PROXY or HTTPS_PROXY
+    # To route requests through the proxy, we manually set up the tunnel to the target.
+    # https://docs.python.org/3.12/library/http.client.html#http.client.HTTPConnection.set_tunnel
+    hostname = _get_hostname(model_alias)
+    if not hostname:
+        raise RuntimeError(f"Hostname not resolved for '{model_alias}'")
+    port = _get_port(model_alias)
+
+    connection = http.client.HTTPSConnection(
+        _SQUID_PROXY_HOST,
+        _SQUID_PROXY_PORT,
+        timeout=timeout_seconds,
+    )
+    connection.set_tunnel(hostname, port)
+
+    return connection
+
+
+def _get_hostname(model_alias: str) -> str | None:
+    if model_alias in _LOCAL_MODEL_ALIASES:
+        return f"{_LLM_SERVER_PREFIX}{model_alias}"
+    if model_alias in _ONLINE_MODEL_ALIASES:
+        match model_alias:
+            case "gpt-4o":
+                return "api.openai.com"
+            case _:
+                return None
+    return None
+
+
+def _get_port(model_alias: str) -> int:
+    if model_alias in _LOCAL_MODEL_ALIASES:
+        return _LLM_SERVER_PORT
+    return 443
+
+
+def _get_authorization_bearer(
+    model_alias: str,
+) -> str | None:
+    match model_alias:
+        case "gpt-4o":
+            return os.getenv("OPENAI_API_KEY")
+        case _:
+            return None
 
 
 app = Starlette(

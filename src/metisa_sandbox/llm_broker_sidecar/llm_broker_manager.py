@@ -12,7 +12,7 @@ from metisa_common.specification_helper import (
     get_resolved_environs_for_llm_broker,
 )
 from metisa_common.specification_models import (
-    LlmServerSpecification,
+    LlmBrokerSpecification,
     MetisaSpecification,
 )
 
@@ -58,7 +58,7 @@ def create_llm_broker_container(
     staged_source_path = create_staged_source_directory(sandbox_context)
 
     metisa_json_file = staged_source_path / "metisa.json"
-    metisa_json = _create_metisa_json(specification.llm_server)
+    metisa_json = _create_metisa_json(specification.llm_broker)
     with metisa_json_file.open("w", encoding="utf-8") as file:
         file.write(metisa_json)
 
@@ -356,14 +356,20 @@ def _generate_image_tag(
     return f"{_IMAGE_FORMAT_VERSION}-{hash}"
 
 
-def _create_metisa_json(llm_specification: LlmServerSpecification | None) -> str:
-    models: list[str] = []
-    if llm_specification is not None:
-        for model in llm_specification.models:
-            models.append(model.alias)
+def _create_metisa_json(llm_broker: LlmBrokerSpecification | None) -> str:
+    local_models: list[str] = []
+    if llm_broker is not None:
+        for alias in llm_broker.local_models:
+            local_models.append(alias)
+
+    online_models: list[str] = []
+    if llm_broker is not None:
+        for alias in llm_broker.online_models:
+            online_models.append(alias)
 
     config = {
-        "models": models,
+        "local_models": local_models,
+        "online_models": online_models,
     }
 
     return json.dumps(config, indent=2)

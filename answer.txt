@@ -1,1 +1,0 @@
-Hello Fred from the Sample Agent.

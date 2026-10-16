@@ -725,17 +725,28 @@ def _get_llm_broker_specification(
             "TOML specification llm_broker must be a table."
         )
 
-    MCP_SERVER_KEYS = frozenset(
+    LLM_BROKER_KEYS = frozenset(
         {
             "environs",
+            "local_models",
+            "online_models",
         }
     )
 
-    _validate_known_keys(llm_broker, "mcp_server", MCP_SERVER_KEYS)
+    _validate_known_keys(llm_broker, "LLM Broker", LLM_BROKER_KEYS)
 
-    environs = _get_environs(llm_broker, "MCP Server environs")
+    environs = _get_environs(llm_broker, "LLM Broker environs")
 
-    return LlmBrokerSpecification(environs=environs)
+    local_models = _get_str_tuple(
+        llm_broker.get("local_models"), "LLM Broker local models"
+    )
+    online_models = _get_str_tuple(
+        llm_broker.get("online_models"), "LLM Broker online models"
+    )
+
+    return LlmBrokerSpecification(
+        environs=environs, local_models=local_models, online_models=online_models
+    )
 
 
 def _get_jina_reader_specification(

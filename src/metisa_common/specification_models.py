@@ -100,6 +100,8 @@ class LlmBrokerSpecification:
     """Represents the LLM Broker section of the Metisa specification."""
 
     environs: frozenset[str]
+    local_models: tuple[str, ...]
+    online_models: tuple[str, ...]
 
 
 @dataclass(frozen=True)

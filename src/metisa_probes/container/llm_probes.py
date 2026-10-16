@@ -1,4 +1,4 @@
-"""Probe declared local LLM models through the LLM Broker."""
+"""Probe local LLM readiness and the LLM Broker's declared model catalog."""
 
 from __future__ import annotations
 
@@ -52,8 +52,32 @@ def llm_servers_are_ready(probe_context: ProbeContext) -> ProbeResult:
 
 
 def llm_models_are_available(probe_context: ProbeContext) -> ProbeResult:
-    """Verify the broker advertises every declared local model alias."""
-    return _run_llm_probe(probe_context, "models_are_available", _check_model)
+    """Verify the broker advertises its declared local and online model aliases."""
+    probe_name = "container__llm__models_are_available"
+    specification = probe_context.specification
+    if Capability.LLM_BROKER not in specification.capabilities:
+        return ProbeResult.success(
+            probe_name, "LLM broker capability is disabled. Skipping probe."
+        )
+
+    llm_broker = specification.llm_broker
+    if llm_broker is None:
+        return ProbeResult.failure(
+            probe_name, "LLM broker capability requires an LLM broker specification."
+        )
+
+    expected_aliases = set(llm_broker.local_models)
+    expected_aliases.update(llm_broker.online_models)
+    try:
+        failure = _check_models(expected_aliases)
+    except Exception as error:
+        failure = f"{type(error).__name__}: {error}"
+
+    if failure is not None:
+        return ProbeResult.failure(probe_name, f"{_LLM_BROKER_URL}: {failure}")
+    return ProbeResult.success(
+        probe_name, f"Checked {len(expected_aliases)} broker-declared LLM models."
+    )
 
 
 def _run_llm_probe(
@@ -114,7 +138,7 @@ def _check_readiness(model: LlmModel) -> str | None:
     return None
 
 
-def _check_model(model: LlmModel) -> str | None:
+def _check_models(expected_aliases: set[str]) -> str | None:
     response = _request_json("/v1/models")
     models = response.get("data")
     if not isinstance(models, list):
@@ -127,8 +151,10 @@ def _check_model(model: LlmModel) -> str | None:
         if not isinstance(alias, str) or not alias:
             return "Broker model listing contained an invalid model identifier."
         advertised_aliases.add(alias)
-    if model.alias not in advertised_aliases:
-        return f"Broker model listing did not advertise expected alias {model.alias!r}."
+    missing_aliases = expected_aliases - advertised_aliases
+    if missing_aliases:
+        missing_names = ", ".join(sorted(missing_aliases))
+        return f"Broker model listing is missing expected aliases: {missing_names}."
     return None
 
 
