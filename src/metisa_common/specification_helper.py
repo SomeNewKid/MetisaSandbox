@@ -29,6 +29,7 @@ from .specification_validator import (
 )
 
 _IMAGE_FORMAT_VERSION = 1
+_WORKLOAD_IMAGE_FORMAT_VERSION = 2
 _VALID_RESOLVERS = ("host",)
 
 
@@ -53,6 +54,8 @@ def get_image_tag(
     for value in ordered_dependencies:
         ordered_collections.append(value)
 
+    # Rebuild cached workload images when their trusted runtime components change.
+    ordered_collections.append(f"workload-format-{_WORKLOAD_IMAGE_FORMAT_VERSION}")
     return generate_image_tag(ordered_collections)
 
 
@@ -160,8 +163,14 @@ def environ_is_valid(
 ) -> bool:
     """Validate the TOML environ value."""
     try:
-        _, value = _get_environ_name_value(environ)
+        name, value = _get_environ_name_value(environ)
     except ValueError:
+        return False
+
+    if _environ_name_is_reserved(name):
+        return False
+
+    if not re.fullmatch("[A-Za-z_][A-Za-z0-9_]*", name):
         return False
 
     if not value.startswith("${"):
@@ -329,6 +338,7 @@ def _create_metisa_specification(
             "capabilities",
             "dependencies",
             "environs",
+            "settings",
         }
     )
 
@@ -351,6 +361,7 @@ def _create_metisa_specification(
     capabilities = _get_capabilities(toml)
     dependencies = _get_dependencies(toml)
     environs = _get_environs(toml, "TOML specification environs")
+    settings = _get_settings(toml)
     haproxy = _get_haproxy_specfication(toml)
     squid_proxy = _get_squid_proxy_specification(toml)
     llm_server = _get_llm_server_specification(toml)
@@ -363,6 +374,7 @@ def _create_metisa_specification(
         capabilities=capabilities,
         dependencies=dependencies,
         environs=environs,
+        settings=settings,
         haproxy=haproxy,
         squid_proxy=squid_proxy,
         llm_server=llm_server,
@@ -419,6 +431,32 @@ def _get_capabilities(
     return frozenset(capabilities)
 
 
+def _get_settings(
+    toml: dict[str, object],
+) -> dict[str, str]:
+    raw_settings = _get_str_tuple(toml.get("settings"), "TOML specification settings")
+
+    keys: list[str] = []
+    settings: dict[str, str] = {}
+
+    for raw_setting in raw_settings:
+        parts = raw_setting.split("=")
+        if len(parts) != 2:
+            raise SpecificationValidationError(
+                f"TOML specification setting '{raw_setting}' is invalid supported."
+            )
+        key = parts[0].strip()
+        if key in keys:
+            raise SpecificationValidationError(
+                f"TOML specification setting has duplicate keys: '{key}'."
+            )
+        value = parts[1].strip()
+        keys.append(key)
+        settings[key] = value
+
+    return settings
+
+
 def _get_dependencies(
     toml: dict[str, object],
 ) -> frozenset[str]:
@@ -455,6 +493,10 @@ def _get_environs(
         if not isinstance(raw_environ, str):
             raise SpecificationValidationError(
                 f"TOML specification environ '{raw_environ}' is not supported."
+            )
+        if _environ_is_reserved(raw_environ):
+            raise SpecificationValidationError(
+                f"TOML specification environ '{raw_environ}' is not permitted."
             )
         if not environ_is_valid(raw_environ):
             raise SpecificationValidationError(
@@ -862,20 +904,75 @@ def _get_str_tuple(
     return tuple(trimmed_values)
 
 
-def _get_int_tuple(
-    collection: object | None,
-    section_name: str,
-) -> tuple[int]:
-    if not collection:
-        return tuple([])
+def _environ_is_reserved(
+    environ: str,
+) -> bool:
+    """Validate the TOML environ value."""
+    try:
+        name, _ = _get_environ_name_value(environ)
+    except ValueError:
+        return False
+    return _environ_name_is_reserved(name)
 
-    if not isinstance(collection, list):
-        error = f"{section_name} must be iterable."
-        raise SpecificationValidationError(error)
 
-    for item in iter(collection):
-        if not isinstance(item, int):
-            error = f"{section_name} must be integers."
-            raise SpecificationValidationError(error)
+def _environ_name_is_reserved(
+    name: str,
+) -> bool:
+    name = name.upper()
 
-    return tuple(collection)
+    # The sandbox launcher owns startup roles and output paths.
+    reserved_by_metisa = (
+        "METISA_RUNTIME_ROLE",
+        "SANDBOX_OUTPUT_DIR",
+    )
+    if name in reserved_by_metisa:
+        return True
+
+    # Container managers own proxy configuration.
+    # Reserve them even when internet access is disabled.
+    reserved_proxy_names = (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+    )
+    if name in reserved_proxy_names:
+        return True
+
+    # Dynamic-loader settings can affect execution before Python’s guards start.
+    if name.startswith("LD_"):
+        return True
+
+    # Prevent declarations from changing executable lookup or interpreter configuration.
+    if name == "PATH" or name.startswith("PYTHON"):
+        return True
+
+    # Keep configuration, persistence, and temporary-file locations
+    # under sandbox control.
+    configuration_names = (
+        "HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+        "XDG_RUNTIME_DIR",
+        "GNUPGHOME",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+    )
+    if name in configuration_names:
+        return True
+
+    integration_channels = (
+        "SSH_AUTH_SOCK",
+        "GPG_AGENT_INFO",
+        "DBUS_SESSION_BUS_ADDRESS",
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+        "XAUTHORITY",
+    )
+    if name in integration_channels:
+        return True
+
+    return False

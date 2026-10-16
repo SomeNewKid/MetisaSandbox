@@ -138,66 +138,81 @@ def main(
             except Exception as error:
                 print("MCP server error:", error)
 
-    if Capability.LLM_SERVER in specification.capabilities:
-        prompt_for_llm = "Explain Docker networks in two sentences."
-
-        try:
-            print(flush=True)
-            print("-" * 30)
-            print("To Granite:", prompt_for_llm)
-            print(flush=True)
-            llm_chat_completion = _get_granite_chat_completion(
-                "granite-4-1b", prompt_for_llm
-            )
-            print("From Granite (chat completion):", llm_chat_completion)
-        except Exception as error:
-            print("Granite chat error:", error)
-
-        try:
-            print(flush=True)
-            llm_response = _get_llm_response("granite-4-1b", prompt_for_llm)
-            print("From Granite (response):", llm_response)
-        except Exception as error:
-            print("Granite response error:", error)
-
-        try:
-            print(flush=True)
-            print("-" * 30)
-            print("To Qwen:", prompt_for_llm)
-            print(flush=True)
-            llm_chat_completion = _get_qwen_chat_completion(
-                "qwen-3-small", prompt_for_llm
-            )
-            print("From Qwen (chat completion):", llm_chat_completion)
-        except Exception as error:
-            print("Qwen error:", error)
-
-        try:
-            print(flush=True)
-            llm_response = _get_llm_response("qwen-3-small", prompt_for_llm)
-            print("From Qwen (response):", llm_response)
-        except Exception as error:
-            print("Qwen response error:", error)
-
     if Capability.LLM_BROKER in specification.capabilities:
         prompt_for_llm = "Explain Docker networks in two sentences."
 
-        try:
-            print(flush=True)
-            print("-" * 30)
-            print("To GPT:", prompt_for_llm)
-            print(flush=True)
-            llm_chat_completion = _get_granite_chat_completion("gpt-4o", prompt_for_llm)
-            print("From GPT (chat completion):", llm_chat_completion)
-        except Exception as error:
-            print("GPT chat error:", error)
+        if specification.llm_broker is not None:
+            local_models = specification.llm_broker.local_models
+        else:
+            local_models = []
 
-        try:
-            print(flush=True)
-            llm_response = _get_llm_response("gpt-4o", prompt_for_llm)
-            print("From GPT (response):", llm_response)
-        except Exception as error:
-            print("GPT response error:", error)
+        if specification.llm_broker is not None:
+            online_models = specification.llm_broker.online_models
+        else:
+            online_models = []
+
+        granite_alias = "granite-4-1b"
+        if granite_alias in local_models:
+            try:
+                print(flush=True)
+                print("-" * 30)
+                print("To Granite:", prompt_for_llm)
+                print(flush=True)
+                llm_chat_completion = _get_granite_chat_completion(
+                    granite_alias, prompt_for_llm
+                )
+                print("From Granite (chat completion):", llm_chat_completion)
+            except Exception as error:
+                print("Granite chat error:", error)
+
+            try:
+                print(flush=True)
+                llm_response = _get_llm_response(granite_alias, prompt_for_llm)
+                print("From Granite (response):", llm_response)
+            except Exception as error:
+                print("Granite response error:", error)
+
+        qwen_alias = "qwen-3-small"
+        if qwen_alias in local_models:
+            try:
+                print(flush=True)
+                print("-" * 30)
+                print("To Qwen:", prompt_for_llm)
+                print(flush=True)
+                llm_chat_completion = _get_qwen_chat_completion(
+                    "qwen-3-small", prompt_for_llm
+                )
+                print("From Qwen (chat completion):", llm_chat_completion)
+            except Exception as error:
+                print("Qwen error:", error)
+
+            try:
+                print(flush=True)
+                llm_response = _get_llm_response("qwen-3-small", prompt_for_llm)
+                print("From Qwen (response):", llm_response)
+            except Exception as error:
+                print("Qwen response error:", error)
+
+        gpt_alias = "gpt-4o"
+        if gpt_alias in online_models:
+            try:
+                print(flush=True)
+                print("-" * 30)
+                print("To GPT:", prompt_for_llm)
+                print(flush=True)
+                llm_chat_completion = _get_granite_chat_completion(
+                    gpt_alias, prompt_for_llm
+                )
+                print("From GPT (chat completion):", llm_chat_completion)
+            except Exception as error:
+                print("GPT chat error:", error)
+
+            try:
+                print(flush=True)
+                llm_response = _get_llm_response(gpt_alias, prompt_for_llm)
+                print("From GPT (response):", llm_response)
+            except Exception as error:
+                print("GPT response error:", error)
 
     if Capability.CODE_EXECUTION in specification.capabilities:
         try:

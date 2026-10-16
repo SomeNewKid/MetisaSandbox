@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable
 
-from metisa_common.specification_models import Capability, LlmModel
+from metisa_common.specification_models import Capability
 
 from ..probe_models import ProbeContext, ProbeGroup, ProbeResult
 
@@ -47,7 +47,7 @@ def llm_broker_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
 
 
 def llm_servers_are_ready(probe_context: ProbeContext) -> ProbeResult:
-    """Verify the broker reports readiness for every declared local model."""
+    """Verify readiness for the local models exposed by the broker."""
     return _run_llm_probe(probe_context, "servers_are_ready", _check_readiness)
 
 
@@ -83,39 +83,35 @@ def llm_models_are_available(probe_context: ProbeContext) -> ProbeResult:
 def _run_llm_probe(
     probe_context: ProbeContext,
     name: str,
-    operation: Callable[[LlmModel], str | None],
+    operation: Callable[[str], str | None],
 ) -> ProbeResult:
     probe_name = f"container__llm__{name}"
     specification = probe_context.specification
-    if Capability.LLM_SERVER not in specification.capabilities:
-        return ProbeResult.success(
-            probe_name, "LLM server capability is disabled. Skipping probe."
-        )
-
     if Capability.LLM_BROKER not in specification.capabilities:
-        return ProbeResult.failure(
-            probe_name, "Local LLM model probes require the LLM broker capability."
+        return ProbeResult.success(
+            probe_name, "LLM broker capability is disabled. Skipping probe."
         )
 
-    llm_server = specification.llm_server
-    if llm_server is None:
+    llm_broker = specification.llm_broker
+    if llm_broker is None:
         return ProbeResult.failure(
-            probe_name, "LLM server capability requires an LLM server specification."
+            probe_name, "LLM broker capability requires an LLM broker specification."
         )
 
     failures: list[str] = []
-    for model in llm_server.models:
+    for model_alias in llm_broker.local_models:
         try:
-            failure = operation(model)
+            failure = operation(model_alias)
         except Exception as error:
             failure = f"{type(error).__name__}: {error}"
         if failure is not None:
-            failures.append(f"{model.alias} ({_LLM_BROKER_URL}): {failure}")
+            failures.append(f"{model_alias} ({_LLM_BROKER_URL}): {failure}")
 
     if failures:
         return ProbeResult.failure(probe_name, "; ".join(failures))
     return ProbeResult.success(
-        probe_name, f"Checked {len(llm_server.models)} declared LLM models."
+        probe_name,
+        f"Checked {len(llm_broker.local_models)} broker-declared local models.",
     )
 
 
@@ -128,13 +124,13 @@ async def _resolve_alias() -> set[str]:
     return {str(address[4][0]) for address in addresses}
 
 
-def _check_readiness(model: LlmModel) -> str | None:
-    model_alias = urllib.parse.quote(model.alias, safe="")
-    response = _request_json(f"/health/{model_alias}")
+def _check_readiness(model_alias: str) -> str | None:
+    encoded_alias = urllib.parse.quote(model_alias, safe="")
+    response = _request_json(f"/health/{encoded_alias}")
     if response.get("status") != "ok":
         return "Broker model health endpoint did not report status 'ok'."
-    if response.get("model") != model.alias:
-        return f"Broker model health response did not match alias {model.alias!r}."
+    if response.get("model") != model_alias:
+        return f"Broker model health response did not match alias {model_alias!r}."
     return None
 
 

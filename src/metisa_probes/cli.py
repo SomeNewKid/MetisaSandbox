@@ -23,6 +23,7 @@ from .kernel.linux_capability_probes import LINUX_CAPABILITY_PROBES
 from .kernel.network_probes import KERNEL_NETWORK_PROBES
 from .kernel.privilege_probes import PRIVILEGE_PROBES
 from .kernel.resource_probes import RESOURCE_PROBES
+from .kernel.seccomp_probes import SECCOMP_PROBES
 from .probe_models import ProbeContext, ProbeGroup, ProbeResult
 from .python.diagnostic_probes import DIAGNOSTIC_PROBES
 from .python.hardware_probes import HARDWARE_PROBES
@@ -74,6 +75,7 @@ def main(
         KERNEL_NETWORK_PROBES,
         PRIVILEGE_PROBES,
         RESOURCE_PROBES,
+        SECCOMP_PROBES,
         DIAGNOSTIC_PROBES,
         HARDWARE_PROBES,
         PYTHON_PROBES,

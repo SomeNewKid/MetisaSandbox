@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from metisa_common.specification_helper import environ_is_valid, parse_specification
@@ -47,6 +49,41 @@ def test_environ_is_valid_with_valid_environ(environ: str) -> None:
 def test_environ_is_valid_with_invalid_environ(environ: str) -> None:
     """Reject missing pairs and unsupported or malformed resolver references."""
     assert not environ_is_valid(environ)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "",
+        "1NAME",
+        "123",
+        " NAME",
+        "NAME ",
+        "NA ME",
+        "\tNAME",
+        "NAME\t",
+        "NAME\n",
+        "NAME\r",
+        "NAME-WITH-DASH",
+        "NAME.WITH.DOT",
+        "NAME:SUFFIX",
+        "NAME/PATH",
+        "$NAME",
+        "NAME!",
+        "\u00c9NAME",
+        "NAM\u00c9",
+        "NAME\u0661",
+    ],
+)
+def test_environs_reject_invalid_names(name: str) -> None:
+    """Reject names outside the ASCII pattern [A-Za-z_][A-Za-z0-9_]*."""
+    declaration = json.dumps(f"{name}=value")
+    toml = f"""
+        agent_name = "sample_agent"
+        environs = [{declaration}]
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
 
 
 def test_missing_environs() -> None:
@@ -151,6 +188,147 @@ def test_environs_with_an_invalid_value(environ: str) -> None:
     with pytest.raises(SpecificationValidationError) as error:
         _ = parse_specification(toml)
     assert "unknown keys" not in str(error.value)
+
+
+@pytest.mark.parametrize("name", ["METISA_RUNTIME_ROLE", "SANDBOX_OUTPUT_DIR"])
+def test_environs_reject_internal_variables(name: str) -> None:
+    """Reject declarations that override sandbox startup configuration."""
+    toml = f"""
+        agent_name = "sample_agent"
+        environs = ["{name}=value"]
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+        "no_proxy",
+    ],
+)
+def test_environs_reject_proxy_variables(name: str) -> None:
+    """Reject declarations that override managed proxy configuration."""
+    toml = f"""
+        agent_name = "sample_agent"
+        environs = ["{name}=value"]
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+        "LD_AUDIT",
+        "LD_DEBUG",
+        "LD_DEBUG_OUTPUT",
+        "LD_BIND_NOW",
+        "LD_BIND_NOT",
+        "LD_DYNAMIC_WEAK",
+        "LD_HWCAP_MASK",
+        "LD_ORIGIN_PATH",
+        "LD_PROFILE",
+        "LD_PROFILE_OUTPUT",
+        "LD_SHOW_AUXV",
+        "LD_USE_LOAD_BIAS",
+        "LD_METISA_POLICY_PROBE",
+    ],
+)
+def test_environs_reject_dynamic_loader_variables(name: str) -> None:
+    """Reject dynamic-loader variables, including unrecognized LD_ names."""
+    toml = f"""
+        agent_name = "sample_agent"
+        environs = ["{name}=value"]
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "PATH",
+        "PYTHONPATH",
+        "PYTHONHOME",
+        "PYTHONSTARTUP",
+        "PYTHONINSPECT",
+        "PYTHONUSERBASE",
+        "PYTHONNOUSERSITE",
+        "PYTHONSAFEPATH",
+        "PYTHONDONTWRITEBYTECODE",
+        "PYTHONPYCACHEPREFIX",
+        "PYTHONWARNINGS",
+        "PYTHONOPTIMIZE",
+        "PYTHONHASHSEED",
+        "PYTHONIOENCODING",
+        "PYTHONUNBUFFERED",
+        "PYTHON_METISA_POLICY_PROBE",
+    ],
+)
+def test_environs_reject_execution_configuration_variables(name: str) -> None:
+    """Reject executable lookup and Python-prefixed configuration variables."""
+    toml = f"""
+        agent_name = "sample_agent"
+        environs = ["{name}=value"]
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+        "XDG_RUNTIME_DIR",
+        "GNUPGHOME",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+    ],
+)
+def test_environs_reject_storage_location_variables(name: str) -> None:
+    """Reject declarations that redirect configuration or temporary storage."""
+    toml = f"""
+        agent_name = "sample_agent"
+        environs = ["{name}=value"]
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "SSH_AUTH_SOCK",
+        "GPG_AGENT_INFO",
+        "DBUS_SESSION_BUS_ADDRESS",
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+        "XAUTHORITY",
+    ],
+)
+def test_environs_reject_host_channel_variables(name: str) -> None:
+    """Reject declarations that configure host integration channels."""
+    toml = f"""
+        agent_name = "sample_agent"
+        environs = ["{name}=value"]
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
 
 
 def test_valid_environs() -> None:

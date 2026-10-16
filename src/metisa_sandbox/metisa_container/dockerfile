@@ -7,6 +7,15 @@
 # such as `pip`, compilers, headers, wheels, metadata, and caches
 FROM python:3.12-slim AS builder
 
+# Compile the trusted syscall probe helper; build tools stay in this stage.
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY seccomp_probe.c /tmp/seccomp_probe.c
+RUN gcc -std=c11 -O2 -Wall -Wextra -Werror \
+    /tmp/seccomp_probe.c -o /usr/local/bin/metisa-seccomp-probe
+
 # Create the Python virtual environment
 #   /opt is a Linux filesystem convention for optional, 
 #   self-contained software installed outside the 
@@ -43,6 +52,8 @@ FROM python:3.12-slim AS runtime
 
 # Copy the Python virtual environment
 COPY --from=builder /opt/metisa-venv /opt/metisa-venv
+COPY --from=builder --chmod=0555 /usr/local/bin/metisa-seccomp-probe \
+    /usr/local/bin/metisa-seccomp-probe
 
 # Remove installation distributions supplied by base image.
 RUN python -m pip uninstall \

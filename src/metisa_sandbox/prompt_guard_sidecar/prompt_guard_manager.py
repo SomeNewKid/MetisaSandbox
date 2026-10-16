@@ -45,6 +45,11 @@ def create_prompt_guard_container(
 
     staged_source_path = create_staged_source_directory(sandbox_context)
 
+    local_models_directory = specification.settings.get("local_models_directory")
+    local_models_dir_path = (
+        Path(local_models_directory) if local_models_directory else Path.cwd()
+    )
+
     environs: list[str] = []
 
     arguments = [
@@ -66,7 +71,7 @@ def create_prompt_guard_container(
 
     # Mount the Meta LLaMA model.
     local_llama_path = (
-        Path(r"C:\Git\__Models")
+        local_models_dir_path
         / "meta-llama"
         / "Llama-Prompt-Guard-2-22M"
         / "11614a155199674a0a95e6602d6ab0417b790ed0"
@@ -89,7 +94,7 @@ def create_prompt_guard_container(
 
     # Mount the Koala model.
     local_koala_path = (
-        Path(r"C:\Git\__Models")
+        local_models_dir_path
         / "KoalaAI"
         / "Text-Moderation"
         / "838ade0edb66dcffc5532d08ff6ed5c899abfb5c"

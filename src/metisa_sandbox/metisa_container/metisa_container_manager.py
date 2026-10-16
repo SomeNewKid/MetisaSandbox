@@ -79,6 +79,16 @@ def create_docker_run_arguments(
         ]
     )
 
+    # Specify a seccomp (secure computing mode) profile for the container.
+    # The seccomp profile defines a set of system calls that the container
+    # is allowed to make (that is, it is a whitelist).
+    # This custom seccomp profile started as a copy of the default Docker
+    # seccomp profile from commit 6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef.
+    seccomp_path = Path(__file__).resolve().with_name("seccomp.json")
+    if not seccomp_path.is_file():
+        raise ValueError(f"Seccomp profile not found at {seccomp_path}")
+    arguments.extend(["--security-opt", f"seccomp={seccomp_path}"])
+
     # Configure the network settings for the container
     # based on whether a network is required.
     if is_network_required:

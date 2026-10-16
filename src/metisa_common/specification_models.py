@@ -36,6 +36,7 @@ class MetisaSpecification:
     capabilities: frozenset[Capability]
     dependencies: frozenset[str]
     environs: frozenset[str]
+    settings: dict[str, str]
     haproxy: HaproxySpecification | None
     squid_proxy: SquidProxySpecification | None
     llm_server: LlmServerSpecification | None

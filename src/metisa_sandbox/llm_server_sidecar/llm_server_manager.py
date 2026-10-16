@@ -21,7 +21,7 @@ from ..docker.docker_image import (
 from ..sandbox_context import SandboxContext
 
 LLM_CONTAINER_ALIAS_PREFIX = "metisa-llm-"
-LLM_CONTAINER_NAME_PREFIX = "metisa-llm-server-"
+LLM_CONTAINER_NAME_PREFIX = "llm-server-"
 _IMAGE_FORMAT_VERSION = 1
 _LLM_SERVER_IMAGE_NAME = "metisa-llm-server"
 
@@ -37,9 +37,14 @@ def create_llm_server_containers(
     if not specification.llm_server:
         return container_names
 
+    local_models_directory = specification.settings.get("local_models_directory", "")
+    local_models_dir_path = (
+        Path(local_models_directory) if local_models_directory else Path.cwd()
+    )
+
     for llm_model in specification.llm_server.models:
         container_name = _create_llm_server_container(
-            llm_model, sandbox_context, image_name
+            local_models_dir_path, llm_model, sandbox_context, image_name
         )
         container_names.append(container_name)
 
@@ -47,6 +52,7 @@ def create_llm_server_containers(
 
 
 def _create_llm_server_container(
+    local_models_path: Path,
     llm_model: LlmModel,
     sandbox_context: SandboxContext,
     image_name: str,
@@ -70,10 +76,7 @@ def _create_llm_server_container(
     # Mount the model file into the container.
     local_relative = llm_model.repo.replace("/", "\\")
     local_model_path = (
-        Path(r"C:\Git\__Models")
-        / local_relative
-        / llm_model.revision
-        / llm_model.filename
+        local_models_path / local_relative / llm_model.revision / llm_model.filename
     )
     if not local_model_path.is_file():
         raise FileNotFoundError(f"Model file not found at {local_model_path}")

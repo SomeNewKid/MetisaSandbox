@@ -12,10 +12,10 @@ from .sandbox_context import SandboxContext
 def create_sandbox_context() -> SandboxContext:
     """Create a sandbox context."""
     run_identifier, host_run_directory = _create_run_identifier_and_directory()
-    workload_container_name = f"metisa-container-workload-{run_identifier}"
-    workload_network_name = f"metisa-network-workload-{run_identifier}"
-    backend_network_name = f"metisa-network-backend-{run_identifier}"
-    egress_network_name = f"metisa-network-egress-{run_identifier}"
+    workload_container_name = f"metisa-workload-{run_identifier}"
+    workload_network_name = f"network-workload-{run_identifier}"
+    backend_network_name = f"network-backend-{run_identifier}"
+    egress_network_name = f"network-egress-{run_identifier}"
     host_output_path = _create_output_directory(host_run_directory, "output")
     host_logs_path = _create_logs_directory(host_run_directory, ".logs")
     host_scratch_path = _create_scratch_directory(host_run_directory, ".scratch")
