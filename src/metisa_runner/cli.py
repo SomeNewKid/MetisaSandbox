@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import NoReturn
 
 from metisa_common.specification_helper import get_workload_specification_path
+from metisa_common.terminal_helper import FAILURE_INDICATOR, terminal_status
 
 _PROBES_MODULE = "metisa_probes"
 
@@ -19,27 +20,31 @@ def main(
     """Run the Metisa probes module and then the workload module."""
     args = sys.argv[1:] if argv is None else argv
     if not args:
-        print("Error: no workload module argument.", file=sys.stderr)
+        error_message = FAILURE_INDICATOR + "Error: no workload module argument."
+        print(error_message, file=sys.stderr)
         return 1
 
     workload_module = args[0]
     specification_path = get_workload_specification_path(workload_module)
 
-    print("Metisa probes starting...", end="\n", flush=True)
-    os.environ["METISA_RUNTIME_ROLE"] = "probes"
-    probes_exit_code = _run_probes_module(_PROBES_MODULE, specification_path)
-    if probes_exit_code != 0:
-        print("Sandbox probes failed.  Workload will not be run.", file=sys.stderr)
-        return probes_exit_code
-    print("Metisa probes finished.", end="\n", flush=True)
+    with terminal_status(
+        running="Starting Metisa probes...",
+        success="Finished Metisa probes.",
+        failure="Could not complete Metisa probes.",
+    ) as status:
+        os.environ["METISA_RUNTIME_ROLE"] = "probes"
+        probes_exit_code = _run_probes_module(_PROBES_MODULE, specification_path)
+        if probes_exit_code != 0:
+            status.fail()
+            return probes_exit_code
 
-    print("Docker workload starting...", end="\n", flush=True)
     os.environ["METISA_RUNTIME_ROLE"] = "workload"
 
     try:
         _execute_workload(workload_module)
     except OSError as error:
-        print(f"Failed to execute workload: {error}", file=sys.stderr)
+        error_message = FAILURE_INDICATOR + f"Failed to execute workload: {error}"
+        print(error_message, file=sys.stderr)
         return 1
 
 

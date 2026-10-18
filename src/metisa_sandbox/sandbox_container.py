@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from metisa_common.terminal_helper import (
+    terminal_status,
+)
+
 from .docker.docker_container import (
     copy_container_files_to_host_folder,
     get_docker_container_inspection,
@@ -137,12 +141,14 @@ def _finalize_and_stop_and_remove_container(
     container_stopped = False
 
     try:
-        print(f"Stopping {container_title} container.")
-        stop_docker_container(container_instance_name, timeout_seconds=10)
-        container_stopped = True
-        print(f"Stopped {container_title} container.")
+        with terminal_status(
+            running=f"Stopping {container_title} container...",
+            success=f"Stopped {container_title} container.",
+            failure=f"Could not stop {container_title} container.",
+        ):
+            stop_docker_container(container_instance_name, timeout_seconds=10)
+            container_stopped = True
     except Exception as error:
-        print(f"Could not stop {container_title} container.")
         cleanup_errors.append(f"Could not stop {container_title} container: {error}")
 
     try:
@@ -151,9 +157,13 @@ def _finalize_and_stop_and_remove_container(
         cleanup_errors.append(f"Could not save {container_title} logs: {error}")
 
     try:
-        print(f"Removing {container_title} container.")
-        remove_docker_container(container_instance_name, force=not container_stopped)
-        print(f"Removed {container_title} container.")
+        with terminal_status(
+            running=f"Removing {container_title} container.",
+            success=f"Removed {container_title} container.",
+            failure=f"Could not remove {container_title} container.",
+        ):
+            remove_docker_container(
+                container_instance_name, force=not container_stopped
+            )
     except Exception as error:
-        print(f"Could not remove {container_title} container.")
         cleanup_errors.append(f"Could not remove {container_title} container: {error}")

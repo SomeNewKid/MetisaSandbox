@@ -258,14 +258,12 @@ def _create_llm_server_container(
         ]
     )
 
-    print(f"Creating {container_alias}")
     create_docker_container(arguments)
 
     start_docker_container(container_name)
     started_successfully = inspect_docker_container(container_name)
     if not started_successfully:
         raise RuntimeError(f"LLM server '{container_alias}' failed to start.")
-    print(f"Created {container_alias}")
 
     return container_name
 

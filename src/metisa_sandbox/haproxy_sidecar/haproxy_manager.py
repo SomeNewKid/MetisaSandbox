@@ -77,10 +77,12 @@ def create_haproxy_container(
     ]
 
     if _use_network_alias(sandbox_context, network_name):
-        arguments.extend([
-            "--network-alias",
-            _HAPROXY_ALIAS,
-        ])
+        arguments.extend(
+            [
+                "--network-alias",
+                _HAPROXY_ALIAS,
+            ]
+        )
 
     # If MCP Server is deployed, overwrite the haproxy.cfg
     if mcp_server_ip_address is not None:
@@ -249,7 +251,7 @@ def create_haproxy_container(
 
 
 def _use_network_alias(
-    sandbox_context: SandboxContext, 
+    sandbox_context: SandboxContext,
     network_name: str,
 ) -> bool:
     if network_name == sandbox_context.egress_network_name:

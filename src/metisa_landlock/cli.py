@@ -11,6 +11,10 @@ from metisa_common.specification_helper import (
     get_workload_specification_path,
     load_specification,
 )
+from metisa_common.terminal_helper import (
+    FAILURE_INDICATOR,
+    terminal_status,
+)
 
 from .landlock import (
     apply_landlock_rules,
@@ -34,18 +38,20 @@ def main(
     specification = load_specification(specification_path)
     log_file_path = _get_landlock_log_path()
 
-    print("Metisa landlock starting...", end="\n", flush=True)
     try:
-        apply_landlock_rules(specification, log_file_path)
-    except Exception as error:
-        print(f"Failed to apply Landlock rules: {error}", file=sys.stderr)
+        with terminal_status(
+            running="Applying landlock rules...",
+            success="Applied landlock rules.",
+            failure="Could not apply landlock rules.",
+        ):
+            apply_landlock_rules(specification, log_file_path)
+    except Exception:
         return 1
-    print("Metisa landlock finished.", end="\n", flush=True)
 
     try:
         return _execute_runner(workload_module)
     except OSError as error:
-        print(f"Failed to execute runner: {error}", file=sys.stderr)
+        print(f"{FAILURE_INDICATOR} Failed to execute runner: {error}", file=sys.stderr)
         return 1
 
 

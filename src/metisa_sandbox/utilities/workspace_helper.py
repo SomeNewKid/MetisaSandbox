@@ -6,6 +6,8 @@ import shutil
 from fnmatch import fnmatchcase
 from pathlib import Path
 
+from ..sandbox_models import SandboxContainer
+
 _IGNORED_DIRECTORY_PATTERNS = (
     ".*",
     "__pycache__",
@@ -28,12 +30,16 @@ _IGNORED_FILE_PATTERNS = (
 )
 
 
-def clean_up_staged_source(
-    staged_source_path: Path,
+def clean_up_staged_sources(
+    sandbox_containers: list[SandboxContainer],
 ) -> None:
-    """Clean up the staged source directory."""
-    if staged_source_path.exists():
-        shutil.rmtree(staged_source_path, ignore_errors=False)
+    """Clean up staged source directories for the given sandbox containers."""
+    for sandbox_container in sandbox_containers:
+        if not sandbox_container.is_created:
+            continue
+        staged_source = sandbox_container.staged_source
+        if staged_source is not None and staged_source.exists():
+            shutil.rmtree(staged_source, ignore_errors=False)
 
 
 def copy_directories_into_staged(

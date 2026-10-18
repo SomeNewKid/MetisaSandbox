@@ -67,10 +67,12 @@ def create_squid_proxy_container(
     ]
 
     if _use_network_alias(sandbox_context, network_name):
-        arguments.extend([
-            "--network-alias",
-            _SQUID_PROXY_ALIAS,
-        ])
+        arguments.extend(
+            [
+                "--network-alias",
+                _SQUID_PROXY_ALIAS,
+            ]
+        )
 
     # Mount the container's root filesystem as strictly read-only
     # Couple with in memory temporary writes (--tmpfs)
@@ -223,7 +225,7 @@ def create_squid_proxy_container(
 
 
 def _use_network_alias(
-    sandbox_context: SandboxContext, 
+    sandbox_context: SandboxContext,
     network_name: str,
 ) -> bool:
     if network_name == sandbox_context.egress_network_name:
@@ -277,6 +279,7 @@ def _create_squid_proxy_image(
         )
     finally:
         shutil.rmtree(temporary_dir)
+
 
 def _get_dockerfile_location() -> Path:
     dockerfile_location = Path(__file__).with_name("dockerfile")

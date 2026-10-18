@@ -13,6 +13,11 @@ from metisa_common.specification_helper import (
 from metisa_common.specification_models import (
     MetisaSpecification,
 )
+from metisa_common.terminal_helper import (
+    FAILURE_INDICATOR,
+    SUCCESS_INDICATOR,
+    terminal_status,
+)
 
 from .docker.docker_engine import (
     docker_engine_started,
@@ -81,31 +86,33 @@ def _ensure_metisa_container_image(
     image_reference: str,
 ) -> int:
     if docker_engine_started():
-        print_info("Docker Engine is reachable.")
+        print_info(SUCCESS_INDICATOR + " Docker Engine is reachable.")
     else:
         print_info("Docker Engine is not reachable.")
         if get_user_approval("Start Docker Desktop (Y/N)?"):
             print_info("Starting Docker Desktop...")
             start_docker_desktop()
             if docker_engine_started(timeout_seconds=128):
-                print_info("Docker Engine started.")
+                print_info(f"{SUCCESS_INDICATOR} Docker Engine started.")
             else:
-                print_error("Docker Engine failed to start.")
+                print_error(f"{FAILURE_INDICATOR} Docker Engine failed to start.")
                 return 1
         else:
-            print_warning("Docker Engine not started.")
+            print_warning(f"{FAILURE_INDICATOR} Docker Engine not started.")
             return 1
 
     image_alias = "Docker Metisa workload image"
     if docker_image_exists(image_reference):
-        print_info(f"{image_alias} already exists.")
+        print_info(f"{SUCCESS_INDICATOR} {image_alias} already exists.")
         return 0
 
-    print_info(f"Building {image_alias}...")
-    build_metisa_container_image(specification, image_reference)
-
-    print_info(f"{image_alias} built.")
-    return 0
+    with terminal_status(
+        running=f"Building {image_alias}...",
+        success=f"Built {image_alias}.",
+        failure=f"Failed to build {image_alias}. Workload will not be run.",
+    ):
+        build_metisa_container_image(specification, image_reference)
+        return 0
 
 
 def _run_metisa_container_workload(
@@ -117,8 +124,8 @@ def _run_metisa_container_workload(
         specification, image_reference, workload_module
     )
     if return_code == 0:
-        print_info("Docker workload completed.")
+        print_info(SUCCESS_INDICATOR + " Completed agent workload.")
     else:
-        print_error("Docker workload failed.")
+        print_error(FAILURE_INDICATOR + " Could not complete agent workload.")
 
     return return_code

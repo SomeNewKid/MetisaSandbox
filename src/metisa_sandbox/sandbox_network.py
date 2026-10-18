@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from metisa_common.terminal_helper import (
+    terminal_status,
+)
+
 from .docker.docker_network import create_docker_network, remove_docker_network
 from .sandbox_models import SandboxNetwork
 
@@ -94,10 +98,13 @@ def create_sandbox_network(
     if network.is_created:
         return
 
-    print(f"Creating {network.title}.")
-    create_docker_network(network.name, internal=network.is_internal)
-    network.set_created()
-    print(f"Created {network.title}.")
+    with terminal_status(
+        running=f"Creating {network.title}...",
+        success=f"Created {network.title}.",
+        failure=f"Could not create {network.title}.",
+    ):
+        create_docker_network(network.name, internal=network.is_internal)
+        network.set_created()
 
 
 def remove_sandbox_networks(
@@ -117,10 +124,13 @@ def _remove_sandbox_network(
         return
 
     try:
-        print(f"Removing network {sandbox_network.title}.")
-        remove_docker_network(sandbox_network.name)
-        sandbox_network.set_removed()
-        print(f"Removed network {sandbox_network.title}.")
+        with terminal_status(
+            running=f"Removing network {sandbox_network.title}...",
+            success=f"Removed network {sandbox_network.title}.",
+            failure=f"Could not remove {sandbox_network.title}.",
+        ):
+            remove_docker_network(sandbox_network.name)
+            sandbox_network.set_removed()
     except Exception as error:
         cleanup_error = f"Could not remove network '{sandbox_network.title}': {error}"
         cleanup_errors.append(cleanup_error)

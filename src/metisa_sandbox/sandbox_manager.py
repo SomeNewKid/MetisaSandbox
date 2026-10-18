@@ -5,6 +5,10 @@ from __future__ import annotations
 import sys
 
 from metisa_common.specification_models import MetisaSpecification
+from metisa_common.terminal_helper import (
+    FAILURE_INDICATOR,
+    terminal_status,
+)
 
 from .code_execution_sidecar.code_execution_manager import (
     create_code_execution_container,
@@ -67,7 +71,7 @@ from .squid_proxy_sidecar.squid_proxy_manager import (
     create_squid_proxy_definition,
 )
 from .utilities.workspace_helper import (
-    clean_up_staged_source,
+    clean_up_staged_sources,
 )
 
 
@@ -209,7 +213,6 @@ def run_metisa_container_workload_in_sandbox(
     finally:
         if sandbox_context is not None:
             try:
-                print("Cleaning up environment.")
                 cleanup_errors: list[str] = []
 
                 stop_and_remove_containers(
@@ -221,7 +224,7 @@ def run_metisa_container_workload_in_sandbox(
                 remove_sandbox_networks(all_networks, cleanup_errors)
 
                 for cleanup_error in cleanup_errors:
-                    print(cleanup_error, file=sys.stderr)
+                    print(f"{FAILURE_INDICATOR} {cleanup_error}", file=sys.stderr)
 
             finally:
                 clean_up_run_directory(
@@ -230,19 +233,7 @@ def run_metisa_container_workload_in_sandbox(
                     sandbox_context.host_scratch_path,
                 )
 
-                if metisa_workload_container.staged_source is not None:
-                    clean_up_staged_source(metisa_workload_container.staged_source)
-
-                if llm_broker_container.staged_source is not None:
-                    clean_up_staged_source(llm_broker_container.staged_source)
-
-                if mcp_server_container.staged_source is not None:
-                    clean_up_staged_source(mcp_server_container.staged_source)
-
-                if prompt_guard_container.staged_source is not None:
-                    clean_up_staged_source(prompt_guard_container.staged_source)
-
-                print("Cleaned up environment.")
+                clean_up_staged_sources(all_containers)
 
 
 def _create_metisa_workload_container(
@@ -254,29 +245,32 @@ def _create_metisa_workload_container(
     squid_proxy_container: SandboxContainer,
     metisa_workload_container: SandboxContainer,
 ) -> None:
-    print("Creating Metisa Workload container.")
-    metisa_workload_creation_context = _create_creation_context(
-        squid_proxy_container=squid_proxy_container,
-        network_names=[
-            sandbox_context.workload_network_name,
-        ],
-    )
-    use_squid_proxy = _workload_container_needs_squid_proxy(sandbox_requirements)
-    metisa_settings = metisa_workload_creation_context.settings
-    metisa_settings["image_reference"] = image_reference
-    metisa_settings["workload_module"] = workload_module
-    metisa_settings["use_squid_proxy"] = use_squid_proxy
-    metisa_settings["is_network_required"] = (
-        sandbox_requirements.is_workload_network_required
-    )
+    with terminal_status(
+        running="Creating Metisa Workload container.",
+        success="Created Metisa Workload container.",
+        failure="Could not create Metisa Workload container.",
+    ):
+        metisa_workload_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.workload_network_name,
+            ],
+        )
+        use_squid_proxy = _workload_container_needs_squid_proxy(sandbox_requirements)
+        metisa_settings = metisa_workload_creation_context.settings
+        metisa_settings["image_reference"] = image_reference
+        metisa_settings["workload_module"] = workload_module
+        metisa_settings["use_squid_proxy"] = use_squid_proxy
+        metisa_settings["is_network_required"] = (
+            sandbox_requirements.is_workload_network_required
+        )
 
-    metisa_workload_creation = create_metisa_workload_container(
-        specification,
-        sandbox_context,
-        metisa_workload_creation_context,
-    )
-    metisa_workload_container.set_created(metisa_workload_creation)
-    print("Created Metisa Workload container.")
+        metisa_workload_creation = create_metisa_workload_container(
+            specification,
+            sandbox_context,
+            metisa_workload_creation_context,
+        )
+        metisa_workload_container.set_created(metisa_workload_creation)
 
 
 def _create_haproxy_container(
@@ -287,29 +281,32 @@ def _create_haproxy_container(
     mcp_server_container: SandboxContainer,
     haproxy_container: SandboxContainer,
 ) -> None:
-    print("Creating HAProxy container.")
-    haproxy_target_network_name = (
-        sandbox_context.backend_network_name
-        if sandbox_requirements.is_backend_network_required
-        else sandbox_context.workload_network_name
-    )
-    haproxy_creation_context = _create_creation_context(
-        squid_proxy_container=squid_proxy_container,
-        network_names=[
-            sandbox_context.egress_network_name,
-            haproxy_target_network_name,
-        ],
-    )
-    mcp_server_ip = mcp_server_container.network_ip_address
-    haproxy_creation_context.mcp_server_ip_address = mcp_server_ip
+    with terminal_status(
+        running="Creating HAProxy container...",
+        success="Created HAProxy container.",
+        failure="Could not create HAProxy container.",
+    ):
+        haproxy_target_network_name = (
+            sandbox_context.backend_network_name
+            if sandbox_requirements.is_backend_network_required
+            else sandbox_context.workload_network_name
+        )
+        haproxy_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.egress_network_name,
+                haproxy_target_network_name,
+            ],
+        )
+        mcp_server_ip = mcp_server_container.network_ip_address
+        haproxy_creation_context.mcp_server_ip_address = mcp_server_ip
 
-    haproxy_creation = create_haproxy_container(
-        specification,
-        sandbox_context,
-        haproxy_creation_context,
-    )
-    haproxy_container.set_created(haproxy_creation)
-    print("Created HAProxy container.")
+        haproxy_creation = create_haproxy_container(
+            specification,
+            sandbox_context,
+            haproxy_creation_context,
+        )
+        haproxy_container.set_created(haproxy_creation)
 
 
 def _create_prompt_guard_container(
@@ -318,18 +315,21 @@ def _create_prompt_guard_container(
     squid_proxy_container: SandboxContainer,
     prompt_guard_container: SandboxContainer,
 ) -> None:
-    print("Creating Prompt Guard container.")
-    prompt_guard_creation_context = _create_creation_context(
-        squid_proxy_container=squid_proxy_container,
-        network_names=[
-            sandbox_context.backend_network_name,
-        ],
-    )
-    prompt_guard_creation = create_prompt_guard_container(
-        specification, sandbox_context, prompt_guard_creation_context
-    )
-    prompt_guard_container.set_created(prompt_guard_creation)
-    print("Created Prompt Guard container.")
+    with terminal_status(
+        running="Creating Prompt Guard container...",
+        success="Created Prompt Guard container.",
+        failure="Could not create Prompt Guard container.",
+    ):
+        prompt_guard_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.backend_network_name,
+            ],
+        )
+        prompt_guard_creation = create_prompt_guard_container(
+            specification, sandbox_context, prompt_guard_creation_context
+        )
+        prompt_guard_container.set_created(prompt_guard_creation)
 
 
 def _create_mcp_server_container(
@@ -338,25 +338,28 @@ def _create_mcp_server_container(
     squid_proxy_container: SandboxContainer,
     mcp_server_container: SandboxContainer,
 ) -> None:
-    print("Creating MCP Server container.")
-    mcp_creation_context = _create_creation_context(
-        squid_proxy_container=squid_proxy_container,
-        network_names=[
-            sandbox_context.workload_network_name,
+    with terminal_status(
+        running="Creating MCP Server container...",
+        success="Created MCP Server container.",
+        failure="Could not create MCP Server container.",
+    ):
+        mcp_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.workload_network_name,
+                sandbox_context.backend_network_name,
+            ],
+        )
+        mcp_server_creation = create_mcp_server_container(
+            specification,
+            sandbox_context,
+            mcp_creation_context,
+        )
+        mcp_server_container.set_created(mcp_server_creation)
+        mcp_server_container.network_ip_address = get_docker_container_ip_address(
+            mcp_server_container.instance_name,
             sandbox_context.backend_network_name,
-        ],
-    )
-    mcp_server_creation = create_mcp_server_container(
-        specification,
-        sandbox_context,
-        mcp_creation_context,
-    )
-    mcp_server_container.set_created(mcp_server_creation)
-    mcp_server_container.network_ip_address = get_docker_container_ip_address(
-        mcp_server_container.instance_name,
-        sandbox_context.backend_network_name,
-    )
-    print("Created MCP Server container.")
+        )
 
 
 def _create_code_execution_container(
@@ -365,18 +368,21 @@ def _create_code_execution_container(
     squid_proxy_container: SandboxContainer,
     code_execution_container: SandboxContainer,
 ) -> None:
-    print("Creating Code Execution container.")
-    code_execution_creation_context = _create_creation_context(
-        squid_proxy_container=squid_proxy_container,
-        network_names=[
-            sandbox_context.backend_network_name,
-        ],
-    )
-    code_execution_creation = create_code_execution_container(
-        specification, sandbox_context, code_execution_creation_context
-    )
-    code_execution_container.set_created(code_execution_creation)
-    print("Created Code Execution container.")
+    with terminal_status(
+        running="Creating Code Execution container...",
+        success="Created Code Execution container.",
+        failure="Could not create Code Execution container.",
+    ):
+        code_execution_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.backend_network_name,
+            ],
+        )
+        code_execution_creation = create_code_execution_container(
+            specification, sandbox_context, code_execution_creation_context
+        )
+        code_execution_container.set_created(code_execution_creation)
 
 
 def _create_jina_reader_container(
@@ -385,18 +391,21 @@ def _create_jina_reader_container(
     squid_proxy_container: SandboxContainer,
     jina_reader_container: SandboxContainer,
 ) -> None:
-    print("Creating Jina Reader container.")
-    jina_reader_creation_context = _create_creation_context(
-        squid_proxy_container=squid_proxy_container,
-        network_names=[
-            sandbox_context.backend_network_name,
-        ],
-    )
-    jina_reader_creation = create_jina_reader_container(
-        specification, sandbox_context, jina_reader_creation_context
-    )
-    jina_reader_container.set_created(jina_reader_creation)
-    print("Created Jina Reader container.")
+    with terminal_status(
+        running="Creating Jina Reader container...",
+        success="Created Jina Reader container.",
+        failure="Could not create Jina Reader container.",
+    ):
+        jina_reader_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.backend_network_name,
+            ],
+        )
+        jina_reader_creation = create_jina_reader_container(
+            specification, sandbox_context, jina_reader_creation_context
+        )
+        jina_reader_container.set_created(jina_reader_creation)
 
 
 def _create_llm_server_containers(
@@ -405,26 +414,29 @@ def _create_llm_server_containers(
     squid_proxy_container: SandboxContainer,
 ) -> list[SandboxContainer]:
     assert specification.llm_server is not None
-    print("Creating LLM Server containers.")
     created_containers = []
     for llm_model in specification.llm_server.models:
-        llm_alias = llm_model.alias
-        llm_model_container = create_llm_server_definition(llm_alias)
-        created_containers.append(llm_model_container)
+        with terminal_status(
+            running=f"Creating LLM ({llm_model.alias}) container...",
+            success=f"Created LLM ({llm_model.alias}) container.",
+            failure=f"Could not create LLM ({llm_model.alias}) container.",
+        ):
+            llm_alias = llm_model.alias
+            llm_model_container = create_llm_server_definition(llm_alias)
+            created_containers.append(llm_model_container)
 
-        llm_server_creation_context = _create_creation_context(
-            squid_proxy_container=squid_proxy_container,
-            network_names=[
-                sandbox_context.backend_network_name,
-            ],
-        )
-        llm_server_creation_context.settings["llm_model"] = llm_model
+            llm_server_creation_context = _create_creation_context(
+                squid_proxy_container=squid_proxy_container,
+                network_names=[
+                    sandbox_context.backend_network_name,
+                ],
+            )
+            llm_server_creation_context.settings["llm_model"] = llm_model
 
-        llm_server_creation = create_llm_server_container(
-            specification, sandbox_context, llm_server_creation_context
-        )
-        llm_model_container.set_created(llm_server_creation)
-    print("Created LLM Server containers.")
+            llm_server_creation = create_llm_server_container(
+                specification, sandbox_context, llm_server_creation_context
+            )
+            llm_model_container.set_created(llm_server_creation)
     return created_containers
 
 
@@ -434,19 +446,22 @@ def _create_llm_broker_container(
     squid_proxy_container: SandboxContainer,
     llm_broker_container: SandboxContainer,
 ) -> None:
-    print("Creating LLM Broker container.")
-    llm_broker_creation_context = _create_creation_context(
-        squid_proxy_container=squid_proxy_container,
-        network_names=[
-            sandbox_context.backend_network_name,
-            sandbox_context.workload_network_name,
-        ],
-    )
-    llm_broker_creation = create_llm_broker_container(
-        specification, sandbox_context, llm_broker_creation_context
-    )
-    llm_broker_container.set_created(llm_broker_creation)
-    print("Created LLM Broker container.")
+    with terminal_status(
+        running="Creating LLM Broker container...",
+        success="Created LLM Broker container.",
+        failure="Could not create LLM Broker container.",
+    ):
+        llm_broker_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.backend_network_name,
+                sandbox_context.workload_network_name,
+            ],
+        )
+        llm_broker_creation = create_llm_broker_container(
+            specification, sandbox_context, llm_broker_creation_context
+        )
+        llm_broker_container.set_created(llm_broker_creation)
 
 
 def _create_squid_proxy_container(
@@ -455,25 +470,28 @@ def _create_squid_proxy_container(
     sandbox_context: SandboxContext,
     squid_proxy_container: SandboxContainer,
 ) -> None:
-    print("Creating Squid Proxy container.")
-    squid_proxy_networks = [sandbox_context.egress_network_name]
-    if sandbox_requirements.is_backend_network_required:
-        squid_proxy_networks.append(sandbox_context.backend_network_name)
-    if (
-        _workload_container_needs_squid_proxy(sandbox_requirements)
-        or not sandbox_requirements.is_backend_network_required
+    with terminal_status(
+        running="Creating Squid Proxy container...",
+        success="Created Squid Proxy container.",
+        failure="Could not create Squid Proxy container.",
     ):
-        squid_proxy_networks.append(sandbox_context.workload_network_name)
+        squid_proxy_networks = [sandbox_context.egress_network_name]
+        if sandbox_requirements.is_backend_network_required:
+            squid_proxy_networks.append(sandbox_context.backend_network_name)
+        if (
+            _workload_container_needs_squid_proxy(sandbox_requirements)
+            or not sandbox_requirements.is_backend_network_required
+        ):
+            squid_proxy_networks.append(sandbox_context.workload_network_name)
 
-    squid_creation_context = _create_creation_context(
-        squid_proxy_container=squid_proxy_container,
-        network_names=squid_proxy_networks,
-    )
-    squid_proxy_creation = create_squid_proxy_container(
-        specification, sandbox_context, squid_creation_context
-    )
-    squid_proxy_container.set_created(squid_proxy_creation)
-    print("Created Squid Proxy container.")
+        squid_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=squid_proxy_networks,
+        )
+        squid_proxy_creation = create_squid_proxy_container(
+            specification, sandbox_context, squid_creation_context
+        )
+        squid_proxy_container.set_created(squid_proxy_creation)
 
 
 def _create_creation_context(
