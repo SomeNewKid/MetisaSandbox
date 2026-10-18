@@ -3,59 +3,60 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
-from metisa_common.specification_models import Capability, MetisaSpecification
+from metisa_common.specification_models import MetisaSpecification
 
 from .code_execution_sidecar.code_execution_manager import (
     create_code_execution_container,
+    create_code_execution_definition,
 )
 from .docker.docker_container import (
-    copy_container_files_to_host_folder,
-    get_docker_container_inspection,
-    get_docker_container_logs,
-    remove_docker_container,
     run_docker_container,
-    stop_docker_container,
 )
 from .docker.docker_network import (
     get_docker_container_ip_address,
 )
 from .haproxy_sidecar.haproxy_manager import (
     create_haproxy_container,
+    create_haproxy_definition,
 )
 from .jina_reader_sidecar.jina_reader_manager import (
     create_jina_reader_container,
+    create_jina_reader_definition,
 )
 from .llm_broker_sidecar.llm_broker_manager import (
     create_llm_broker_container,
+    create_llm_broker_definition,
 )
 from .llm_server_sidecar.llm_server_manager import (
-    LLM_CONTAINER_NAME_PREFIX,
-    create_llm_server_containers,
+    create_llm_server_container,
+    create_llm_server_definition,
 )
 from .mcp_server_sidecar.mcp_server_manager import (
     create_mcp_server_container,
+    create_mcp_server_definition,
 )
 from .metisa_container.metisa_container_manager import (
-    create_docker_run_arguments,
-)
-from .metisa_container.metisa_container_workspace import (
-    create_staged_source_directory,
+    create_metisa_workload_container,
+    create_metisa_workload_definition,
 )
 from .prompt_guard_sidecar.prompt_guard_manager import (
     create_prompt_guard_container,
+    create_prompt_guard_definition,
+)
+from .sandbox_container import (
+    stop_and_remove_containers,
 )
 from .sandbox_models import (
+    ContainerCreationContext,
+    SandboxContainer,
     SandboxContext,
+    SandboxRequirements,
 )
 from .sandbox_network import (
-    create_docker_backend_network,
-    create_docker_egress_network,
-    create_docker_workload_network,
-    remove_docker_backend_network,
-    remove_docker_egress_network,
-    remove_docker_workload_network,
+    create_sandbox_network,
+    define_sandbox_network,
+    remove_sandbox_networks,
 )
 from .sandbox_workspace import (
     clean_up_run_directory,
@@ -63,14 +64,11 @@ from .sandbox_workspace import (
 )
 from .squid_proxy_sidecar.squid_proxy_manager import (
     create_squid_proxy_container,
-    get_squid_proxy_url,
+    create_squid_proxy_definition,
 )
 from .utilities.workspace_helper import (
     clean_up_staged_source,
 )
-
-_LOG_INSPECTION_FILES = False
-_ACKNOWLEDGE_INSPECTION_FILES_HAVE_SENSITIVE_DATA = False
 
 
 def run_metisa_container_workload_in_sandbox(
@@ -79,161 +77,134 @@ def run_metisa_container_workload_in_sandbox(
     workload_module: str,
 ) -> int:
     """Run the specified workload in a Docker sandbox."""
-    is_mcp_server_required = Capability.MCP_SERVER in specification.capabilities
-    is_jina_reader_required = Capability.JINA_READER in specification.capabilities
-    is_code_execution_required = Capability.CODE_EXECUTION in specification.capabilities
-    is_llm_broker_required = Capability.LLM_BROKER in specification.capabilities
-    is_llm_server_required = Capability.LLM_SERVER in specification.capabilities
+    sandbox_requirements = SandboxRequirements(specification)
 
-    is_workload_network_required = Capability.NETWORK in specification.capabilities
-    is_internet_access_required = Capability.INTERNET in specification.capabilities
-    is_localnet_access_required = Capability.LOCALNET in specification.capabilities
-    is_backend_network_required = is_mcp_server_required
-    is_egress_network_required = (
-        is_internet_access_required or is_localnet_access_required
+    sandbox_context: SandboxContext = create_sandbox_context()
+    sc = sandbox_context
+
+    workload_network = define_sandbox_network(
+        "workload", sc.workload_network_name, True
     )
+    backend_network = define_sandbox_network("backend", sc.backend_network_name, True)
+    egress_network = define_sandbox_network("egress", sc.egress_network_name, False)
 
-    sandbox_context: SandboxContext | None = None
-    metisa_staged_source: Path | None = None
-    workload_network_created = False
-    backend_network_created = False
-    egress_network_created = False
-    return_code: int | None = None
-    squid_proxy_container_name: str | None = None
-    squid_proxy_url: str | None = None
-    haproxy_container_name: str | None = None
-    mcp_server_container_name: str | None = None
-    mcp_server_staged_source: Path | None = None
-    mcp_server_ip_address: str | None = None
-    jina_reader_container_name: str | None = None
-    code_execution_container_name: str | None = None
-    llm_broker_container_name: str | None = None
-    llm_broker_staged_source: Path | None = None
-    llm_server_container_names: list[str] = []
-    prompt_guard_container_name: str | None = None
-    prompt_guard_staged_source: Path | None = None
+    all_networks = [
+        workload_network,
+        backend_network,
+        egress_network,
+    ]
 
-    if is_internet_access_required:
-        squid_proxy_url = get_squid_proxy_url()
+    metisa_workload_container = create_metisa_workload_definition()
+    squid_proxy_container = create_squid_proxy_definition()
+    haproxy_container = create_haproxy_definition()
+    mcp_server_container = create_mcp_server_definition()
+    jina_reader_container = create_jina_reader_definition()
+    code_execution_container = create_code_execution_definition()
+    llm_broker_container = create_llm_broker_definition()
+    prompt_guard_container = create_prompt_guard_definition()
+
+    all_containers = [
+        metisa_workload_container,
+        squid_proxy_container,
+        haproxy_container,
+        mcp_server_container,
+        jina_reader_container,
+        code_execution_container,
+        llm_broker_container,
+        prompt_guard_container,
+    ]
 
     try:
-        sandbox_context = create_sandbox_context()
+        if sandbox_requirements.is_workload_network_required:
+            create_sandbox_network(workload_network)
 
-        metisa_staged_source = create_staged_source_directory(
-            sandbox_context, workload_module
-        )
+        if sandbox_requirements.is_backend_network_required:
+            create_sandbox_network(backend_network)
 
-        arguments = create_docker_run_arguments(
-            specification,
-            sandbox_context,
-            image_reference,
-            metisa_staged_source,
-            workload_module,
-            is_workload_network_required,
-            squid_proxy_url,
-        )
+        if sandbox_requirements.is_egress_network_required:
+            create_sandbox_network(egress_network)
 
-        if is_workload_network_required:
-            print("Creating private workload network.")
-            create_docker_workload_network(sandbox_context)
-            workload_network_created = True
-            print("Created private workload network.")
-
-        if is_backend_network_required:
-            print("Creating private backend network.")
-            create_docker_backend_network(sandbox_context)
-            backend_network_created = True
-            print("Created private backend network.")
-
-        if is_egress_network_required:
-            print("Creating egress network.")
-            create_docker_egress_network(sandbox_context)
-            egress_network_created = True
-            print("Created egress network.")
-
-            if is_internet_access_required:
-                print("Creating Squid Proxy container.")
-                squid_proxy_container_name = create_squid_proxy_container(
-                    specification, sandbox_context
-                )
-                print("Created Squid Proxy container.")
-
-        if is_llm_broker_required:
-            print("Creating LLM Broker container.")
-            llm_broker_container_name, llm_broker_staged_source = (
-                create_llm_broker_container(
-                    specification, sandbox_context, squid_proxy_url
-                )
-            )
-            print("Created LLM Broker container.")
-
-        if is_llm_server_required:
-            print("Creating LLM Server containers.")
-            llm_server_container_names = create_llm_server_containers(
-                specification, sandbox_context
-            )
-            print("Created LLM Server containers.")
-
-        if is_jina_reader_required:
-            print("Creating Jina Reader container.")
-            jina_reader_container_name = create_jina_reader_container(
-                specification, sandbox_context, squid_proxy_url
-            )
-            print("Created Jina Reader container.")
-
-        if is_code_execution_required:
-            print("Creating Code Execution container.")
-            code_execution_container_name = create_code_execution_container(
-                specification, sandbox_context
-            )
-            print("Created Code Execution container.")
-
-        if is_mcp_server_required:
-            print("Creating MCP Server container.")
-            mcp_server_container_name, mcp_server_staged_source = (
-                create_mcp_server_container(
+            if sandbox_requirements.is_internet_access_required:
+                _create_squid_proxy_container(
                     specification,
+                    sandbox_requirements,
                     sandbox_context,
-                    squid_proxy_url,
+                    squid_proxy_container,
                 )
-            )
-            mcp_server_ip_address = get_docker_container_ip_address(
-                mcp_server_container_name,
-                sandbox_context.backend_network_name,
-            )
-            print("Created MCP Server container.")
 
-        if is_mcp_server_required:
-            print("Creating Prompt Guard container.")
-            prompt_guard_container_name, prompt_guard_staged_source = (
-                create_prompt_guard_container(specification, sandbox_context)
-            )
-            print("Created Prompt Guard container.")
-
-        if is_localnet_access_required:
-            print("Creating HAProxy container.")
-            haproxy_target_network_name = (
-                sandbox_context.backend_network_name
-                if is_backend_network_required
-                else sandbox_context.workload_network_name
-            )
-            haproxy_container_name = create_haproxy_container(
+        if sandbox_requirements.is_llm_broker_required:
+            _create_llm_broker_container(
                 specification,
                 sandbox_context,
-                haproxy_target_network_name,
-                mcp_server_ip_address,
+                squid_proxy_container,
+                llm_broker_container,
             )
-            print("Created HAProxy container.")
 
-        is_interactive = Capability.INTERACTIVE in specification.capabilities
+        if sandbox_requirements.is_llm_server_required and specification.llm_server:
+            all_containers.extend(
+                _create_llm_server_containers(
+                    specification,
+                    sandbox_context,
+                    squid_proxy_container,
+                )
+            )
 
-        return_code = run_docker_container(arguments, interactive=is_interactive)
+        if sandbox_requirements.is_jina_reader_required:
+            _create_jina_reader_container(
+                specification,
+                sandbox_context,
+                squid_proxy_container,
+                jina_reader_container,
+            )
 
-        return return_code
+        if sandbox_requirements.is_code_execution_required:
+            _create_code_execution_container(
+                specification,
+                sandbox_context,
+                squid_proxy_container,
+                code_execution_container,
+            )
 
-    except Exception:
-        # no longer logging the error
-        raise
+        if sandbox_requirements.is_mcp_server_required:
+            _create_mcp_server_container(
+                specification,
+                sandbox_context,
+                squid_proxy_container,
+                mcp_server_container,
+            )
+
+        if (
+            sandbox_requirements.is_mcp_server_required
+            or sandbox_requirements.is_llm_broker_required
+        ):
+            _create_prompt_guard_container(
+                specification,
+                sandbox_context,
+                squid_proxy_container,
+                prompt_guard_container,
+            )
+
+        if sandbox_requirements.is_localnet_access_required:
+            _create_haproxy_container(
+                specification,
+                sandbox_requirements,
+                sandbox_context,
+                squid_proxy_container,
+                mcp_server_container,
+                haproxy_container,
+            )
+
+        _create_metisa_workload_container(
+            specification,
+            image_reference,
+            workload_module,
+            sandbox_requirements,
+            sandbox_context,
+            squid_proxy_container,
+            metisa_workload_container,
+        )
+
+        return run_docker_container(metisa_workload_container.instance_name)
 
     finally:
         if sandbox_context is not None:
@@ -241,88 +212,13 @@ def run_metisa_container_workload_in_sandbox(
                 print("Cleaning up environment.")
                 cleanup_errors: list[str] = []
 
-                _stop_and_remove_metisa_workload_container(
+                stop_and_remove_containers(
                     sandbox_context,
                     cleanup_errors,
+                    all_containers,
                 )
 
-                if llm_broker_container_name is not None:
-                    _stop_and_remove_llm_broker_container(
-                        sandbox_context,
-                        cleanup_errors,
-                        llm_broker_container_name,
-                    )
-
-                if llm_server_container_names:
-                    for llm_server_container_name in llm_server_container_names:
-                        _stop_and_remove_llm_server_container(
-                            sandbox_context, cleanup_errors, llm_server_container_name
-                        )
-
-                if jina_reader_container_name is not None:
-                    _stop_and_remove_jina_reader_container(
-                        sandbox_context, cleanup_errors, jina_reader_container_name
-                    )
-
-                if code_execution_container_name is not None:
-                    _stop_and_remove_code_execution_container(
-                        sandbox_context, cleanup_errors, code_execution_container_name
-                    )
-
-                if squid_proxy_container_name is not None:
-                    _stop_and_remove_squid_proxy_container(
-                        sandbox_context,
-                        cleanup_errors,
-                        squid_proxy_container_name,
-                    )
-
-                if haproxy_container_name is not None:
-                    _stop_and_remove_haproxy_container(
-                        sandbox_context,
-                        cleanup_errors,
-                        haproxy_container_name,
-                    )
-
-                if mcp_server_container_name is not None:
-                    _stop_and_remove_mcp_server_container(
-                        sandbox_context,
-                        cleanup_errors,
-                        mcp_server_container_name,
-                    )
-
-                if prompt_guard_container_name is not None:
-                    _stop_and_remove_prompt_guard_container(
-                        sandbox_context,
-                        cleanup_errors,
-                        prompt_guard_container_name,
-                    )
-
-                if egress_network_created:
-                    try:
-                        print("Removing egress network.")
-                        remove_docker_egress_network(sandbox_context)
-                        print("Removed egress network.")
-                    except Exception as error:
-                        cleanup_error = f"Could not remove egress network: {error}"
-                        cleanup_errors.append(cleanup_error)
-
-                if workload_network_created:
-                    try:
-                        print("Removing private network.")
-                        remove_docker_workload_network(sandbox_context)
-                        print("Removed private network.")
-                    except Exception as error:
-                        cleanup_error = f"Could not remove private network: {error}"
-                        cleanup_errors.append(cleanup_error)
-
-                if backend_network_created:
-                    try:
-                        print("Removing private network.")
-                        remove_docker_backend_network(sandbox_context)
-                        print("Removed private network.")
-                    except Exception as error:
-                        cleanup_error = f"Could not remove private network: {error}"
-                        cleanup_errors.append(cleanup_error)
+                remove_sandbox_networks(all_networks, cleanup_errors)
 
                 for cleanup_error in cleanup_errors:
                     print(cleanup_error, file=sys.stderr)
@@ -334,326 +230,267 @@ def run_metisa_container_workload_in_sandbox(
                     sandbox_context.host_scratch_path,
                 )
 
-                if metisa_staged_source is not None:
-                    clean_up_staged_source(metisa_staged_source)
+                if metisa_workload_container.staged_source is not None:
+                    clean_up_staged_source(metisa_workload_container.staged_source)
 
-                if llm_broker_staged_source is not None:
-                    clean_up_staged_source(llm_broker_staged_source)
+                if llm_broker_container.staged_source is not None:
+                    clean_up_staged_source(llm_broker_container.staged_source)
 
-                if mcp_server_staged_source is not None:
-                    clean_up_staged_source(mcp_server_staged_source)
+                if mcp_server_container.staged_source is not None:
+                    clean_up_staged_source(mcp_server_container.staged_source)
 
-                if prompt_guard_staged_source is not None:
-                    clean_up_staged_source(prompt_guard_staged_source)
+                if prompt_guard_container.staged_source is not None:
+                    clean_up_staged_source(prompt_guard_container.staged_source)
 
                 print("Cleaned up environment.")
 
 
-def _save_container_logs(
-    sandbox_context: SandboxContext | None,
-    container_name: str,
-    target_dir_name: str,
-) -> None:
-    if sandbox_context is None:
-        return
-    run_logs_path = sandbox_context.host_logs_path
-    run_logs_path.mkdir(parents=True, exist_ok=True)
-    target_log_dir = run_logs_path / target_dir_name
-    stdout, stderr = get_docker_container_logs(container_name)
-    _save_log_file(target_log_dir / "stdout.txt", stdout)
-    _save_log_file(target_log_dir / "stderr.txt", stderr)
-
-
-def _save_log_file(
-    target_file: Path,
-    content: str,
-) -> None:
-    target_file.parent.mkdir(parents=True, exist_ok=True)
-    with target_file.open("w", encoding="utf-8") as file:
-        file.write(content)
-
-
-def _save_files_from_container(
+def _create_metisa_workload_container(
+    specification: MetisaSpecification,
+    image_reference: str,
+    workload_module: str,
+    sandbox_requirements: SandboxRequirements,
     sandbox_context: SandboxContext,
-    container_name: str,
-    container_files: list[str],
-    log_folder: str,
+    squid_proxy_container: SandboxContainer,
+    metisa_workload_container: SandboxContainer,
 ) -> None:
-    run_logs_path = sandbox_context.host_logs_path
-    run_logs_path.mkdir(parents=True, exist_ok=True)
-    target_log_dir = run_logs_path / log_folder
-    target_log_dir.mkdir(parents=True, exist_ok=True)
-    copy_container_files_to_host_folder(
-        container_name,
-        container_files,
-        str(target_log_dir),
+    print("Creating Metisa Workload container.")
+    metisa_workload_creation_context = _create_creation_context(
+        squid_proxy_container=squid_proxy_container,
+        network_names=[
+            sandbox_context.workload_network_name,
+        ],
+    )
+    use_squid_proxy = _workload_container_needs_squid_proxy(sandbox_requirements)
+    metisa_settings = metisa_workload_creation_context.settings
+    metisa_settings["image_reference"] = image_reference
+    metisa_settings["workload_module"] = workload_module
+    metisa_settings["use_squid_proxy"] = use_squid_proxy
+    metisa_settings["is_network_required"] = (
+        sandbox_requirements.is_workload_network_required
     )
 
-
-def _save_container_inspection(
-    sandbox_context: SandboxContext,
-    container_name: str,
-    target_dir_name: str,
-) -> None:
-    inspection = get_docker_container_inspection(container_name)
-    target_dir = sandbox_context.host_logs_path / target_dir_name
-    _save_log_file(target_dir / "inspect.json", inspection)
-
-
-def _stop_and_remove_metisa_workload_container(
-    sandbox_context: SandboxContext,
-    cleanup_errors: list[str],
-) -> None:
-    _stop_and_remove_container(
-        sandbox_context=sandbox_context,
-        cleanup_errors=cleanup_errors,
-        container_name=sandbox_context.workload_container_name,
-        container_title="Metisa Workload",
-        log_folder="metisa",
+    metisa_workload_creation = create_metisa_workload_container(
+        specification,
+        sandbox_context,
+        metisa_workload_creation_context,
     )
+    metisa_workload_container.set_created(metisa_workload_creation)
+    print("Created Metisa Workload container.")
 
 
-def _stop_and_remove_squid_proxy_container(
+def _create_haproxy_container(
+    specification: MetisaSpecification,
+    sandbox_requirements: SandboxRequirements,
     sandbox_context: SandboxContext,
-    cleanup_errors: list[str],
-    squid_proxy_container_name: str,
+    squid_proxy_container: SandboxContainer,
+    mcp_server_container: SandboxContainer,
+    haproxy_container: SandboxContainer,
 ) -> None:
-    log_folder = "squid_proxy"
-    try:
-        _save_files_from_container(
-            sandbox_context,
-            squid_proxy_container_name,
-            ["/etc/squid/squid.conf", "/etc/squid/metisa-allow.conf"],
-            log_folder,
-        )
-    except Exception as error:
-        cleanup_errors.append(f"Could not save Squid Proxy config files: {error}")
-    finally:
-        _stop_and_remove_container(
-            sandbox_context=sandbox_context,
-            cleanup_errors=cleanup_errors,
-            container_name=squid_proxy_container_name,
-            container_title="Squid Proxy",
-            log_folder=log_folder,
-        )
+    print("Creating HAProxy container.")
+    haproxy_target_network_name = (
+        sandbox_context.backend_network_name
+        if sandbox_requirements.is_backend_network_required
+        else sandbox_context.workload_network_name
+    )
+    haproxy_creation_context = _create_creation_context(
+        squid_proxy_container=squid_proxy_container,
+        network_names=[
+            sandbox_context.egress_network_name,
+            haproxy_target_network_name,
+        ],
+    )
+    mcp_server_ip = mcp_server_container.network_ip_address
+    haproxy_creation_context.mcp_server_ip_address = mcp_server_ip
+
+    haproxy_creation = create_haproxy_container(
+        specification,
+        sandbox_context,
+        haproxy_creation_context,
+    )
+    haproxy_container.set_created(haproxy_creation)
+    print("Created HAProxy container.")
 
 
-def _stop_and_remove_jina_reader_container(
+def _create_prompt_guard_container(
+    specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-    cleanup_errors: list[str],
-    jina_reader_container_name: str,
+    squid_proxy_container: SandboxContainer,
+    prompt_guard_container: SandboxContainer,
 ) -> None:
-    log_folder = "jina_reader"
-    try:
-        _save_files_from_container(
-            sandbox_context,
-            jina_reader_container_name,
-            [],
-            log_folder,
-        )
-    except Exception as error:
-        cleanup_errors.append(f"Could not save Jina Reader config files: {error}")
-    finally:
-        _stop_and_remove_container(
-            sandbox_context=sandbox_context,
-            cleanup_errors=cleanup_errors,
-            container_name=jina_reader_container_name,
-            container_title="Jina Reader",
-            log_folder=log_folder,
-        )
+    print("Creating Prompt Guard container.")
+    prompt_guard_creation_context = _create_creation_context(
+        squid_proxy_container=squid_proxy_container,
+        network_names=[
+            sandbox_context.backend_network_name,
+        ],
+    )
+    prompt_guard_creation = create_prompt_guard_container(
+        specification, sandbox_context, prompt_guard_creation_context
+    )
+    prompt_guard_container.set_created(prompt_guard_creation)
+    print("Created Prompt Guard container.")
 
 
-def _stop_and_remove_llm_server_container(
+def _create_mcp_server_container(
+    specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-    cleanup_errors: list[str],
-    llm_server_container_name: str,
+    squid_proxy_container: SandboxContainer,
+    mcp_server_container: SandboxContainer,
 ) -> None:
-    model_name = llm_server_container_name.removeprefix(LLM_CONTAINER_NAME_PREFIX)
-    model_name = model_name.removeprefix(sandbox_context.run_identifier)
-    model_name = model_name.lstrip("-")
-    log_folder = f"llm_{model_name}"
-    try:
-        _save_files_from_container(
-            sandbox_context,
-            llm_server_container_name,
-            [],
-            log_folder,
-        )
-    except Exception as error:
-        cleanup_errors.append(f"Could not save LLM {model_name} config files: {error}")
-    finally:
-        _stop_and_remove_container(
-            sandbox_context=sandbox_context,
-            cleanup_errors=cleanup_errors,
-            container_name=llm_server_container_name,
-            container_title="LLM Server",
-            log_folder=log_folder,
-        )
+    print("Creating MCP Server container.")
+    mcp_creation_context = _create_creation_context(
+        squid_proxy_container=squid_proxy_container,
+        network_names=[
+            sandbox_context.workload_network_name,
+            sandbox_context.backend_network_name,
+        ],
+    )
+    mcp_server_creation = create_mcp_server_container(
+        specification,
+        sandbox_context,
+        mcp_creation_context,
+    )
+    mcp_server_container.set_created(mcp_server_creation)
+    mcp_server_container.network_ip_address = get_docker_container_ip_address(
+        mcp_server_container.instance_name,
+        sandbox_context.backend_network_name,
+    )
+    print("Created MCP Server container.")
 
 
-def _stop_and_remove_code_execution_container(
+def _create_code_execution_container(
+    specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-    cleanup_errors: list[str],
-    code_execution_container_name: str,
+    squid_proxy_container: SandboxContainer,
+    code_execution_container: SandboxContainer,
 ) -> None:
-    log_folder = "code_execution"
-    try:
-        _save_files_from_container(
-            sandbox_context,
-            code_execution_container_name,
-            [],
-            log_folder,
-        )
-    except Exception as error:
-        cleanup_errors.append(f"Could not save Code Execution config files: {error}")
-    finally:
-        _stop_and_remove_container(
-            sandbox_context=sandbox_context,
-            cleanup_errors=cleanup_errors,
-            container_name=code_execution_container_name,
-            container_title="Code Execution",
-            log_folder=log_folder,
-        )
+    print("Creating Code Execution container.")
+    code_execution_creation_context = _create_creation_context(
+        squid_proxy_container=squid_proxy_container,
+        network_names=[
+            sandbox_context.backend_network_name,
+        ],
+    )
+    code_execution_creation = create_code_execution_container(
+        specification, sandbox_context, code_execution_creation_context
+    )
+    code_execution_container.set_created(code_execution_creation)
+    print("Created Code Execution container.")
 
 
-def _stop_and_remove_haproxy_container(
+def _create_jina_reader_container(
+    specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-    cleanup_errors: list[str],
-    haproxy_container_name: str,
+    squid_proxy_container: SandboxContainer,
+    jina_reader_container: SandboxContainer,
 ) -> None:
-    log_folder = "haproxy"
-    try:
-        _save_files_from_container(
-            sandbox_context,
-            haproxy_container_name,
-            ["/etc/haproxy/haproxy.cfg"],
-            log_folder,
-        )
-    except Exception as error:
-        cleanup_errors.append(f"Could not save HAProxy config files: {error}")
-    finally:
-        _stop_and_remove_container(
-            sandbox_context=sandbox_context,
-            cleanup_errors=cleanup_errors,
-            container_name=haproxy_container_name,
-            container_title="HAProxy",
-            log_folder=log_folder,
-        )
+    print("Creating Jina Reader container.")
+    jina_reader_creation_context = _create_creation_context(
+        squid_proxy_container=squid_proxy_container,
+        network_names=[
+            sandbox_context.backend_network_name,
+        ],
+    )
+    jina_reader_creation = create_jina_reader_container(
+        specification, sandbox_context, jina_reader_creation_context
+    )
+    jina_reader_container.set_created(jina_reader_creation)
+    print("Created Jina Reader container.")
 
 
-def _stop_and_remove_mcp_server_container(
+def _create_llm_server_containers(
+    specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-    cleanup_errors: list[str],
-    mcp_server_container_name: str,
-) -> None:
-    log_folder = "mcp_server"
-    try:
-        _save_files_from_container(
-            sandbox_context,
-            mcp_server_container_name,
-            ["/sandbox-source/metisa.json"],
-            log_folder,
+    squid_proxy_container: SandboxContainer,
+) -> list[SandboxContainer]:
+    assert specification.llm_server is not None
+    print("Creating LLM Server containers.")
+    created_containers = []
+    for llm_model in specification.llm_server.models:
+        llm_alias = llm_model.alias
+        llm_model_container = create_llm_server_definition(llm_alias)
+        created_containers.append(llm_model_container)
+
+        llm_server_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.backend_network_name,
+            ],
         )
-    except Exception as error:
-        cleanup_errors.append(f"Could not save MCP Server config files: {error}")
-    finally:
-        _stop_and_remove_container(
-            sandbox_context=sandbox_context,
-            cleanup_errors=cleanup_errors,
-            container_name=mcp_server_container_name,
-            container_title="MCP Server",
-            log_folder="mcp_server",
+        llm_server_creation_context.settings["llm_model"] = llm_model
+
+        llm_server_creation = create_llm_server_container(
+            specification, sandbox_context, llm_server_creation_context
         )
+        llm_model_container.set_created(llm_server_creation)
+    print("Created LLM Server containers.")
+    return created_containers
 
 
-def _stop_and_remove_llm_broker_container(
+def _create_llm_broker_container(
+    specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-    cleanup_errors: list[str],
-    llm_broker_container_name: str,
+    squid_proxy_container: SandboxContainer,
+    llm_broker_container: SandboxContainer,
 ) -> None:
-    log_folder = "llm_broker"
-    try:
-        _save_files_from_container(
-            sandbox_context,
-            llm_broker_container_name,
-            ["/sandbox-source/metisa.json"],
-            log_folder,
-        )
-    except Exception as error:
-        cleanup_errors.append(f"Could not save LLM Broker config files: {error}")
-    finally:
-        _stop_and_remove_container(
-            sandbox_context=sandbox_context,
-            cleanup_errors=cleanup_errors,
-            container_name=llm_broker_container_name,
-            container_title="LLM Broker",
-            log_folder="llm_broker",
-        )
+    print("Creating LLM Broker container.")
+    llm_broker_creation_context = _create_creation_context(
+        squid_proxy_container=squid_proxy_container,
+        network_names=[
+            sandbox_context.backend_network_name,
+            sandbox_context.workload_network_name,
+        ],
+    )
+    llm_broker_creation = create_llm_broker_container(
+        specification, sandbox_context, llm_broker_creation_context
+    )
+    llm_broker_container.set_created(llm_broker_creation)
+    print("Created LLM Broker container.")
 
 
-def _stop_and_remove_prompt_guard_container(
+def _create_squid_proxy_container(
+    specification: MetisaSpecification,
+    sandbox_requirements: SandboxRequirements,
     sandbox_context: SandboxContext,
-    cleanup_errors: list[str],
-    prompt_guard_container_name: str,
+    squid_proxy_container: SandboxContainer,
 ) -> None:
-    log_folder = "prompt_guard"
-    try:
-        _save_files_from_container(
-            sandbox_context,
-            prompt_guard_container_name,
-            [],
-            log_folder,
-        )
-    except Exception as error:
-        cleanup_errors.append(f"Could not save Prompt Guard config files: {error}")
-    finally:
-        _stop_and_remove_container(
-            sandbox_context=sandbox_context,
-            cleanup_errors=cleanup_errors,
-            container_name=prompt_guard_container_name,
-            container_title="Prompt Guard",
-            log_folder="prompt_guard",
-        )
+    print("Creating Squid Proxy container.")
+    squid_proxy_networks = [sandbox_context.egress_network_name]
+    if sandbox_requirements.is_backend_network_required:
+        squid_proxy_networks.append(sandbox_context.backend_network_name)
+    if (
+        _workload_container_needs_squid_proxy(sandbox_requirements)
+        or not sandbox_requirements.is_backend_network_required
+    ):
+        squid_proxy_networks.append(sandbox_context.workload_network_name)
+
+    squid_creation_context = _create_creation_context(
+        squid_proxy_container=squid_proxy_container,
+        network_names=squid_proxy_networks,
+    )
+    squid_proxy_creation = create_squid_proxy_container(
+        specification, sandbox_context, squid_creation_context
+    )
+    squid_proxy_container.set_created(squid_proxy_creation)
+    print("Created Squid Proxy container.")
 
 
-def _stop_and_remove_container(
-    sandbox_context: SandboxContext,
-    cleanup_errors: list[str],
-    container_name: str,
-    container_title: str,
-    log_folder: str,
-) -> None:
-    if _LOG_INSPECTION_FILES and _ACKNOWLEDGE_INSPECTION_FILES_HAVE_SENSITIVE_DATA:
-        try:
-            _save_container_inspection(
-                sandbox_context,
-                container_name,
-                log_folder,
-            )
-        except Exception as error:
-            error_message = f"Could not save {container_title} inspection: {error}"
-            cleanup_errors.append(error_message)
+def _create_creation_context(
+    *,
+    squid_proxy_container: SandboxContainer,
+    network_names: list[str],
+) -> ContainerCreationContext:
+    container_creation_context = ContainerCreationContext()
+    container_creation_context.squid_proxy_url = squid_proxy_container.network_url
+    container_creation_context.network_names = network_names
+    return container_creation_context
 
-    container_stopped = False
 
-    try:
-        print(f"Stopping {container_title} container.")
-        stop_docker_container(container_name, timeout_seconds=10)
-        container_stopped = True
-        print(f"Stopped {container_title} container.")
-    except Exception as error:
-        print(f"Could not stop {container_title} container.")
-        cleanup_errors.append(f"Could not stop {container_title} container: {error}")
-
-    try:
-        _save_container_logs(sandbox_context, container_name, log_folder)
-    except Exception as error:
-        cleanup_errors.append(f"Could not save {container_title} logs: {error}")
-
-    try:
-        print(f"Removing {container_title} container.")
-        remove_docker_container(container_name, force=not container_stopped)
-        print(f"Removed {container_title} container.")
-    except Exception as error:
-        print(f"Could not remove {container_title} container.")
-        cleanup_errors.append(f"Could not remove {container_title} container: {error}")
+def _workload_container_needs_squid_proxy(
+    sandbox_requirements: SandboxRequirements,
+) -> bool:
+    return (
+        sandbox_requirements.is_internet_access_required
+        and not sandbox_requirements.is_llm_broker_required
+    )

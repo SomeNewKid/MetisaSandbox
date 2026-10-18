@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .docker.docker_network import create_docker_network, remove_docker_network
-from .sandbox_models import SandboxContext
+from .sandbox_models import SandboxNetwork
 
 # -----------------------------------------------------------------------------------
 #
@@ -76,52 +76,51 @@ from .sandbox_models import SandboxContext
 # -----------------------------------------------------------------------------------
 
 
-def create_docker_workload_network(
-    sandbox_context: SandboxContext,
-) -> None:
-    """Create a private Docker network for the workload."""
-    create_docker_network(
-        network_name=sandbox_context.workload_network_name,
-        internal=True,
+def define_sandbox_network(
+    short_name: str,
+    instance_name: str,
+    is_internal: bool,
+) -> SandboxNetwork:
+    """Define a new sandbox network."""
+    return SandboxNetwork(
+        f"{short_name} network", name=instance_name, is_internal=is_internal
     )
 
 
-def create_docker_backend_network(
-    sandbox_context: SandboxContext,
+def create_sandbox_network(
+    network: SandboxNetwork,
 ) -> None:
-    """Create a private Docker network for the backend."""
-    create_docker_network(
-        network_name=sandbox_context.backend_network_name,
-        internal=True,
-    )
+    """Create the specified sandbox network if it does not already exist."""
+    if network.is_created:
+        return
+
+    print(f"Creating {network.title}.")
+    create_docker_network(network.name, internal=network.is_internal)
+    network.set_created()
+    print(f"Created {network.title}.")
 
 
-def create_docker_egress_network(
-    sandbox_context: SandboxContext,
+def remove_sandbox_networks(
+    sandbox_networks: list[SandboxNetwork],
+    cleanup_errors: list[str],
 ) -> None:
-    """Create an egress Docker network."""
-    create_docker_network(
-        network_name=sandbox_context.egress_network_name,
-        internal=False,
-    )
+    """Remove all specified sandbox networks."""
+    for sandbox_network in sandbox_networks:
+        _remove_sandbox_network(sandbox_network, cleanup_errors)
 
 
-def remove_docker_workload_network(
-    sandbox_context: SandboxContext,
+def _remove_sandbox_network(
+    sandbox_network: SandboxNetwork,
+    cleanup_errors: list[str],
 ) -> None:
-    """Remove the Docker internal network for the workload."""
-    remove_docker_network(sandbox_context.workload_network_name)
+    if not sandbox_network.is_created:
+        return
 
-
-def remove_docker_backend_network(
-    sandbox_context: SandboxContext,
-) -> None:
-    """Remove the Docker internal network for the backend."""
-    remove_docker_network(sandbox_context.backend_network_name)
-
-
-def remove_docker_egress_network(
-    sandbox_context: SandboxContext,
-) -> None:
-    """Remove the Docker egress network."""
-    remove_docker_network(sandbox_context.egress_network_name)
+    try:
+        print(f"Removing network {sandbox_network.title}.")
+        remove_docker_network(sandbox_network.name)
+        sandbox_network.set_removed()
+        print(f"Removed network {sandbox_network.title}.")
+    except Exception as error:
+        cleanup_error = f"Could not remove network '{sandbox_network.title}': {error}"
+        cleanup_errors.append(cleanup_error)

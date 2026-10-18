@@ -24,7 +24,12 @@ from ..docker.docker_image import (
 from ..docker.docker_network import (
     connect_container_to_docker_network,
 )
-from ..sandbox_models import SandboxContext
+from ..sandbox_models import (
+    ContainerCreationContext,
+    ContainerCreationResult,
+    SandboxContainer,
+    SandboxContext,
+)
 
 _IMAGE_FORMAT_VERSION = 1
 _HAPROXY_ALIAS = "metisa-haproxy"
@@ -32,15 +37,29 @@ _HAPROXY_PORT = 8404
 _HAPROXY_IMAGE_NAME = "metisa-haproxy"
 
 
+def create_haproxy_definition() -> SandboxContainer:
+    """Return the definition of the HAProxy container."""
+    return SandboxContainer(
+        "HAProxy",
+        "haproxy",
+        log_folder="haproxy",
+        log_files=["/etc/haproxy/haproxy.cfg"],
+    )
+
+
 def create_haproxy_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-    target_network_name: str,
-    mcp_server_ip_address: str | None,
-) -> str:
+    container_creation_context: ContainerCreationContext,
+) -> ContainerCreationResult:
     """Create the HAProxy container and connect it to the Docker networks."""
     image_name = _ensure_haproxy_image_exists(specification)
     container_name = _create_haproxy_container_name(sandbox_context.run_identifier)
+
+    if not container_creation_context.network_names:
+        raise RuntimeError("No network specified for the HAProxy container.")
+    network_name = container_creation_context.network_names[0]
+    mcp_server_ip_address = container_creation_context.mcp_server_ip_address
 
     haproxy_cfg_file = os.path.join(sandbox_context.host_scratch_path, "haproxy.cfg")
     haproxy_cfg_contents = _create_haproxy_cfg(specification, mcp_server_ip_address)
@@ -54,8 +73,14 @@ def create_haproxy_container(
         "--name",
         container_name,
         "--network",
-        sandbox_context.egress_network_name,
+        network_name,
     ]
+
+    if _use_network_alias(sandbox_context, network_name):
+        arguments.extend([
+            "--network-alias",
+            _HAPROXY_ALIAS,
+        ])
 
     # If MCP Server is deployed, overwrite the haproxy.cfg
     if mcp_server_ip_address is not None:
@@ -199,11 +224,19 @@ def create_haproxy_container(
 
     create_docker_container(arguments)
 
-    connect_container_to_docker_network(
-        container_name=container_name,
-        network_name=target_network_name,
-        aliases=(_HAPROXY_ALIAS,),
-    )
+    if len(container_creation_context.network_names) > 1:
+        for network_name in container_creation_context.network_names[1:]:
+            if _use_network_alias(sandbox_context, network_name):
+                connect_container_to_docker_network(
+                    container_name=container_name,
+                    network_name=network_name,
+                    aliases=(_HAPROXY_ALIAS,),
+                )
+            else:
+                connect_container_to_docker_network(
+                    container_name=container_name,
+                    network_name=network_name,
+                )
 
     start_docker_container(container_name)
     started_successfully = inspect_docker_container(container_name)
@@ -212,7 +245,16 @@ def create_haproxy_container(
 
     _verify_haproxy_configuration(container_name)
 
-    return container_name
+    return ContainerCreationResult(container_name)
+
+
+def _use_network_alias(
+    sandbox_context: SandboxContext, 
+    network_name: str,
+) -> bool:
+    if network_name == sandbox_context.egress_network_name:
+        return False
+    return True
 
 
 # Verify HAProxy configuration inside the container.

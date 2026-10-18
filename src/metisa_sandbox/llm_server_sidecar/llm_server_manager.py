@@ -18,7 +18,12 @@ from ..docker.docker_image import (
     build_docker_image,
     docker_image_exists,
 )
-from ..sandbox_models import SandboxContext
+from ..sandbox_models import (
+    ContainerCreationContext,
+    ContainerCreationResult,
+    SandboxContainer,
+    SandboxContext,
+)
 
 LLM_CONTAINER_ALIAS_PREFIX = "metisa-llm-"
 LLM_CONTAINER_NAME_PREFIX = "llm-server-"
@@ -26,29 +31,43 @@ _IMAGE_FORMAT_VERSION = 1
 _LLM_SERVER_IMAGE_NAME = "metisa-llm-server"
 
 
-def create_llm_server_containers(
+def create_llm_server_definition(
+    llm_model_alias: str,
+) -> SandboxContainer:
+    """Return the definition of the LLM Server container for the given model alias."""
+    return SandboxContainer(
+        f"LLM Server ({llm_model_alias})",
+        f"llm_server_{llm_model_alias.replace('-', '_')}",
+        log_folder=f"llm-{llm_model_alias}",
+        log_files=[],
+    )
+
+
+def create_llm_server_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-) -> list[str]:
+    container_creation_context: ContainerCreationContext,
+) -> ContainerCreationResult:
     """Create and start LLM Server containers."""
     image_name = _ensure_llm_server_image_exists(specification)
-    container_names: list[str] = []
-
-    if not specification.llm_server:
-        return container_names
 
     local_models_directory = specification.settings.get("local_models_directory", "")
     local_models_dir_path = (
         Path(local_models_directory) if local_models_directory else Path.cwd()
     )
 
-    for llm_model in specification.llm_server.models:
-        container_name = _create_llm_server_container(
-            local_models_dir_path, llm_model, sandbox_context, image_name
-        )
-        container_names.append(container_name)
+    llm_model = container_creation_context.settings.get("llm_model")
+    if not llm_model:
+        error = "LLM model must be specified in the container creation context."
+        raise ValueError(error)
+    if not isinstance(llm_model, LlmModel):
+        raise TypeError("LLM model must be an instance of LlmModel.")
 
-    return container_names
+    container_name = _create_llm_server_container(
+        local_models_dir_path, llm_model, sandbox_context, image_name
+    )
+
+    return ContainerCreationResult(container_name=container_name)
 
 
 def _create_llm_server_container(

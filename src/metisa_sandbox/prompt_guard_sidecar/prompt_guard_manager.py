@@ -22,7 +22,12 @@ from ..docker.docker_image import (
     build_docker_image,
     docker_image_exists,
 )
-from ..sandbox_models import SandboxContext
+from ..sandbox_models import (
+    ContainerCreationContext,
+    ContainerCreationResult,
+    SandboxContainer,
+    SandboxContext,
+)
 from .prompt_guard_workspace import (
     PROMPT_GUARD_MODULE_NAME,
     create_staged_source_directory,
@@ -35,13 +40,28 @@ _GUEST_SOURCE_DIR = "/sandbox-source"
 _GUEST_PYTHON_VENV = "/opt/metisa-venv"
 
 
+def create_prompt_guard_definition() -> SandboxContainer:
+    """Return the definition of the Prompt Guard container."""
+    return SandboxContainer(
+        "Prompt Guard",
+        "prompt_guard",
+        log_folder="prompt-guard",
+        log_files=[],
+    )
+
+
 def create_prompt_guard_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-) -> tuple[str, Path]:
+    container_creation_context: ContainerCreationContext,
+) -> ContainerCreationResult:
     """Create the Prompt Guard container and connect it to the Docker network."""
     image_name = _ensure_prompt_guard_image_exists(specification)
     container_name = _create_prompt_guard_container_name(sandbox_context.run_identifier)
+
+    if not container_creation_context.network_names:
+        raise RuntimeError("No network specified for the Prompt Guard container.")
+    network_name = container_creation_context.network_names[0]
 
     staged_source_path = create_staged_source_directory(sandbox_context)
 
@@ -56,7 +76,7 @@ def create_prompt_guard_container(
         "--name",
         container_name,
         "--network",
-        sandbox_context.backend_network_name,
+        network_name,
         "--network-alias",
         _PROMPT_GUARD_NETWORK_ALIAS,
     ]
@@ -291,7 +311,7 @@ def create_prompt_guard_container(
     if not started_successfully:
         raise RuntimeError("Prompt Guard sidecar failed to start.")
 
-    return container_name, staged_source_path
+    return ContainerCreationResult(container_name, staged_source=staged_source_path)
 
 
 def _ensure_prompt_guard_image_exists(

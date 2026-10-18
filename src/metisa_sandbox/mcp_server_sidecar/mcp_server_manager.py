@@ -28,7 +28,12 @@ from ..docker.docker_image import (
 from ..docker.docker_network import (
     connect_container_to_docker_network,
 )
-from ..sandbox_models import SandboxContext
+from ..sandbox_models import (
+    ContainerCreationContext,
+    ContainerCreationResult,
+    SandboxContainer,
+    SandboxContext,
+)
 from .mcp_server_workspace import (
     MCP_SERVER_MODULE_NAME,
     create_staged_source_directory,
@@ -43,17 +48,31 @@ _GUEST_PYTHON_VENV = "/opt/metisa-venv"
 _USE_SQUID_PROXY = True
 
 
+def create_mcp_server_definition() -> SandboxContainer:
+    """Return the definition of the MCP Server container."""
+    return SandboxContainer(
+        "MCP Server",
+        "mcp_server",
+        log_folder="mcp-server",
+        log_files=["/sandbox-source/metisa.json"],
+    )
+
+
 def create_mcp_server_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-    squid_proxy_url: str | None,
-) -> tuple[str, Path]:
+    container_creation_context: ContainerCreationContext,
+) -> ContainerCreationResult:
     """Create the MCP Server container and connect it to the Docker network."""
     if specification.mcp_server is None:
         raise RuntimeError("Metisa specification has no [mcp_server] section.")
 
     image_name = _ensure_mcp_server_image_exists(specification)
     container_name = _create_mcp_server_container_name(sandbox_context.run_identifier)
+
+    if not container_creation_context.network_names:
+        raise RuntimeError("No network specified for the HAProxy container.")
+    network_name = container_creation_context.network_names[0]
 
     staged_source_path = create_staged_source_directory(sandbox_context)
 
@@ -71,7 +90,9 @@ def create_mcp_server_container(
         "--name",
         container_name,
         "--network",
-        sandbox_context.backend_network_name,
+        network_name,
+        "--network-alias",
+        _MCP_SERVER_NETWORK_ALIAS,
     ]
 
     # Mount the container's root filesystem as strictly read-only
@@ -225,6 +246,7 @@ def create_mcp_server_container(
     )
 
     # Configure use of Squid Proxy
+    squid_proxy_url = container_creation_context.squid_proxy_url
     if squid_proxy_url is not None and _USE_SQUID_PROXY:
         no_proxy_destinations = ",".join(
             [
@@ -283,18 +305,20 @@ def create_mcp_server_container(
 
     create_docker_container(arguments)
 
-    connect_container_to_docker_network(
-        container_name=container_name,
-        network_name=sandbox_context.workload_network_name,
-        aliases=(_MCP_SERVER_NETWORK_ALIAS,),
-    )
+    if len(container_creation_context.network_names) > 1:
+        for network_name in container_creation_context.network_names[1:]:
+            connect_container_to_docker_network(
+                container_name=container_name,
+                network_name=network_name,
+                aliases=(_MCP_SERVER_NETWORK_ALIAS,),
+            )
 
     start_docker_container(container_name)
     started_successfully = inspect_docker_container(container_name)
     if not started_successfully:
         raise RuntimeError("MCP Server sidecar failed to start.")
 
-    return container_name, staged_source_path
+    return ContainerCreationResult(container_name, staged_source=staged_source_path)
 
 
 def _ensure_mcp_server_image_exists(

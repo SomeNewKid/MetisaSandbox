@@ -19,7 +19,12 @@ from ..docker.docker_image import (
     build_docker_image,
     docker_image_exists,
 )
-from ..sandbox_models import SandboxContext
+from ..sandbox_models import (
+    ContainerCreationContext,
+    ContainerCreationResult,
+    SandboxContainer,
+    SandboxContext,
+)
 
 _IMAGE_FORMAT_VERSION = 1
 _JINA_READER_ALIAS = "metisa-jina-reader"
@@ -27,14 +32,28 @@ _JINA_READER_IMAGE_NAME = "metisa-jina-reader"
 _USE_SQUID_PROXY = True
 
 
+def create_jina_reader_definition() -> SandboxContainer:
+    """Return the definition of the Jina Reader container."""
+    return SandboxContainer(
+        "Jina Reader",
+        "jina_reader",
+        log_folder="jina-reader",
+        log_files=[],
+    )
+
+
 def create_jina_reader_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-    squid_proxy_url: str | None,
-) -> str:
+    container_creation_context: ContainerCreationContext,
+) -> ContainerCreationResult:
     """Create the Jina Reader container and connect it to the Docker network."""
     image_name = _ensure_jina_reader_image_exists(specification)
     container_name = _create_jina_reader_container_name(sandbox_context.run_identifier)
+
+    if not container_creation_context.network_names:
+        raise RuntimeError("No network specified for the Jina Reader container.")
+    network_name = container_creation_context.network_names[0]
 
     environs: list[str] = []
 
@@ -42,7 +61,7 @@ def create_jina_reader_container(
         "--name",
         container_name,
         "--network",
-        sandbox_context.backend_network_name,
+        network_name,
         "--network-alias",
         _JINA_READER_ALIAS,
     ]
@@ -176,6 +195,7 @@ def create_jina_reader_container(
     )
 
     # Configure use of Squid Proxy
+    squid_proxy_url = container_creation_context.squid_proxy_url
     if squid_proxy_url is not None and _USE_SQUID_PROXY:
         no_proxy_destinations = ",".join(
             [
@@ -223,7 +243,7 @@ def create_jina_reader_container(
     if not started_successfully:
         raise RuntimeError("Jina Reader sidecar failed to start.")
 
-    return container_name
+    return ContainerCreationResult(container_name)
 
 
 def _ensure_jina_reader_image_exists(

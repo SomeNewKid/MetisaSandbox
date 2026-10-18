@@ -19,22 +19,42 @@ from ..docker.docker_image import (
     build_docker_image,
     docker_image_exists,
 )
-from ..sandbox_models import SandboxContext
+from ..sandbox_models import (
+    ContainerCreationContext,
+    ContainerCreationResult,
+    SandboxContainer,
+    SandboxContext,
+)
 
 _IMAGE_FORMAT_VERSION = 1
 _CODE_EXECUTION_ALIAS = "metisa-code-execution"
 _CODE_EXECUTION_IMAGE_NAME = "metisa-code-execution"
 
 
+def create_code_execution_definition() -> SandboxContainer:
+    """Return the definition of the Code Execution container."""
+    return SandboxContainer(
+        "Code Execution",
+        "code_execution",
+        log_folder="code-execution",
+        log_files=[],
+    )
+
+
 def create_code_execution_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-) -> str:
+    container_creation_context: ContainerCreationContext,
+) -> ContainerCreationResult:
     """Create and start a Code Execution sidecar container."""
     image_name = _ensure_code_execution_image_exists(specification)
     container_name = _create_code_execution_container_name(
         sandbox_context.run_identifier
     )
+
+    if not container_creation_context.network_names:
+        raise RuntimeError("No network specified for the Code Execution container.")
+    network_name = container_creation_context.network_names[0]
 
     environs: list[str] = []
 
@@ -42,7 +62,7 @@ def create_code_execution_container(
         "--name",
         container_name,
         "--network",
-        sandbox_context.backend_network_name,
+        network_name,
         "--network-alias",
         _CODE_EXECUTION_ALIAS,
     ]
@@ -132,7 +152,7 @@ def create_code_execution_container(
     if not started_successfully:
         raise RuntimeError("Code Execution sidecar failed to start.")
 
-    return container_name
+    return ContainerCreationResult(container_name)
 
 
 def _ensure_code_execution_image_exists(

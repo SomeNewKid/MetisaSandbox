@@ -185,10 +185,8 @@ def proxy_configuration_is_absent(
 ) -> ProbeResult:
     """Ensure the workload receives no proxy configuration."""
     probe_name = "container__network__proxy_configuration_is_absent"
-    specification = probe_context.specification
-
-    if Capability.INTERNET in specification.capabilities:
-        message = "Internet access is enabled. Skipping probe."
+    if _direct_internet_access_is_allowed(probe_context):
+        message = "Direct workload internet access is enabled. Skipping probe."
         return ProbeResult.success(probe_name, message)
 
     configured_variables = {
@@ -221,12 +219,10 @@ def proxy_configuration_is_absent(
 def proxy_configuration_exists(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """Ensure an internet-enabled workload receives proxy configuration."""
+    """Ensure a workload with direct internet access receives proxy configuration."""
     probe_name = "container__network__proxy_configuration_exists"
-    specification = probe_context.specification
-
-    if Capability.INTERNET not in specification.capabilities:
-        message = "Internet access is not enabled. Skipping probe."
+    if not _direct_internet_access_is_allowed(probe_context):
+        message = "Direct workload internet access is disabled. Skipping probe."
         return ProbeResult.success(probe_name, message)
 
     discovered_proxies = urllib.request.getproxies()
@@ -251,10 +247,8 @@ def external_http_is_blocked(
 ) -> ProbeResult:
     """Ensure outbound unsecured HTTP access is unavailable."""
     probe_name = "container__docker__external_http_is_blocked"
-    specification = probe_context.specification
-
-    if Capability.INTERNET in specification.capabilities:
-        message = "Internet access is enabled. Skipping probe."
+    if _direct_internet_access_is_allowed(probe_context):
+        message = "Direct workload internet access is enabled. Skipping probe."
         return ProbeResult.success(probe_name, message)
 
     target_url = "http://example.com"
@@ -295,12 +289,10 @@ def external_http_is_blocked(
 def external_http_is_allowed(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """Ensure an internet-enabled workload can access external HTTP."""
+    """Ensure a workload with direct internet access can access external HTTP."""
     probe_name = "container__network__external_http_is_allowed"
-    specification = probe_context.specification
-
-    if Capability.INTERNET not in specification.capabilities:
-        message = "Internet access is not enabled. Skipping probe."
+    if not _direct_internet_access_is_allowed(probe_context):
+        message = "Direct workload internet access is disabled. Skipping probe."
         return ProbeResult.success(probe_name, message)
 
     target_url = "http://example.com"
@@ -341,10 +333,8 @@ def disallowed_external_http_is_blocked(
 ) -> ProbeResult:
     """Ensure the internet proxy denies HTTP to a disallowed destination."""
     probe_name = "container__network__disallowed_external_http_is_blocked"
-    specification = probe_context.specification
-
-    if Capability.INTERNET not in specification.capabilities:
-        message = "Internet access is not enabled. Skipping probe."
+    if not _direct_internet_access_is_allowed(probe_context):
+        message = "Direct workload internet access is disabled. Skipping probe."
         return ProbeResult.success(probe_name, message)
 
     target_url = "http://example.invalid"
@@ -382,10 +372,8 @@ def external_https_is_blocked(
 ) -> ProbeResult:
     """Ensure outbound HTTPS access is unavailable."""
     probe_name = "container__network__external_https_is_blocked"
-    specification = probe_context.specification
-
-    if Capability.INTERNET in specification.capabilities:
-        message = "Internet access is enabled. Skipping probe."
+    if _direct_internet_access_is_allowed(probe_context):
+        message = "Direct workload internet access is enabled. Skipping probe."
         return ProbeResult.success(probe_name, message)
 
     target_url = "https://example.com"
@@ -426,12 +414,10 @@ def external_https_is_blocked(
 def external_https_is_allowed(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """Ensure an internet-enabled workload can access external HTTPS."""
+    """Ensure a workload with direct internet access can access external HTTPS."""
     probe_name = "container__network__external_https_is_allowed"
-    specification = probe_context.specification
-
-    if Capability.INTERNET not in specification.capabilities:
-        message = "Internet access is not enabled. Skipping probe."
+    if not _direct_internet_access_is_allowed(probe_context):
+        message = "Direct workload internet access is disabled. Skipping probe."
         return ProbeResult.success(probe_name, message)
 
     target_url = "https://example.com"
@@ -479,10 +465,8 @@ def disallowed_external_https_is_blocked(
 ) -> ProbeResult:
     """Ensure the internet proxy denies HTTPS to a disallowed destination."""
     probe_name = "container__network__disallowed_external_https_is_blocked"
-    specification = probe_context.specification
-
-    if Capability.INTERNET not in specification.capabilities:
-        message = "Internet access is not enabled. Skipping probe."
+    if not _direct_internet_access_is_allowed(probe_context):
+        message = "Direct workload internet access is disabled. Skipping probe."
         return ProbeResult.success(probe_name, message)
 
     target_url = "https://example.invalid"
@@ -865,6 +849,14 @@ def workload_has_no_default_route(probe_context: ProbeContext) -> ProbeResult:
         )
     return ProbeResult.success(
         probe_name, "No usable IPv4 or IPv6 default route exists."
+    )
+
+
+def _direct_internet_access_is_allowed(probe_context: ProbeContext) -> bool:
+    capabilities = probe_context.specification.capabilities
+    return (
+        Capability.INTERNET in capabilities
+        and Capability.LLM_BROKER not in capabilities
     )
 
 

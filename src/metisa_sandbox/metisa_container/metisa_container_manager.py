@@ -5,10 +5,19 @@ from __future__ import annotations
 from pathlib import Path
 
 from metisa_common.specification_helper import get_resolved_environs_for_metisa
-from metisa_common.specification_models import Capability, MetisaSpecification
+from metisa_common.specification_models import MetisaSpecification
+from metisa_sandbox.docker.docker_container import create_docker_container
 
-from ..sandbox_models import SandboxContext
-from .metisa_container_workspace import LANDLOCK_MODULE_NAME
+from ..sandbox_models import (
+    ContainerCreationContext,
+    ContainerCreationResult,
+    SandboxContainer,
+    SandboxContext,
+)
+from .metisa_container_workspace import (
+    LANDLOCK_MODULE_NAME,
+    create_staged_source_directory,
+)
 
 _GUEST_SOURCE_DIR = "/sandbox-source"
 _GUEST_OUTPUT_DIR = "/sandbox-output"
@@ -16,17 +25,51 @@ _GUEST_WORK_DIR = "/sandbox-work"
 _GUEST_PYTHON_VENV = "/opt/metisa-venv"
 
 
-def create_docker_run_arguments(
+def create_metisa_workload_definition() -> SandboxContainer:
+    """Return the definition of the Metisa workload container."""
+    return SandboxContainer(
+        "Metisa Workload",
+        "metisa_workload",
+        log_folder="metisa",
+        log_files=[],
+    )
+
+
+def create_metisa_workload_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-    image_reference: str,
-    staged_source_path: Path,
-    workload_module: str,
-    is_network_required: bool,
-    squid_proxy_url: str | None,
-) -> list[str]:
-    """Create the list of Docker run arguments for the workload container."""
-    is_interactive = Capability.INTERACTIVE in specification.capabilities
+    container_creation_context: ContainerCreationContext,
+) -> ContainerCreationResult:
+    """Create the Metisa Workload container and connect it to the Docker network."""
+    creation_settings = container_creation_context.settings
+
+    image_reference = creation_settings.get("image_reference", "")
+    if not image_reference:
+        raise RuntimeError("Metisa Workload requires an image reference.")
+    if not isinstance(image_reference, str):
+        raise RuntimeError("Metisa Workload image reference must be a string.")
+
+    workload_module = creation_settings.get("workload_module", "")
+    if not workload_module:
+        raise RuntimeError("Metisa Workload requires a workload_module.")
+    if not isinstance(workload_module, str):
+        raise RuntimeError("Metisa Workload workload module must be a string.")
+
+    is_network_required = creation_settings.get("is_network_required", None)
+    if not is_network_required:
+        raise RuntimeError("Metisa Workload requires a network-required flag.")
+    if not isinstance(is_network_required, bool):
+        raise RuntimeError("Metisa Workload network-required flag must be a bool.")
+
+    use_squid_proxy = creation_settings.get("use_squid_proxy", None)
+    if use_squid_proxy is not None and not isinstance(use_squid_proxy, bool):
+        raise RuntimeError("Metisa Workload squid-proxy flag must be a bool.")
+    if use_squid_proxy is None:
+        use_squid_proxy = False
+
+    staged_source_path = create_staged_source_directory(
+        sandbox_context, workload_module
+    )
 
     environs: list[str] = []
 
@@ -35,6 +78,49 @@ def create_docker_run_arguments(
         "--name",
         sandbox_context.workload_container_name,
     ]
+
+    # Configure the network settings for the container
+    # based on whether a network is required.
+    if is_network_required:
+        arguments.extend(
+            [
+                "--network",
+                sandbox_context.workload_network_name,
+                "--network-alias",
+                "metisa-workload",
+            ]
+        )
+        squid_proxy_url = (
+            container_creation_context.squid_proxy_url if is_network_required else None
+        )
+        if use_squid_proxy and squid_proxy_url is not None:
+            no_proxy_destinations = ",".join(
+                [
+                    "localhost",
+                    "127.0.0.1",
+                    "::1",
+                    "metisa-workload",
+                    "metisa-squid",
+                    "metisa-mcp-server",
+                ]
+            )
+            environs.extend(
+                [
+                    f"HTTP_PROXY={squid_proxy_url}",
+                    f"HTTPS_PROXY={squid_proxy_url}",
+                    f"NO_PROXY={no_proxy_destinations}",
+                    f"http_proxy={squid_proxy_url}",
+                    f"https_proxy={squid_proxy_url}",
+                    f"no_proxy={no_proxy_destinations}",
+                ]
+            )
+    else:
+        arguments.extend(
+            [
+                "--network",
+                "none",
+            ]
+        )
 
     # Mount the container's root filesystem as strictly read-only
     # Couple with in memory temporary writes (--tmpfs)
@@ -89,55 +175,14 @@ def create_docker_run_arguments(
         raise ValueError(f"Seccomp profile not found at {seccomp_path}")
     arguments.extend(["--security-opt", f"seccomp={seccomp_path}"])
 
-    # Configure the network settings for the container
-    # based on whether a network is required.
-    if is_network_required:
-        arguments.extend(
-            [
-                "--network",
-                sandbox_context.workload_network_name,
-                "--network-alias",
-                "metisa-workload",
-            ]
-        )
-        if squid_proxy_url is not None:
-            no_proxy_destinations = ",".join(
-                [
-                    "localhost",
-                    "127.0.0.1",
-                    "::1",
-                    "metisa-workload",
-                    "metisa-squid",
-                    "metisa-mcp-server",
-                ]
-            )
-            environs.extend(
-                [
-                    f"HTTP_PROXY={squid_proxy_url}",
-                    f"HTTPS_PROXY={squid_proxy_url}",
-                    f"NO_PROXY={no_proxy_destinations}",
-                    f"http_proxy={squid_proxy_url}",
-                    f"https_proxy={squid_proxy_url}",
-                    f"no_proxy={no_proxy_destinations}",
-                ]
-            )
-    else:
-        arguments.extend(
-            [
-                "--network",
-                "none",
-            ]
-        )
-
-    # Allocate a pseudo-terminal if the sandbox is interactive.
+    # Allocate a pseudo-terminal.
     # Allows Python `input` to get user input from the terminal.
-    if is_interactive:
-        arguments.extend(
-            [
-                "--interactive",  # keeps stdin open
-                "--tty",  # allocates a pseudo-terminal
-            ]
-        )
+    arguments.extend(
+        [
+            "--interactive",  # keeps stdin open
+            "--tty",  # allocates a pseudo-terminal
+        ]
+    )
 
     # Drop all Linux capabilities for the container.
     # https://man7.org/linux/man-pages/man7/capabilities.7.html
@@ -282,4 +327,9 @@ def create_docker_run_arguments(
         ]
     )
 
-    return arguments
+    create_docker_container(arguments)
+
+    return ContainerCreationResult(
+        sandbox_context.workload_container_name,
+        staged_source=staged_source_path,
+    )

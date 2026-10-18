@@ -29,53 +29,30 @@ def create_docker_container(
 
 
 def run_docker_container(
-    arguments: Sequence[str],
-    *,
-    interactive: bool = False,
+    container_name: str,
 ) -> int:
     """Run a Docker container."""
     docker_command_location = get_docker_command_location()
 
     command = [
         docker_command_location,
-        "run",
+        "start",
+        "--attach",
+        "--interactive",
+        container_name,
     ]
-
-    if arguments:
-        for arg in arguments:
-            command.append(arg)
-
-    if interactive:  # no streaming
-        process = subprocess.Popen(
-            command,
-            text=True,
-        )
-
-        return process.wait()
-
-    # streaming
 
     process = subprocess.Popen(
         command,
-        # stdout=subprocess.PIPE,
-        # stderr=subprocess.STDOUT,
         text=True,
-        bufsize=0,
     )
-
-    if process.stdout is not None:
-        while True:
-            chunk = process.stdout.read(1)
-            if chunk == "":
-                break
-
-            print(chunk, end="", flush=True)
 
     return process.wait()
 
 
 def start_docker_container(
     container_name: str,
+    arguments: Sequence[str] | None = None,
 ) -> None:
     """Start the named Docker container."""
     docker_command_location = get_docker_command_location()
@@ -83,8 +60,13 @@ def start_docker_container(
     command = [
         docker_command_location,
         "start",
-        container_name,
     ]
+
+    if arguments:
+        for arg in arguments:
+            command.append(arg)
+
+    command.append(container_name)
 
     _run_command(command, f"Could not start Docker container '{container_name}'")
 

@@ -27,7 +27,7 @@ if not metisa_json_path.is_file():
     raise FileNotFoundError("Sample Agent missing a metisa.toml file.")
 specification: MetisaSpecification = load_specification(metisa_json_path)
 
-IS_INTERACTIVE = Capability.INTERACTIVE in specification.capabilities
+_is_interactive = False
 
 
 def main(
@@ -44,7 +44,7 @@ def main(
     print(flush=True)
     print("-" * 30)
 
-    if IS_INTERACTIVE:
+    if _is_interactive:
         user_name = input("What is your name? ")
     else:
         user_name = "Fred"

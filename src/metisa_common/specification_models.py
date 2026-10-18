@@ -10,18 +10,18 @@ from enum import StrEnum, unique
 class Capability(StrEnum):
     """Represents the declared capabilities of a Metisa workload."""
 
-    INTERACTIVE = "interactive"
-    NETWORK = "network"
+    CODE_EXECUTION = "code_execution"
+    INTERACTIVE = "interactive"  # Legacy, but helpful with unit testing
     INTERNET = "internet"
+    JINA_READER = "jina_reader"
+    LLM_BROKER = "llm_broker"
+    LLM_SERVER = "llm_server"
     LOCALNET = "localnet"
     MCP_SERVER = "mcp_server"
-    LLM_BROKER = "llm_broker"
-    JINA_READER = "jina_reader"
-    CODE_EXECUTION = "code_execution"
-    LLM_SERVER = "llm_server"
-    PROMPT_GUARD = "prompt_guard"
-    PLAYWRIGHT_CHROMIUM = "playwright_chromium"
+    NETWORK = "network"
     OPENAI = "openai"
+    PLAYWRIGHT_CHROMIUM = "playwright_chromium"
+    PROMPT_GUARD = "prompt_guard"
 
 
 class SpecificationValidationError(ValueError):

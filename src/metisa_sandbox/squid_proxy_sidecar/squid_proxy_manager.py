@@ -22,7 +22,12 @@ from ..docker.docker_image import (
 from ..docker.docker_network import (
     connect_container_to_docker_network,
 )
-from ..sandbox_models import SandboxContext
+from ..sandbox_models import (
+    ContainerCreationContext,
+    ContainerCreationResult,
+    SandboxContainer,
+    SandboxContext,
+)
 
 _IMAGE_FORMAT_VERSION = 1
 _SQUID_PROXY_ALIAS = "metisa-squid"
@@ -30,20 +35,42 @@ _SQUID_PROXY_PORT = 3128
 _SQUID_PROXY_IMAGE_NAME = "metisa-squid-proxy"
 
 
+def create_squid_proxy_definition() -> SandboxContainer:
+    """Return the definition of the Squid Proxy container."""
+    return SandboxContainer(
+        "Squid Proxy",
+        "squid_proxy",
+        network_url=_get_squid_proxy_url(),
+        log_folder="squid-proxy",
+        log_files=["/etc/squid/squid.conf", "/etc/squid/metisa-allow.conf"],
+    )
+
+
 def create_squid_proxy_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
-) -> str:
+    container_creation_context: ContainerCreationContext,
+) -> ContainerCreationResult:
     """Create the Squid Proxy container and connect it to the Docker networks."""
     image_name = _ensure_squid_proxy_image_exists(specification)
     container_name = _create_squid_proxy_container_name(sandbox_context.run_identifier)
+
+    if not container_creation_context.network_names:
+        raise RuntimeError("No network specified for the Squid Proxy container.")
+    network_name = container_creation_context.network_names[0]
 
     arguments = [
         "--name",
         container_name,
         "--network",
-        sandbox_context.egress_network_name,
+        network_name,
     ]
+
+    if _use_network_alias(sandbox_context, network_name):
+        arguments.extend([
+            "--network-alias",
+            _SQUID_PROXY_ALIAS,
+        ])
 
     # Mount the container's root filesystem as strictly read-only
     # Couple with in memory temporary writes (--tmpfs)
@@ -173,27 +200,38 @@ def create_squid_proxy_container(
 
     create_docker_container(arguments)
 
-    connect_container_to_docker_network(
-        container_name=container_name,
-        network_name=sandbox_context.workload_network_name,
-        aliases=(_SQUID_PROXY_ALIAS,),
-    )
-
-    connect_container_to_docker_network(
-        container_name=container_name,
-        network_name=sandbox_context.backend_network_name,
-        aliases=(_SQUID_PROXY_ALIAS,),
-    )
+    if len(container_creation_context.network_names) > 1:
+        for network_name in container_creation_context.network_names[1:]:
+            if _use_network_alias(sandbox_context, network_name):
+                connect_container_to_docker_network(
+                    container_name=container_name,
+                    network_name=network_name,
+                    aliases=(_SQUID_PROXY_ALIAS,),
+                )
+            else:
+                connect_container_to_docker_network(
+                    container_name=container_name,
+                    network_name=network_name,
+                )
 
     start_docker_container(container_name)
     started_successfully = inspect_docker_container(container_name)
     if not started_successfully:
         raise RuntimeError("Squid Proxy sidecar failed to start.")
 
-    return container_name
+    return ContainerCreationResult(container_name=container_name)
 
 
-def get_squid_proxy_url() -> str:
+def _use_network_alias(
+    sandbox_context: SandboxContext, 
+    network_name: str,
+) -> bool:
+    if network_name == sandbox_context.egress_network_name:
+        return False
+    return True
+
+
+def _get_squid_proxy_url() -> str:
     """Get the URL for the Squid Proxy container."""
     return f"http://{_SQUID_PROXY_ALIAS}:{_SQUID_PROXY_PORT}"
 
@@ -239,7 +277,6 @@ def _create_squid_proxy_image(
         )
     finally:
         shutil.rmtree(temporary_dir)
-
 
 def _get_dockerfile_location() -> Path:
     dockerfile_location = Path(__file__).with_name("dockerfile")

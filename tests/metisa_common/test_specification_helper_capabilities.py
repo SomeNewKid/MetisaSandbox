@@ -48,27 +48,7 @@ def test_network_capability() -> None:
         capabilities = ["network"]
     """
     specification = parse_specification(toml)
-    assert Capability.INTERACTIVE not in specification.capabilities
     assert Capability.NETWORK in specification.capabilities
-    assert Capability.INTERNET not in specification.capabilities
-    assert Capability.LOCALNET not in specification.capabilities
-    assert Capability.MCP_SERVER not in specification.capabilities
-    assert Capability.JINA_READER not in specification.capabilities
-    assert Capability.CODE_EXECUTION not in specification.capabilities
-    assert Capability.LLM_SERVER not in specification.capabilities
-    assert Capability.PROMPT_GUARD not in specification.capabilities
-    assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
-    assert Capability.OPENAI not in specification.capabilities
-
-
-def test_interactive_capability() -> None:
-    toml = """
-        agent_name="sample_agent"
-        capabilities = ["interactive"]
-    """
-    specification = parse_specification(toml)
-    assert Capability.INTERACTIVE in specification.capabilities
-    assert Capability.NETWORK not in specification.capabilities
     assert Capability.INTERNET not in specification.capabilities
     assert Capability.LOCALNET not in specification.capabilities
     assert Capability.MCP_SERVER not in specification.capabilities
@@ -86,7 +66,6 @@ def test_internet_capability() -> None:
         capabilities = ["network", "internet"]
     """
     specification = parse_specification(toml)
-    assert Capability.INTERACTIVE not in specification.capabilities
     assert Capability.NETWORK in specification.capabilities
     assert Capability.INTERNET in specification.capabilities
     assert Capability.LOCALNET not in specification.capabilities
@@ -105,7 +84,6 @@ def test_localnet_capability() -> None:
         capabilities = ["network", "localnet"]
     """
     specification = parse_specification(toml)
-    assert Capability.INTERACTIVE not in specification.capabilities
     assert Capability.NETWORK in specification.capabilities
     assert Capability.INTERNET not in specification.capabilities
     assert Capability.LOCALNET in specification.capabilities
@@ -124,7 +102,6 @@ def test_mcp_server_capability() -> None:
         capabilities = ["network", "mcp_server", "prompt_guard"]
     """
     specification = parse_specification(toml)
-    assert Capability.INTERACTIVE not in specification.capabilities
     assert Capability.NETWORK in specification.capabilities
     assert Capability.INTERNET not in specification.capabilities
     assert Capability.LOCALNET not in specification.capabilities
@@ -143,7 +120,6 @@ def test_jina_reader_capability() -> None:
         capabilities = ["network", "mcp_server", "prompt_guard", "jina_reader"]
     """
     specification = parse_specification(toml)
-    assert Capability.INTERACTIVE not in specification.capabilities
     assert Capability.NETWORK in specification.capabilities
     assert Capability.INTERNET not in specification.capabilities
     assert Capability.LOCALNET not in specification.capabilities
@@ -162,7 +138,6 @@ def test_code_execution_capability() -> None:
         capabilities = ["network", "mcp_server", "prompt_guard", "code_execution"]
     """
     specification = parse_specification(toml)
-    assert Capability.INTERACTIVE not in specification.capabilities
     assert Capability.NETWORK in specification.capabilities
     assert Capability.INTERNET not in specification.capabilities
     assert Capability.LOCALNET not in specification.capabilities
@@ -181,7 +156,6 @@ def test_llm_server_capability() -> None:
         capabilities = ["llm_server", "network"]
     """
     specification = parse_specification(toml)
-    assert Capability.INTERACTIVE not in specification.capabilities
     assert Capability.NETWORK in specification.capabilities
     assert Capability.INTERNET not in specification.capabilities
     assert Capability.LOCALNET not in specification.capabilities
@@ -200,7 +174,6 @@ def test_prompt_guard_capability() -> None:
         capabilities = ["prompt_guard"]
     """
     specification = parse_specification(toml)
-    assert Capability.INTERACTIVE not in specification.capabilities
     assert Capability.NETWORK not in specification.capabilities
     assert Capability.INTERNET not in specification.capabilities
     assert Capability.LOCALNET not in specification.capabilities
@@ -219,7 +192,6 @@ def test_playwright_chromium_capability() -> None:
         capabilities = ["playwright_chromium"]
     """
     specification = parse_specification(toml)
-    assert Capability.INTERACTIVE not in specification.capabilities
     assert Capability.NETWORK not in specification.capabilities
     assert Capability.INTERNET not in specification.capabilities
     assert Capability.LOCALNET not in specification.capabilities
@@ -238,7 +210,6 @@ def test_openai_capability() -> None:
         capabilities = ["openai"]
     """
     specification = parse_specification(toml)
-    assert Capability.INTERACTIVE not in specification.capabilities
     assert Capability.NETWORK not in specification.capabilities
     assert Capability.INTERNET not in specification.capabilities
     assert Capability.LOCALNET not in specification.capabilities
