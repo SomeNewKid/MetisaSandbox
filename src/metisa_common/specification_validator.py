@@ -163,6 +163,10 @@ def _validate_capabilities(
             raise SpecificationValidationError(
                 '"mcp_server" capability requires "prompt_guard" capability.'
             )
+        if Capability.ENTITY_GUARD not in capabilities:
+            raise SpecificationValidationError(
+                '"mcp_server" capability requires "entity_guard" capability.'
+            )
 
     if Capability.JINA_READER in capabilities:
         if Capability.MCP_SERVER not in capabilities:
@@ -190,6 +194,10 @@ def _validate_capabilities(
         if Capability.PROMPT_GUARD not in capabilities:
             raise SpecificationValidationError(
                 '"llm_broker" capability requires "prompt_guard" capability.'
+            )
+        if Capability.ENTITY_GUARD not in capabilities:
+            raise SpecificationValidationError(
+                '"llm_broker" capability requires "entity_guard" capability.'
             )
 
 

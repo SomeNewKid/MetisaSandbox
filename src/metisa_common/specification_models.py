@@ -22,6 +22,7 @@ class Capability(StrEnum):
     OPENAI = "openai"
     PLAYWRIGHT_CHROMIUM = "playwright_chromium"
     PROMPT_GUARD = "prompt_guard"
+    ENTITY_GUARD = "entity_guard"
 
 
 class SpecificationValidationError(ValueError):

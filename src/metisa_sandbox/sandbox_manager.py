@@ -20,6 +20,10 @@ from .docker.docker_container import (
 from .docker.docker_network import (
     get_docker_container_ip_address,
 )
+from .entity_guard_sidecar.entity_guard_manager import (
+    create_entity_guard_container,
+    create_entity_guard_definition,
+)
 from .haproxy_sidecar.haproxy_manager import (
     create_haproxy_container,
     create_haproxy_definition,
@@ -106,6 +110,7 @@ def run_metisa_container_workload_in_sandbox(
     code_execution_container = create_code_execution_definition()
     llm_broker_container = create_llm_broker_definition()
     prompt_guard_container = create_prompt_guard_definition()
+    entity_guard_container = create_entity_guard_definition()
 
     all_containers = [
         metisa_workload_container,
@@ -116,6 +121,7 @@ def run_metisa_container_workload_in_sandbox(
         code_execution_container,
         llm_broker_container,
         prompt_guard_container,
+        entity_guard_container,
     ]
 
     try:
@@ -186,6 +192,13 @@ def run_metisa_container_workload_in_sandbox(
                 sandbox_context,
                 squid_proxy_container,
                 prompt_guard_container,
+            )
+
+            _create_entity_guard_container(
+                specification,
+                sandbox_context,
+                squid_proxy_container,
+                entity_guard_container,
             )
 
         if sandbox_requirements.is_localnet_access_required:
@@ -330,6 +343,29 @@ def _create_prompt_guard_container(
             specification, sandbox_context, prompt_guard_creation_context
         )
         prompt_guard_container.set_created(prompt_guard_creation)
+
+
+def _create_entity_guard_container(
+    specification: MetisaSpecification,
+    sandbox_context: SandboxContext,
+    squid_proxy_container: SandboxContainer,
+    entity_guard_container: SandboxContainer,
+) -> None:
+    with terminal_status(
+        running="Creating Entity Guard container...",
+        success="Created Entity Guard container.",
+        failure="Could not create Entity Guard container.",
+    ):
+        entity_guard_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.backend_network_name,
+            ],
+        )
+        entity_guard_creation = create_entity_guard_container(
+            specification, sandbox_context, entity_guard_creation_context
+        )
+        entity_guard_container.set_created(entity_guard_creation)
 
 
 def _create_mcp_server_container(

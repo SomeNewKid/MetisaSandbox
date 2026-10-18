@@ -11,7 +11,7 @@ from metisa_common.specification_models import Capability, SpecificationValidati
 def test_missing_llm_broker_table() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "llm_broker", "prompt_guard"]
+        capabilities = ["network", "llm_broker", "prompt_guard", "entity_guard"]
     """
     specification = parse_specification(toml)
     assert Capability.LLM_BROKER in specification.capabilities
@@ -22,7 +22,7 @@ def test_llm_broker_missing_environs() -> None:
     """Treat a table without environment declarations as absent."""
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "llm_broker", "prompt_guard"]
+        capabilities = ["network", "llm_broker", "prompt_guard", "entity_guard"]
 
         [llm_broker]
     """
@@ -34,7 +34,7 @@ def test_llm_broker_invalid_if_no_network_capability() -> None:
     """Reject the capability even when no broker table is supplied."""
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["llm_broker", "prompt_guard"]
+        capabilities = ["llm_broker", "prompt_guard", "entity_guard"]
     """
     with pytest.raises(SpecificationValidationError, match="requires.*network"):
         _ = parse_specification(toml)
@@ -53,7 +53,7 @@ def test_llm_broker_invalid_if_no_prompt_guard_capability() -> None:
 def test_llm_broker_invalid_if_no_llm_broker_capability() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "prompt_guard"]
+        capabilities = ["network", "prompt_guard", "entity_guard"]
 
         [llm_broker]
         environs = []
@@ -66,7 +66,7 @@ def test_llm_broker_invalid_if_no_llm_broker_capability() -> None:
 def test_llm_broker_with_unknown_key(key: str) -> None:
     toml = f"""
         agent_name = "sample_agent"
-        capabilities = ["network", "llm_broker", "prompt_guard"]
+        capabilities = ["network", "llm_broker", "prompt_guard", "entity_guard"]
 
         [llm_broker]
         {key} = []
@@ -80,7 +80,7 @@ def test_llm_broker_empty_environs() -> None:
     """Accept empty broker environs without requiring the MCP capability."""
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "llm_broker", "prompt_guard"]
+        capabilities = ["network", "llm_broker", "prompt_guard", "entity_guard"]
 
         [llm_broker]
         environs = []
@@ -95,7 +95,13 @@ def test_llm_broker_valid_environs() -> None:
     """Preserve broker literals and references separately from other environs."""
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "llm_broker", "mcp_server", "prompt_guard"]
+        capabilities = [
+            "network", 
+            "llm_broker", 
+            "mcp_server", 
+            "prompt_guard", 
+            "entity_guard"
+        ]
         environs = ["WORKLOAD=value"]
 
         [mcp_server]
@@ -139,7 +145,7 @@ def test_llm_broker_environs_with_invalid_item(item: str) -> None:
     """Reject invalid items among otherwise valid environment declarations."""
     toml = f"""
         agent_name = "sample_agent"
-        capabilities = ["network", "llm_broker", "prompt_guard"]
+        capabilities = ["network", "llm_broker", "prompt_guard", "entity_guard"]
 
         [llm_broker]
         environs = ["VALID=value", {item}, "ALSO_VALID=value"]
@@ -157,7 +163,7 @@ def test_llm_broker_not_iterable_environs(environs: str) -> None:
     """Require the environment declarations field to be an array."""
     toml = f"""
         agent_name = "sample_agent"
-        capabilities = ["network", "llm_broker", "prompt_guard"]
+        capabilities = ["network", "llm_broker", "prompt_guard", "entity_guard"]
 
         [llm_broker]
         environs = {environs}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -147,6 +148,28 @@ def main(
                     print("Labels of unsafe content:", classification)
                 except Exception as error:
                     print("MCP server error:", error)
+
+        if Capability.ENTITY_GUARD in specification.capabilities:
+            _anonymize_text_sentences(
+                [
+                    "My phone number is 9332 1234.",
+                    "My phone number is (08) 9332 1234.",
+                    "My phone number is +61 9332 1234.",
+                    "My phone number is 0488123456.",
+                    "My phone number is 0488 123 456.",
+                    "My name is Samantha.",
+                    "My name is Samantha Smith.",
+                    "My email is samantha.smith@example.com.",
+                    "My credit card number is 4111-1111-1111-1111.",
+                    "Our ABN is 50 110 219 460.",
+                    "Our ABN is 50110219460.",
+                    "My tax file number is 333-333-333.",
+                    "My tax file number is 333 333 333.",
+                    "My tax file number is 333333333.",
+                    "My Medicare number is 2428 77813 2.",
+                    "My Medicare number is 2428778132.",
+                ]
+            )
 
     if Capability.LLM_BROKER in specification.capabilities:
         prompt_for_llm = "Explain Docker networks in two sentences."
@@ -309,6 +332,35 @@ def _moderate_text(
     text: str,
 ) -> str:
     return _get_mcp_server_tool_result("moderate_text", {"text": text})
+
+
+def _anonymize_text_sentences(
+    sentences: list[str],
+) -> None:
+    if not sentences:
+        return
+    print(flush=True)
+    print("-" * 30)
+    print("Anonymization")
+    for sentence in sentences:
+        with print_elapsed_time():
+            try:
+                anonymized = _anonymize_text(sentence)
+                successful = anonymized != sentence
+                indicator = "✓" if successful else "x"
+                print()
+                print(indicator, "Clear content:", sentence)
+                print("  Anonymized content:", anonymized)
+            except Exception as error:
+                print("MCP server error:", error)
+
+
+def _anonymize_text(
+    text: str,
+) -> str:
+    raw_result = _get_mcp_server_tool_result("anonymize_text", {"text": text})
+    result = json.loads(raw_result)
+    return result.get("anonymized")
 
 
 def _get_active_items() -> str:

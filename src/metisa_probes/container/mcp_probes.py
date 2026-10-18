@@ -23,6 +23,7 @@ _MCP_SERVER_URL = f"http://{_MCP_SERVER_ALIAS}:{_MCP_SERVER_PORT}/mcp"
 _TIMEOUT_SECONDS = 5
 _JINA_READER_TIMEOUT_SECONDS = 75
 _PROMPT_GUARD_TIMEOUT_SECONDS = 240
+_ENTITY_GUARD_TIMEOUT_SECONDS = 240
 
 
 def mcp_server_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
@@ -414,6 +415,39 @@ def moderate_unsafe_text_returns_labels(
     )
 
 
+def anonymize_text_removes_person_name(probe_context: ProbeContext) -> ProbeResult:
+    """Verify anonymize_text removes a name while preserving surrounding text."""
+    return _run_anonymization_probe(
+        probe_context,
+        "anonymize_text_removes_person_name",
+        "My name is Samantha Smith.",
+        "My name is",
+        "Samantha Smith",
+    )
+
+
+def anonymize_text_removes_email_address(probe_context: ProbeContext) -> ProbeResult:
+    """Verify anonymize_text removes an email while preserving surrounding text."""
+    return _run_anonymization_probe(
+        probe_context,
+        "anonymize_text_removes_email_address",
+        "My email is samantha.smith@example.com.",
+        "My email is",
+        "samantha.smith@example.com",
+    )
+
+
+def anonymize_text_removes_phone_number(probe_context: ProbeContext) -> ProbeResult:
+    """Verify anonymize_text removes a phone while preserving surrounding text."""
+    return _run_anonymization_probe(
+        probe_context,
+        "anonymize_text_removes_phone_number",
+        "My phone number is 0488 123 456.",
+        "My phone number is",
+        "0488 123 456",
+    )
+
+
 def execute_starlark_code_returns_expected_result(
     probe_context: ProbeContext,
 ) -> ProbeResult:
@@ -783,6 +817,59 @@ def _run_moderation_probe(
     )
 
 
+def _run_anonymization_probe(
+    probe_context: ProbeContext,
+    name: str,
+    text: str,
+    expected_text: str,
+    sensitive_text: str,
+) -> ProbeResult:
+    probe_name = f"container__mcp__{name}"
+    tool_name = "anonymize_text"
+    if Capability.ENTITY_GUARD not in probe_context.specification.capabilities:
+        return ProbeResult.success(
+            probe_name, "Entity Guard is disabled. Skipping probe."
+        )
+    mcp_server = probe_context.specification.mcp_server
+    if mcp_server is None or tool_name not in mcp_server.tools:
+        return ProbeResult.success(
+            probe_name, f"{tool_name} is not declared. Skipping probe."
+        )
+
+    async def _operation(client: Client) -> str | None:
+        from mcp import types
+
+        result = await client.call_tool(tool_name, {"text": text})
+        if result.is_error:
+            return f"{tool_name} returned a tool execution error."
+        if len(result.content) != 1:
+            return f"{tool_name} did not return exactly one content block."
+        content = result.content[0]
+        if not isinstance(content, types.TextContent):
+            return f"{tool_name} did not return a text content block."
+        try:
+            payload = json.loads(content.text)
+        except ValueError:
+            return f"{tool_name} did not return valid JSON."
+        if not isinstance(payload, dict):
+            return f"{tool_name} did not return a JSON object."
+        anonymized = payload.get("anonymized")
+        if not isinstance(anonymized, str):
+            return f"{tool_name} did not return an anonymized string."
+        if expected_text not in anonymized:
+            return f"{tool_name} did not preserve the expected surrounding text."
+        if sensitive_text in anonymized:
+            return f"{tool_name} did not remove the sensitive text."
+        return None
+
+    return _run_mcp_probe(
+        probe_context,
+        name,
+        _operation,
+        timeout_seconds=_ENTITY_GUARD_TIMEOUT_SECONDS,
+    )
+
+
 def _run_starlark_error_probe(
     probe_context: ProbeContext,
     name: str,
@@ -906,6 +993,9 @@ MCP_PROBES = ProbeGroup(
         classify_unsafe_text_returns_indicators,
         moderate_safe_text_returns_no_labels,
         moderate_unsafe_text_returns_labels,
+        anonymize_text_removes_person_name,
+        anonymize_text_removes_email_address,
+        anonymize_text_removes_phone_number,
         execute_starlark_code_returns_expected_result,
         execute_starlark_code_rejects_missing_main,
         execute_starlark_code_enforces_step_budget,

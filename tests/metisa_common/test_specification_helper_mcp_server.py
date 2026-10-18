@@ -9,7 +9,7 @@ from metisa_common.specification_models import SpecificationValidationError
 def test_missing_mcp_server_table() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
     """
     specification = parse_specification(toml)
     assert specification.mcp_server is None
@@ -18,7 +18,7 @@ def test_missing_mcp_server_table() -> None:
 def test_mcp_server_missing_details() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
     """
@@ -29,7 +29,7 @@ def test_mcp_server_missing_details() -> None:
 def test_mcp_server_invalid_if_no_network_capability() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["mcp_server", "prompt_guard", "prompt_guard"]
+        capabilities = ["mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         tools=[]        
@@ -42,7 +42,20 @@ def test_mcp_server_invalid_if_no_network_capability() -> None:
 def test_mcp_server_invalid_if_no_prompt_guard_capability() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["mcp_server", "network"]
+        capabilities = ["mcp_server", "network", "entity_guard"]
+
+        [mcp_server]
+        tools=[]        
+        resources = []
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
+def test_mcp_server_invalid_if_no_entity_guard_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["mcp_server", "network", "prompt_guard"]
 
         [mcp_server]
         tools=[]        
@@ -55,7 +68,7 @@ def test_mcp_server_invalid_if_no_prompt_guard_capability() -> None:
 def test_mcp_server_invalid_if_no_mcp_server_capability() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "prompt_guard"]
+        capabilities = ["network", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         tools=[]        
@@ -68,7 +81,7 @@ def test_mcp_server_invalid_if_no_mcp_server_capability() -> None:
 def test_mcp_server_with_unknown_key() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         unknown = []
@@ -80,7 +93,7 @@ def test_mcp_server_with_unknown_key() -> None:
 def test_mcp_server_missing_tools() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         resources = []
@@ -94,7 +107,7 @@ def test_mcp_server_missing_tools() -> None:
 def test_mcp_server_empty_tools() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         tools = []
@@ -108,7 +121,7 @@ def test_mcp_server_empty_tools() -> None:
 def test_mcp_server_populated_tools() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         tools = [
@@ -126,7 +139,7 @@ def test_mcp_server_populated_tools() -> None:
 def test_mcp_server_invalid_types_in_tools() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         tools = [
@@ -140,7 +153,7 @@ def test_mcp_server_invalid_types_in_tools() -> None:
 def test_mcp_server_empty_value_in_tools() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         tools = [
@@ -154,7 +167,7 @@ def test_mcp_server_empty_value_in_tools() -> None:
 def test_mcp_server_missing_resources() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         tools = []
@@ -168,7 +181,7 @@ def test_mcp_server_missing_resources() -> None:
 def test_mcp_server_empty_resources() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         resources = []
@@ -182,7 +195,7 @@ def test_mcp_server_empty_resources() -> None:
 def test_mcp_server_populated_resources() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         resources = [
@@ -199,7 +212,7 @@ def test_mcp_server_populated_resources() -> None:
 def test_mcp_server_invalid_types_in_resources() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         resources = [
@@ -213,7 +226,7 @@ def test_mcp_server_invalid_types_in_resources() -> None:
 def test_mcp_server_empty_value_in_resources() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         resources = [
@@ -227,7 +240,7 @@ def test_mcp_server_empty_value_in_resources() -> None:
 def test_mcp_server_whitespace_value_in_resources() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         resources = [
@@ -242,7 +255,7 @@ def test_mcp_server_missing_environs() -> None:
     """Default omitted MCP environment declarations to an empty collection."""
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         tools = []
@@ -257,7 +270,7 @@ def test_mcp_server_empty_environs() -> None:
     """Accept an explicitly empty MCP environment declaration list."""
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         tools = []
@@ -273,7 +286,7 @@ def test_mcp_server_valid_environs() -> None:
     """Preserve MCP literals and host references separately from workload environs."""
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
         environs = ["WORKLOAD=value"]
 
         [mcp_server]
@@ -314,7 +327,7 @@ def test_mcp_server_environs_with_invalid_item(item: str) -> None:
     """Reject a list containing an invalid item among valid declarations."""
     toml = f"""
         agent_name = "sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [mcp_server]
         tools = []

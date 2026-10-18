@@ -56,6 +56,7 @@ def test_network_capability() -> None:
     assert Capability.CODE_EXECUTION not in specification.capabilities
     assert Capability.LLM_SERVER not in specification.capabilities
     assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.ENTITY_GUARD not in specification.capabilities
     assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
     assert Capability.OPENAI not in specification.capabilities
 
@@ -74,6 +75,7 @@ def test_internet_capability() -> None:
     assert Capability.CODE_EXECUTION not in specification.capabilities
     assert Capability.LLM_SERVER not in specification.capabilities
     assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.ENTITY_GUARD not in specification.capabilities
     assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
     assert Capability.OPENAI not in specification.capabilities
 
@@ -92,6 +94,7 @@ def test_localnet_capability() -> None:
     assert Capability.CODE_EXECUTION not in specification.capabilities
     assert Capability.LLM_SERVER not in specification.capabilities
     assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.ENTITY_GUARD not in specification.capabilities
     assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
     assert Capability.OPENAI not in specification.capabilities
 
@@ -99,7 +102,7 @@ def test_localnet_capability() -> None:
 def test_mcp_server_capability() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard"]
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
     """
     specification = parse_specification(toml)
     assert Capability.NETWORK in specification.capabilities
@@ -110,6 +113,7 @@ def test_mcp_server_capability() -> None:
     assert Capability.CODE_EXECUTION not in specification.capabilities
     assert Capability.LLM_SERVER not in specification.capabilities
     assert Capability.PROMPT_GUARD in specification.capabilities
+    assert Capability.ENTITY_GUARD in specification.capabilities
     assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
     assert Capability.OPENAI not in specification.capabilities
 
@@ -117,7 +121,13 @@ def test_mcp_server_capability() -> None:
 def test_jina_reader_capability() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard", "jina_reader"]
+        capabilities = [
+            "network", 
+            "mcp_server", 
+            "prompt_guard", 
+            "entity_guard", 
+            "jina_reader"
+        ]
     """
     specification = parse_specification(toml)
     assert Capability.NETWORK in specification.capabilities
@@ -128,6 +138,7 @@ def test_jina_reader_capability() -> None:
     assert Capability.CODE_EXECUTION not in specification.capabilities
     assert Capability.LLM_SERVER not in specification.capabilities
     assert Capability.PROMPT_GUARD in specification.capabilities
+    assert Capability.ENTITY_GUARD in specification.capabilities
     assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
     assert Capability.OPENAI not in specification.capabilities
 
@@ -135,7 +146,13 @@ def test_jina_reader_capability() -> None:
 def test_code_execution_capability() -> None:
     toml = """
         agent_name="sample_agent"
-        capabilities = ["network", "mcp_server", "prompt_guard", "code_execution"]
+        capabilities = [
+            "network", 
+            "mcp_server", 
+            "prompt_guard", 
+            "entity_guard", 
+            "code_execution"
+        ]
     """
     specification = parse_specification(toml)
     assert Capability.NETWORK in specification.capabilities
@@ -146,6 +163,7 @@ def test_code_execution_capability() -> None:
     assert Capability.CODE_EXECUTION in specification.capabilities
     assert Capability.LLM_SERVER not in specification.capabilities
     assert Capability.PROMPT_GUARD in specification.capabilities
+    assert Capability.ENTITY_GUARD in specification.capabilities
     assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
     assert Capability.OPENAI not in specification.capabilities
 
@@ -164,6 +182,7 @@ def test_llm_server_capability() -> None:
     assert Capability.CODE_EXECUTION not in specification.capabilities
     assert Capability.LLM_SERVER in specification.capabilities
     assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.ENTITY_GUARD not in specification.capabilities
     assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
     assert Capability.OPENAI not in specification.capabilities
 
@@ -182,6 +201,26 @@ def test_prompt_guard_capability() -> None:
     assert Capability.CODE_EXECUTION not in specification.capabilities
     assert Capability.LLM_SERVER not in specification.capabilities
     assert Capability.PROMPT_GUARD in specification.capabilities
+    assert Capability.ENTITY_GUARD not in specification.capabilities
+    assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
+    assert Capability.OPENAI not in specification.capabilities
+
+
+def test_prompt_entity_capability() -> None:
+    toml = """
+        agent_name="sample_agent"
+        capabilities = ["entity_guard"]
+    """
+    specification = parse_specification(toml)
+    assert Capability.NETWORK not in specification.capabilities
+    assert Capability.INTERNET not in specification.capabilities
+    assert Capability.LOCALNET not in specification.capabilities
+    assert Capability.MCP_SERVER not in specification.capabilities
+    assert Capability.JINA_READER not in specification.capabilities
+    assert Capability.CODE_EXECUTION not in specification.capabilities
+    assert Capability.LLM_SERVER not in specification.capabilities
+    assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.ENTITY_GUARD in specification.capabilities
     assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
     assert Capability.OPENAI not in specification.capabilities
 
@@ -200,6 +239,7 @@ def test_playwright_chromium_capability() -> None:
     assert Capability.CODE_EXECUTION not in specification.capabilities
     assert Capability.LLM_SERVER not in specification.capabilities
     assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.ENTITY_GUARD not in specification.capabilities
     assert Capability.PLAYWRIGHT_CHROMIUM in specification.capabilities
     assert Capability.OPENAI not in specification.capabilities
 
@@ -218,6 +258,7 @@ def test_openai_capability() -> None:
     assert Capability.CODE_EXECUTION not in specification.capabilities
     assert Capability.LLM_SERVER not in specification.capabilities
     assert Capability.PROMPT_GUARD not in specification.capabilities
+    assert Capability.ENTITY_GUARD not in specification.capabilities
     assert Capability.PLAYWRIGHT_CHROMIUM not in specification.capabilities
     assert Capability.OPENAI in specification.capabilities
 

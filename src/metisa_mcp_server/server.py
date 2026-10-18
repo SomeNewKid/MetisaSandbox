@@ -28,6 +28,7 @@ from .resources import (
     test_resource_3,
 )
 from .tools import (
+    anonymize_text,
     classify_text,
     execute_starlark_code,
     get_active_items,
@@ -121,6 +122,7 @@ TOOL_REGISTRY = _create_tool_registry(
         execute_starlark_code,
         classify_text,
         moderate_text,
+        anonymize_text,
     ],
 )
 

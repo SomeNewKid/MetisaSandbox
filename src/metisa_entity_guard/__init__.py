@@ -1,0 +1,1 @@
+"""Metisa Entity Guard package."""

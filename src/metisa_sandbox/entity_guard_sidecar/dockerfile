@@ -1,0 +1,164 @@
+# ---------------------------------------------------------------------------
+
+# This image may end up with installation-only components
+# such as `pip`, compilers, headers, wheels, metadata, and caches
+FROM python:3.12-slim AS builder
+
+# Create the Python virtual environment
+#   /opt is a Linux filesystem convention for optional, 
+#   self-contained software installed outside the 
+#   operating system’s normal package-managed directories.
+RUN python -m venv /opt/metisa-venv
+
+# Install capability-specific packages before removing `pip`.
+COPY --from=temporary_dir \
+     --chmod=0444 \
+     requirements.txt \
+     /tmp/requirements.txt
+
+RUN /opt/metisa-venv/bin/python -m pip install \
+       --disable-pip-version-check \
+       --no-cache-dir \
+       --requirement /tmp/requirements.txt \
+    && /opt/metisa-venv/bin/python -m pip check \
+    && rm -f /tmp/requirements.txt
+
+# Download the English large model for spaCy within the virtual environment.
+RUN /opt/metisa-venv/bin/python -m spacy download en_core_web_lg
+
+# Remove installation distributions from the virtual environment.
+RUN /opt/metisa-venv/bin/python -m pip uninstall \
+       --yes \
+       setuptools \
+       wheel \
+    && /opt/metisa-venv/bin/python -m pip uninstall \
+       --yes \
+       pip
+
+# ---------------------------------------------------------------------------
+
+# This image purposely copies only the needed components,
+# omitting installation-only components in the `builder`.
+FROM python:3.12-slim AS runtime
+
+# Install needed packages:
+# - curl for issuing HTTP health check
+# - haproxy for the HAProxy
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+        --no-install-recommends \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Document port 8000 as the port on which Entity Guard server exposes its endpoints.
+# This does not publish the port to the host.
+EXPOSE 8000
+
+# Copy the Python virtual environment
+COPY --from=builder /opt/metisa-venv /opt/metisa-venv
+
+# Remove installation distributions supplied by base image.
+RUN python -m pip uninstall \
+       --yes \
+       setuptools \
+       wheel \
+    && python -m pip uninstall \
+       --yes \
+       pip
+
+# Remove Debian package-management commands and metadata.
+RUN rm -f \
+       /usr/bin/apt \
+       /usr/bin/apt-get \
+       /usr/bin/dpkg \
+       /usr/bin/dpkg-query \
+    && rm -rf \
+       /var/lib/apt \
+       /var/cache/apt \
+       /var/lib/dpkg \
+       /var/log/apt
+
+# Remove restricted administrative, namespace, persistence,
+# remote-access, and desktop-automation commands.
+RUN set -eu; \
+    for command in \
+        bash \
+        busctl \
+        dbus-send \
+        findmnt \
+        git \
+        gpg \
+        gpg-connect-agent \
+        gpgconf \
+        journalctl \
+        loginctl \
+        mount \
+        nice \
+        nohup \
+        nsenter \
+        perl \
+        renice \
+        scp \
+        sftp \
+        setsid \
+        ssh \
+        ssh-add \
+        su \
+        systemd-run \
+        systemctl \
+        umount \
+        unshare \
+        service \
+        gdbus \
+        qdbus \
+        wmctrl \
+        xdotool \
+    ; do \
+        for directory in \
+            /bin \
+            /sbin \
+            /usr/bin \
+            /usr/sbin \
+            /usr/local/bin \
+            /usr/local/sbin \
+        ; do \
+            rm -f "${directory}/${command}"; \
+        done; \
+    done
+    
+# Remove Python packages 
+RUN --mount=type=bind,source=remove_python_packaging.py,target=/tmp/remove_python_packaging.py,readonly \
+    python /tmp/remove_python_packaging.py
+
+# Copy the metisa-source.pth file into the virtual environment's site-packages directory.
+# Allow for discovery of the Metisa source code within the virtual environment.
+COPY --chmod=0444 metisa-source.pth \
+     /opt/metisa-venv/lib/python3.12/site-packages/metisa-source.pth
+
+# Healthcheck used by Docker, periodically checking Entity Guard's health endpoint.
+# Read health status from host: docker.exe inspect <container_name>
+HEALTHCHECK \
+    --start-period=30s \
+    --start-interval=1s \
+    --interval=30s \
+    --timeout=2s \
+    --retries=3 \
+    CMD curl \
+        --fail \
+        --silent \
+        --max-time 1 \
+        http://127.0.0.1:8000/health \
+        > /dev/null \
+        || exit 1
+
+# Create non-root guardian group and user
+RUN groupadd --gid 10001 guardian \
+    && useradd \
+     --uid 10001 \
+     --gid 10001 \
+     --create-home \
+     --shell /usr/sbin/nologin \
+     guardian
+
+# Set the default Linux identity for processes executed in the image.
+USER guardian
