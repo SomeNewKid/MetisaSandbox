@@ -9,33 +9,46 @@ from metisa_common.specification_models import (
 
 from ..helper import (
     get_mcp_server_tool_result,
+    print_caution,
+    print_disabled,
     print_elapsed_time,
     print_failure,
-    print_skipped,
     print_success,
     print_suite_title,
 )
+
+_SKIP_DOCLING_TESTS = False
 
 
 def test_docling(specification: MetisaSpecification):
     """Run Docling tests."""
     print_suite_title("Docling")
 
-    if Capability.DOCLING not in specification.capabilities:
-        print_skipped("Docling capability not declared.")
+    if _SKIP_DOCLING_TESTS:
+        print_caution("Docling capability is being skipped.")
         return
 
-    url = "https://www.example.com"
+    if Capability.DOCLING not in specification.capabilities:
+        print_disabled("Docling capability not declared.")
+        return
+
+    filename = "Docling Technical Report.pdf"
     with print_elapsed_time():
         try:
             markdown = get_mcp_server_tool_result(
-                tool_name="convert_to_markdown",
-                params={"url": url},
+                tool_name="retrieve_from_docling_sample",
+                params={"filename": filename},
             )
-            print("Markdown from ", url)
+            print("Data from ", filename)
             if markdown:
+                if len(markdown) > 200:
+                    markdown = markdown[0:200] + "..."
                 print_success(markdown)
             else:
-                print_failure("[No Markdown returned]")
+                print_failure("[No data returned]")
         except Exception as error:
-            print_failure("URL to Markdown conversion error:", error)
+            print_failure(
+                "Retrieve Docling sample error:",
+                type(error).__name__,
+                str(error),
+            )

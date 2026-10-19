@@ -50,7 +50,7 @@ tools = [
     "classify_text",
     "moderate_text",
     "anonymize_text",
-    "convert_to_markdown",
+    "retrieve_from_docling_sample",
 ]
 resources = [
     "test_resource_2",
@@ -78,4 +78,11 @@ resources = [
 # ]
 
 [docling]
-environs = []
+environs = [
+    "DOCLING_ARTIFACTS_PATH=/models/docling",
+    "HF_HUB_OFFLINE=1",
+    "OPENBLAS_NUM_THREADS=1",
+    "OMP_NUM_THREADS=1",
+    "MKL_NUM_THREADS=1",
+    "DOCLING_NUM_THREADS=1",
+]

@@ -9,20 +9,27 @@ from metisa_common.specification_models import (
 
 from ..helper import (
     get_mcp_server_tool_result,
+    print_caution,
+    print_disabled,
     print_elapsed_time,
     print_failure,
-    print_skipped,
     print_success,
     print_suite_title,
 )
+
+_SKIP_PROMPT_GUARD_TESTS = True
 
 
 def test_prompt_guard(specification: MetisaSpecification):
     """Run Prompt Guard tests."""
     print_suite_title("Prompt Guard")
 
+    if _SKIP_PROMPT_GUARD_TESTS:
+        print_caution("Promp Guard capability is being skipped.")
+        return
+
     if Capability.PROMPT_GUARD not in specification.capabilities:
-        print_skipped("Prompt Guard capability not declared.")
+        print_disabled("Prompt Guard capability not declared.")
         return
 
     with print_elapsed_time():

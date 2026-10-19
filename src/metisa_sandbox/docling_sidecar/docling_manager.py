@@ -8,6 +8,7 @@ from pathlib import Path
 
 from metisa_common.specification_helper import (
     generate_image_tag,
+    get_resolved_environs_for_docling,
 )
 from metisa_common.specification_models import (
     MetisaSpecification,
@@ -42,6 +43,7 @@ _DOCLING_IMAGE_NAME = "metisa-docling"
 _DOCLING_NETWORK_ALIAS = "metisa-docling"
 _GUEST_SOURCE_DIR = "/sandbox-source"
 _GUEST_PYTHON_VENV = "/opt/metisa-venv"
+_USE_SQUID_PROXY = False  # Disallow Docling accessing the internet
 
 
 def create_docling_definition() -> SandboxContainer:
@@ -104,17 +106,23 @@ def create_docling_container(
         ]
     )
 
-    # Configure use of Squid Proxy
-    squid_proxy_url = container_creation_context.squid_proxy_url
-    configure_http_proxy(environs, squid_proxy_url)
+    # Configure use of Squid Proxy, potentially
+    if _USE_SQUID_PROXY:
+        squid_proxy_url = container_creation_context.squid_proxy_url
+        configure_http_proxy(environs, squid_proxy_url)
+
+    # Get environment variables
+    specified_environs = get_resolved_environs_for_docling(specification)
+    environs.extend(specified_environs)
 
     # Harden the container
     harden_docker_container(
         arguments=arguments,
         environs=environs,
         username="librarian",
+        number_container_processes=128,
         cpu_count=2,
-        memory="1g",
+        memory="2g",
     )
 
     # The image name must be specified last in the arguments list.

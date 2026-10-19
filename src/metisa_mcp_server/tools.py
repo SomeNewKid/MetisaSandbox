@@ -232,15 +232,15 @@ def anonymize_text(
         raise RuntimeError(f"Entity Guard returned an error: {error}") from error
 
 
-def convert_to_markdown(
-    url: Annotated[str, Field(description="The URL to convert to Markdown")],
+def retrieve_from_docling_sample(
+    filename: Annotated[str, Field(description="The filename of the sample.")],
 ) -> str | None:
-    """Return the provided text with entities anonymized."""
-    docling_endpoint = "http://metisa-docling:8000/convert-to-markdown"
+    """Return the data from the specified example filename."""
+    docling_endpoint = "http://metisa-docling:8000/retrieve-from-sample"
     headers = {
         "Accept": "application/json",
     }
-    payload = {"url": url}
+    payload = {"filename": filename}
 
     content: str | None = None
 

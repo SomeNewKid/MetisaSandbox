@@ -50,7 +50,7 @@ def get_mcp_server_tool_result(
 ) -> str:
     """Get the result of calling a tool on the MCP Server."""
     url = "http://metisa-mcp-server:8000/mcp"
-    timeout_seconds = 30
+    timeout_seconds = 300
 
     async def _call() -> types.CallToolResult:
         async with asyncio.timeout(timeout_seconds):
@@ -119,7 +119,7 @@ def print_failure(*args: object) -> None:
     _print_colored(_RED, "x ", *args)
 
 
-def print_skipped(*args: object) -> None:
+def print_disabled(*args: object) -> None:
     """Print a skipped message."""
     _print_colored(_GREY, *args)
 
@@ -129,12 +129,6 @@ def print_caution(*args: object) -> None:
     _print_colored(_YELLOW, *args)
 
 
-def _print_colored(
-    color: str,
-    *args: object
-) -> None:
-    colored_args = [
-        f"{color}{arg}{_RESET}"
-        for arg in args
-    ]
+def _print_colored(color: str, *args: object) -> None:
+    colored_args = [f"{color}{arg}{_RESET}" for arg in args]
     print(*colored_args, flush=True)

@@ -3,7 +3,7 @@
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .converter import convert_to_markdown
+from .converter import extract_from_sample_file
 
 _MAX_REQUEST_BYTES = 1024 * 1024  # 1 MiB
 _CODE_200_OK = 200
@@ -29,7 +29,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:
-        if self.path != "/convert-to-markdown":
+        if self.path != "/retrieve-from-sample":
             self.send_error(_CODE_404_NOT_FOUND)
             return
 
@@ -76,18 +76,18 @@ class _RequestHandler(BaseHTTPRequestHandler):
             self.send_error(_CODE_400_BAD_REQUEST, "Expected a JSON object")
             return
 
-        url = payload.get("url")
-        if not isinstance(url, str):
-            self.send_error(_CODE_400_BAD_REQUEST, "'url' must be a string")
+        filename = payload.get("filename")
+        if not isinstance(filename, str):
+            self.send_error(_CODE_400_BAD_REQUEST, "'filename' must be a string")
             return
 
         try:
-            markdown = convert_to_markdown(url)
+            data = extract_from_sample_file(filename)
         except Exception:
             self.send_error(_CODE_500_INTERNAL_SERVER_ERROR, "Conversion failed")
             return
 
-        result = {"markdown": markdown}
+        result = {"data": data}
         response_text = json.dumps(result)
 
         body = response_text.encode("utf-8")

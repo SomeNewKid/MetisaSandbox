@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from metisa_common.terminal_helper import (
@@ -12,6 +13,7 @@ from .docker.docker_container import (
     copy_container_files_to_host_folder,
     get_docker_container_inspection,
     get_docker_container_logs,
+    get_docker_container_state,
     remove_docker_container,
     stop_docker_container,
 )
@@ -117,7 +119,29 @@ def _save_container_inspection(
 ) -> None:
     inspection = get_docker_container_inspection(container_name)
     target_dir = sandbox_context.host_logs_path / target_dir_name
+    original = inspection
+    try:
+        inspection_json = json.loads(inspection)
+        inspection = json.dumps(inspection_json, indent=2)
+    except json.JSONDecodeError:
+        inspection = original
     _save_container_log_file(target_dir / "inspect.json", inspection)
+
+
+def _save_container_state(
+    sandbox_context: SandboxContext,
+    container_name: str,
+    target_dir_name: str,
+) -> None:
+    state = get_docker_container_state(container_name)
+    target_dir = sandbox_context.host_logs_path / target_dir_name
+    original = state
+    try:
+        state_json = json.loads(state)
+        state = json.dumps(state_json, indent=2)
+    except json.JSONDecodeError:
+        state = original
+    _save_container_log_file(target_dir / "state.json", state)
 
 
 def _finalize_and_stop_and_remove_container(
@@ -127,6 +151,12 @@ def _finalize_and_stop_and_remove_container(
     container_title: str,
     log_folder: str,
 ) -> None:
+    _save_container_state(
+        sandbox_context,
+        container_instance_name,
+        log_folder,
+    )
+
     if _LOG_INSPECTION_FILES and _ACKNOWLEDGE_INSPECTION_FILES_HAVE_SENSITIVE_DATA:
         try:
             _save_container_inspection(

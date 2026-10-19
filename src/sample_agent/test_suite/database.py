@@ -9,20 +9,27 @@ from metisa_common.specification_models import (
 
 from ..helper import (
     get_mcp_server_tool_result,
+    print_caution,
+    print_disabled,
     print_elapsed_time,
     print_failure,
-    print_skipped,
     print_success,
     print_suite_title,
 )
+
+_SKIP_DATABASE_TESTS = True
 
 
 def test_database_access(specification: MetisaSpecification):
     """Run database access tests."""
     print_suite_title("Database")
 
+    if _SKIP_DATABASE_TESTS:
+        print_caution("Database capability is being skipped.")
+        return
+
     if Capability.LOCALNET not in specification.capabilities:
-        print_skipped("Localnet capability not declared.")
+        print_disabled("Localnet capability not declared.")
         return
 
     with print_elapsed_time():

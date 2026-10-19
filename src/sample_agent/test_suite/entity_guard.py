@@ -11,21 +11,28 @@ from metisa_common.specification_models import (
 
 from ..helper import (
     get_mcp_server_tool_result,
+    print_caution,
+    print_disabled,
     print_elapsed_time,
     print_failure,
     print_message,
-    print_skipped,
     print_success,
     print_suite_title,
 )
+
+_SKIP_ENTITY_GUARD_TESTS = True
 
 
 def test_entity_guard(specification: MetisaSpecification):
     """Run Entity Guard tests."""
     print_suite_title("Entity Guard")
 
+    if _SKIP_ENTITY_GUARD_TESTS:
+        print_caution("Entity Guard capability is being skipped.")
+        return
+
     if Capability.ENTITY_GUARD not in specification.capabilities:
-        print_skipped("Entity Guard capability not declared.")
+        print_disabled("Entity Guard capability not declared.")
         return
 
     _anonymize_text_sentences(

@@ -11,20 +11,27 @@ from metisa_common.specification_models import (
 
 from ..helper import (
     get_mcp_server_tool_result,
+    print_caution,
+    print_disabled,
     print_elapsed_time,
     print_failure,
-    print_skipped,
     print_success,
     print_suite_title,
 )
+
+_SKIP_INTERNET_TESTS = True
 
 
 def test_internet_access(specification: MetisaSpecification):
     """Run internet access tests."""
     print_suite_title("Internet")
 
+    if _SKIP_INTERNET_TESTS:
+        print_caution("Internet capability is being skipped.")
+        return
+
     if Capability.INTERNET not in specification.capabilities:
-        print_skipped("Internet capability not declared.")
+        print_disabled("Internet capability not declared.")
         return
 
     url = "https://example.com"

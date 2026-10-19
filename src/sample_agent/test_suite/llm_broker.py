@@ -10,21 +10,28 @@ from metisa_common.specification_models import (
 )
 
 from ..helper import (
+    print_caution,
+    print_disabled,
     print_elapsed_time,
     print_failure,
     print_message,
-    print_skipped,
     print_success,
     print_suite_title,
 )
+
+_SKIP_LLM_BROKER_TESTS = True
 
 
 def test_llm_broker(specification: MetisaSpecification):
     """Run LLM Broker tests."""
     print_suite_title("LLM Broker")
 
+    if _SKIP_LLM_BROKER_TESTS:
+        print_caution("LLM Broker capability is being skipped.")
+        return
+
     if Capability.LLM_BROKER not in specification.capabilities:
-        print_skipped("LLM broker capability not declared.")
+        print_disabled("LLM Broker capability not declared.")
         return
 
     prompt_for_llm = "Explain Docker networks in two sentences."

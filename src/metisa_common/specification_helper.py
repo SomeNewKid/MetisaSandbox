@@ -241,6 +241,17 @@ def get_resolved_environs_for_code_execution(
     return _get_resolved_environs(specification.code_execution.environs)
 
 
+def get_resolved_environs_for_docling(
+    specification: MetisaSpecification,
+) -> list[str]:
+    """Resolve environment variables specified for the Docling container."""
+    if not specification.docling:
+        return []
+    if not specification.docling.environs:
+        return []
+    return _get_resolved_environs(specification.docling.environs)
+
+
 def _get_resolved_environs(
     environs: frozenset[str],
 ) -> list[str]:

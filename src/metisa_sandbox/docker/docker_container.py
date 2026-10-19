@@ -209,6 +209,28 @@ def get_docker_container_inspection(
     return result.stdout
 
 
+def get_docker_container_state(
+    container_name: str,
+) -> str:
+    """Get the state data for the named Docker container."""
+    docker_command_location = get_docker_command_location()
+
+    command = [
+        docker_command_location,
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        container_name,
+    ]
+
+    result = _run_command(
+        command,
+        f"Could not get container state '{container_name}'",
+    )
+
+    return result.stdout
+
+
 def execute_docker_command(
     arguments: Sequence[str],
 ) -> tuple[int, str]:

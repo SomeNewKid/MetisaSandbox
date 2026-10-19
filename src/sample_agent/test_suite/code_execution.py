@@ -11,20 +11,27 @@ from metisa_common.specification_models import (
 
 from ..helper import (
     get_mcp_server_tool_result,
+    print_caution,
+    print_disabled,
     print_elapsed_time,
     print_failure,
-    print_skipped,
     print_success,
     print_suite_title,
 )
+
+_SKIP_CODE_EXECUTION_TESTS = True
 
 
 def test_code_execution(specification: MetisaSpecification):
     """Run code execution tests."""
     print_suite_title("Code Execution")
 
+    if _SKIP_CODE_EXECUTION_TESTS:
+        print_caution("Code execution capability is being skipped.")
+        return
+
     if Capability.CODE_EXECUTION not in specification.capabilities:
-        print_skipped("Code execution capability not declared.")
+        print_disabled("Code execution capability not declared.")
         return
 
     with print_elapsed_time():

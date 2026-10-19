@@ -23,6 +23,14 @@ RUN /opt/metisa-venv/bin/python -m pip install \
     && /opt/metisa-venv/bin/python -m pip check \
     && rm -f /tmp/requirements.txt
 
+# Install the models needed by Docling
+RUN /opt/metisa-venv/bin/docling-tools \
+    models \
+    download \
+    layout \
+    tableformer \
+    --output-dir /models/docling
+
 # Remove installation distributions from the virtual environment.
 RUN /opt/metisa-venv/bin/python -m pip uninstall \
        --yes \
@@ -53,6 +61,9 @@ EXPOSE 8000
 
 # Copy the Python virtual environment
 COPY --from=builder /opt/metisa-venv /opt/metisa-venv
+
+# Copy the Docling models
+COPY --from=builder /models/docling /models/docling
 
 # Remove installation distributions supplied by base image.
 RUN python -m pip uninstall \

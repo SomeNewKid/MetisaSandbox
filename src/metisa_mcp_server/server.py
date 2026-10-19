@@ -30,12 +30,12 @@ from .resources import (
 from .tools import (
     anonymize_text,
     classify_text,
-    convert_to_markdown,
     execute_starlark_code,
     get_active_items,
     get_title_from_url,
     moderate_text,
     read_content_from_url,
+    retrieve_from_docling_sample,
     test_tool_1,
     test_tool_2,
     test_tool_3,
@@ -124,7 +124,7 @@ TOOL_REGISTRY = _create_tool_registry(
         classify_text,
         moderate_text,
         anonymize_text,
-        convert_to_markdown,
+        retrieve_from_docling_sample,
     ],
 )
 

@@ -9,20 +9,27 @@ from metisa_common.specification_models import (
 
 from ..helper import (
     get_mcp_server_tool_result,
+    print_caution,
+    print_disabled,
     print_elapsed_time,
     print_failure,
-    print_skipped,
     print_success,
     print_suite_title,
 )
+
+_SKIP_JINA_READER_TESTS = False
 
 
 def test_jina_reader(specification: MetisaSpecification):
     """Run Jina Reader tests."""
     print_suite_title("Jina Reader")
 
+    if _SKIP_JINA_READER_TESTS:
+        print_caution("Jina Reader capability is being skipped.")
+        return
+
     if Capability.JINA_READER not in specification.capabilities:
-        print_skipped("Jina Reader capability not declared.")
+        print_disabled("Jina Reader capability not declared.")
         return
 
     with print_elapsed_time():
