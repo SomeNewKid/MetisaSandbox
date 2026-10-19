@@ -1,0 +1,24 @@
+FROM nginxinc/nginx-unprivileged:stable-alpine-slim
+
+COPY --chmod=0444 nginx.conf /etc/nginx/nginx.conf
+
+HEALTHCHECK \
+    --start-period=10s \
+    --start-interval=1s \
+    --interval=30s \
+    --timeout=2s \
+    --retries=3 \
+    CMD wget \
+        --quiet \
+        --proxy off \
+        --timeout=1 \
+        --output-document=/dev/null \
+        http://127.0.0.1:8080/health \
+        || exit 1
+
+ENTRYPOINT ["nginx"]
+CMD ["-g", "daemon off;"]
+
+# Run the service and its health checks without root privileges.
+# LIBRARIAN user
+USER 10007:10007 

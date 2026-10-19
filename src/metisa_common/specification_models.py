@@ -12,6 +12,7 @@ class Capability(StrEnum):
 
     CODE_EXECUTION = "code_execution"
     DOCLING = "docling"
+    DOCUMENTS = "documents"
     INTERACTIVE = "interactive"  # Legacy, but helpful with unit testing
     INTERNET = "internet"
     JINA_READER = "jina_reader"
@@ -47,6 +48,7 @@ class MetisaSpecification:
     jina_reader: JinaReaderSpecification | None
     code_execution: CodeExecutionSpecification | None
     docling: DoclingSpecification | None
+    documents: DocumentsSpecification | None
 
 
 @dataclass(frozen=True)
@@ -88,6 +90,14 @@ class LlmModel:
     repo: str
     revision: str
     filename: str
+
+
+@dataclass(frozen=True)
+class DocumentsSpecification:
+    """Represents the Documents section of the Metisa specification."""
+
+    environs: frozenset[str]
+    local_directory: str
 
 
 @dataclass(frozen=True)

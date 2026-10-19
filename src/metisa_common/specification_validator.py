@@ -8,6 +8,7 @@ from .specification_models import (
     Capability,
     CodeExecutionSpecification,
     DoclingSpecification,
+    DocumentsSpecification,
     HaproxySpecification,
     JinaReaderSpecification,
     LlmBrokerSpecification,
@@ -63,6 +64,11 @@ def validate_specification(
     _validate_docling_specification(
         specification.capabilities,
         specification.docling,
+    )
+
+    _validate_documents_specification(
+        specification.capabilities,
+        specification.documents,
     )
 
 
@@ -220,11 +226,6 @@ def _validate_squid_proxy_specification(
     if squid_proxy_specification is None:
         return
 
-    if Capability.INTERNET not in capabilities:
-        raise SpecificationValidationError(
-            '"[squid_proxy]" table requires "internet" capability.'
-        )
-
     for value in squid_proxy_specification.allowed_domains:
         if not is_valid_domain_name(value, suffix_domain_ok=True):
             raise SpecificationValidationError(
@@ -244,11 +245,6 @@ def _validate_haproxy_specification(
 ):
     if haproxy_specification is None:
         return
-
-    if Capability.LOCALNET not in capabilities:
-        raise SpecificationValidationError(
-            '"[haproxy]" table requires "localnet" capability.'
-        )
 
     listen_ports: list[int] = []
     conflicted_ports: list[int] = []
@@ -273,11 +269,7 @@ def _validate_mcp_server_specification(
 ):
     if mcp_server_specification is None:
         return
-
-    if Capability.MCP_SERVER not in capabilities:
-        raise SpecificationValidationError(
-            '"[mcp_server]" table requires "mcp_server" capability.'
-        )
+    return
 
 
 def _validate_llm_broker_specification(
@@ -286,11 +278,7 @@ def _validate_llm_broker_specification(
 ):
     if llm_broker_specification is None:
         return
-
-    if Capability.LLM_BROKER not in capabilities:
-        raise SpecificationValidationError(
-            '"[llm_broker]" table requires "llm_broker" capability.'
-        )
+    return
 
 
 def _validate_llm_server_specification(
@@ -307,11 +295,7 @@ def _validate_jina_reader_specification(
 ):
     if jina_reader_specification is None:
         return
-
-    if Capability.JINA_READER not in capabilities:
-        raise SpecificationValidationError(
-            '"[jina_reader]" table requires "jina_reader" capability.'
-        )
+    return
 
 
 def _validate_code_execution_specification(
@@ -320,11 +304,7 @@ def _validate_code_execution_specification(
 ):
     if code_execution_specification is None:
         return
-
-    if Capability.CODE_EXECUTION not in capabilities:
-        raise SpecificationValidationError(
-            '"[code_execution]" table requires "code_execution" capability.'
-        )
+    return
 
 
 def _validate_docling_specification(
@@ -333,11 +313,16 @@ def _validate_docling_specification(
 ):
     if docling_specification is None:
         return
+    return
 
-    if Capability.DOCLING not in capabilities:
-        raise SpecificationValidationError(
-            '"[docling]" table requires "docling" capability.'
-        )
+
+def _validate_documents_specification(
+    capabilities: frozenset[Capability],
+    documents_specification: DocumentsSpecification | None,
+):
+    if documents_specification is None:
+        return
+    return
 
 
 def _is_valid_domain_name_part(

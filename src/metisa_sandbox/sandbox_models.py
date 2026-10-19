@@ -37,33 +37,39 @@ class SandboxRequirements:
 
     @property
     def is_mcp_server_required(self) -> bool:
-        """Returns a flag indicating if an MCP Server is required."""
+        """Returns a flag indicating if the MCP Server is required."""
         return Capability.MCP_SERVER in self._specification.capabilities
 
     @property
     def is_jina_reader_required(self) -> bool:
-        """Returns a flag indicating if Jina Reader sidecar is required."""
+        """Returns a flag indicating if the Jina Reader sidecar is required."""
         return Capability.JINA_READER in self._specification.capabilities
 
     @property
     def is_code_execution_required(self) -> bool:
-        """Returns a flag indicating if a Code Execution sidecar is required."""
+        """Returns a flag indicating if the Code Execution sidecar is required."""
         return Capability.CODE_EXECUTION in self._specification.capabilities
 
     @property
     def is_llm_broker_required(self) -> bool:
-        """Returns a flag indicating if an LLM Broker is required."""
+        """Returns a flag indicating if the LLM Broker is required."""
         return Capability.LLM_BROKER in self._specification.capabilities
 
     @property
     def is_llm_server_required(self) -> bool:
-        """Returns a flag indicating if LLM Server sidecars are required."""
+        """Returns a flag indicating if the LLM Server sidecars are required."""
         return Capability.LLM_SERVER in self._specification.capabilities
 
     @property
     def is_docling_required(self) -> bool:
-        """Returns a flag indicating if Docling sidecar is required."""
+        """Returns a flag indicating if the Docling sidecar is required."""
         return Capability.DOCLING in self._specification.capabilities
+
+    @property
+    def is_documents_required(self) -> bool:
+        """Returns a flag indicating if the Documents sidecar is required."""
+        return Capability.DOCUMENTS in self._specification.capabilities
+
 
     @property
     def is_internet_access_required(self) -> bool:

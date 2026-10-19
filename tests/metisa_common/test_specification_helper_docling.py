@@ -64,7 +64,7 @@ def test_docling_invalid_if_no_mcp_server_capability() -> None:
         _ = parse_specification(toml)
 
 
-def test_docling_invalid_if_no_docling_capability() -> None:
+def test_docling_valid_if_no_docling_capability() -> None:
     toml = """
         agent_name = "sample_agent"
         capabilities = ["network", "prompt_guard", "entity_guard"]
@@ -72,8 +72,8 @@ def test_docling_invalid_if_no_docling_capability() -> None:
         [docling]
         environs = []
     """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
+    specification = parse_specification(toml)
+    assert specification.docling is not None
 
 
 @pytest.mark.parametrize("key", ["unknown", "tools", "resources"])

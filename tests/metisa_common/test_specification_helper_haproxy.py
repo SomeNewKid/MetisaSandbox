@@ -60,7 +60,7 @@ def test_haproxy_invalid_if_localnet_capability_but_no_network_capability() -> N
         _ = parse_specification(toml)
 
 
-def test_haproxy_invalid_if_no_localnet_capability() -> None:
+def test_haproxy_valid_if_no_localnet_capability() -> None:
     """Require localnet capability when the HAProxy table is configured."""
     toml = """
         agent_name = "sample_agent"
@@ -69,8 +69,8 @@ def test_haproxy_invalid_if_no_localnet_capability() -> None:
         [haproxy]
         backends = []
     """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
+    specification = parse_specification(toml)
+    assert specification.haproxy is not None
 
 
 def test_haproxy_empty_backends() -> None:

@@ -64,7 +64,7 @@ def test_jina_reader_invalid_if_no_mcp_server_capability() -> None:
         _ = parse_specification(toml)
 
 
-def test_jina_reader_invalid_if_no_jina_reader_capability() -> None:
+def test_jina_reader_valid_if_no_jina_reader_capability() -> None:
     toml = """
         agent_name = "sample_agent"
         capabilities = ["network", "prompt_guard", "entity_guard"]
@@ -72,8 +72,8 @@ def test_jina_reader_invalid_if_no_jina_reader_capability() -> None:
         [jina_reader]
         environs = []
     """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
+    specification = parse_specification(toml)
+    assert specification.jina_reader is not None
 
 
 @pytest.mark.parametrize("key", ["unknown", "tools", "resources"])

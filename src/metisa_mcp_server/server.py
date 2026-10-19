@@ -36,6 +36,7 @@ from .tools import (
     moderate_text,
     read_content_from_url,
     retrieve_from_docling_sample,
+    retrieve_from_documents,
     test_tool_1,
     test_tool_2,
     test_tool_3,
@@ -125,6 +126,7 @@ TOOL_REGISTRY = _create_tool_registry(
         moderate_text,
         anonymize_text,
         retrieve_from_docling_sample,
+        retrieve_from_documents,
     ],
 )
 
@@ -155,7 +157,6 @@ async def _call_tool(
     params: types.CallToolRequestParams,
 ) -> types.CallToolResult:
     tool_name = params.name
-
     requsted_tool = None
     for tool in TOOL_REGISTRY:
         if tool.definition.name == tool_name:

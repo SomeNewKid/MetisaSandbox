@@ -50,7 +50,7 @@ def test_llm_broker_invalid_if_no_prompt_guard_capability() -> None:
         _ = parse_specification(toml)
 
 
-def test_llm_broker_invalid_if_no_llm_broker_capability() -> None:
+def test_llm_broker_valid_if_no_llm_broker_capability() -> None:
     toml = """
         agent_name = "sample_agent"
         capabilities = ["network", "prompt_guard", "entity_guard"]
@@ -58,8 +58,8 @@ def test_llm_broker_invalid_if_no_llm_broker_capability() -> None:
         [llm_broker]
         environs = []
     """
-    with pytest.raises(SpecificationValidationError, match="requires.*llm_broker"):
-        _ = parse_specification(toml)
+    specification = parse_specification(toml)
+    assert specification.llm_broker is not None
 
 
 @pytest.mark.parametrize("key", ["unknown", "tools", "resources"])

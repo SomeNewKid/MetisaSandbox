@@ -64,16 +64,16 @@ def test_code_execution_invalid_if_no_mcp_server_capability() -> None:
         _ = parse_specification(toml)
 
 
-def test_code_execution_invalid_if_no_code_execution_capability() -> None:
+def test_code_execution_valid_if_no_code_execution_capability() -> None:
     toml = """
         agent_name = "sample_agent"
         capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
 
         [code_execution]
         environs = []
-    """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
+    """    
+    specification = parse_specification(toml)
+    assert specification.code_execution is not None
 
 
 @pytest.mark.parametrize("key", ["unknown", "tools", "resources"])

@@ -24,6 +24,10 @@ from .docling_sidecar.docling_manager import (
     create_docling_container,
     create_docling_definition,
 )
+from .documents_sidecar.documents_manager import (
+    create_documents_container,
+    create_documents_definition,
+)
 from .entity_guard_sidecar.entity_guard_manager import (
     create_entity_guard_container,
     create_entity_guard_definition,
@@ -116,6 +120,7 @@ def run_metisa_container_workload_in_sandbox(
     prompt_guard_container = create_prompt_guard_definition()
     entity_guard_container = create_entity_guard_definition()
     docling_container = create_docling_definition()
+    documents_container = create_documents_definition()
 
     all_containers = [
         metisa_workload_container,
@@ -128,6 +133,7 @@ def run_metisa_container_workload_in_sandbox(
         prompt_guard_container,
         entity_guard_container,
         docling_container,
+        documents_container,
     ]
 
     try:
@@ -195,6 +201,14 @@ def run_metisa_container_workload_in_sandbox(
                 sandbox_context,
                 squid_proxy_container,
                 docling_container,
+            )
+
+        if sandbox_requirements.is_documents_required:
+            _create_documents_container(
+                specification,
+                sandbox_context,
+                squid_proxy_container,
+                documents_container,
             )
 
         if (
@@ -479,6 +493,29 @@ def _create_docling_container(
             specification, sandbox_context, docling_creation_context
         )
         docling_container.set_created(docling_creation)
+
+
+def _create_documents_container(
+    specification: MetisaSpecification,
+    sandbox_context: SandboxContext,
+    squid_proxy_container: SandboxContainer,
+    documents_container: SandboxContainer,
+) -> None:
+    with terminal_status(
+        running="Creating Documents container...",
+        success="Created Documents container.",
+        failure="Could not create Documents container.",
+    ):
+        documents_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.backend_network_name,
+            ],
+        )
+        documents_creation = create_documents_container(
+            specification, sandbox_context, documents_creation_context
+        )
+        documents_container.set_created(documents_creation)
 
 
 def _create_llm_server_containers(

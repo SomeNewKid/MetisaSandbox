@@ -65,7 +65,7 @@ def test_mcp_server_invalid_if_no_entity_guard_capability() -> None:
         _ = parse_specification(toml)
 
 
-def test_mcp_server_invalid_if_no_mcp_server_capability() -> None:
+def test_mcp_server_valid_if_no_mcp_server_capability() -> None:
     toml = """
         agent_name="sample_agent"
         capabilities = ["network", "prompt_guard", "entity_guard"]
@@ -74,8 +74,8 @@ def test_mcp_server_invalid_if_no_mcp_server_capability() -> None:
         tools=[]        
         resources = []
     """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
+    specification = parse_specification(toml)
+    assert specification.mcp_server is not None
 
 
 def test_mcp_server_with_unknown_key() -> None:

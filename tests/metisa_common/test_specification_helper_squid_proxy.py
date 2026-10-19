@@ -52,7 +52,7 @@ def test_squid_proxy_invalid_if_internet_capability_but_no_network_capability() 
         _ = parse_specification(toml)
 
 
-def test_squid_proxy_invalid_if_no_internet_capability() -> None:
+def test_squid_proxy_valid_if_no_internet_capability() -> None:
     toml = """
         agent_name="sample_agent"
         capabilities = [
@@ -63,8 +63,8 @@ def test_squid_proxy_invalid_if_no_internet_capability() -> None:
         allowed_domains = []
         allowed_ip_addresses = []
     """
-    with pytest.raises(SpecificationValidationError):
-        _ = parse_specification(toml)
+    specification = parse_specification(toml)
+    assert specification.squid_proxy is not None
 
 
 def test_squid_proxy_missing_allowed_domains() -> None:

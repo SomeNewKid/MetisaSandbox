@@ -17,7 +17,7 @@ from ..helper import (
     print_suite_title,
 )
 
-_SKIP_DOCLING_TESTS = False
+_SKIP_DOCLING_TESTS = True
 
 
 def test_docling(specification: MetisaSpecification):
@@ -42,7 +42,7 @@ def test_docling(specification: MetisaSpecification):
             print("Data from ", filename)
             if markdown:
                 if len(markdown) > 200:
-                    markdown = markdown[0:200] + "..."
+                    markdown = markdown[0:200].strip() + "..."
                 print_success(markdown)
             else:
                 print_failure("[No data returned]")

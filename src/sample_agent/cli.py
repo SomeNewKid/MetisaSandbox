@@ -14,6 +14,7 @@ from metisa_common.specification_models import (
 from .test_suite.code_execution import test_code_execution
 from .test_suite.database import test_database_access
 from .test_suite.docling import test_docling
+from .test_suite.docments import test_documents
 from .test_suite.entity_guard import test_entity_guard
 from .test_suite.interactivity import test_interactivity
 from .test_suite.internet import test_internet_access
@@ -41,6 +42,7 @@ def main(
     test_docling(specification)
     test_llm_broker(specification)
     test_code_execution(specification)
+    test_documents(specification)
     _print_separator()
 
     return 0

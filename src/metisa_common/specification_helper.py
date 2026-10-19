@@ -14,6 +14,7 @@ from .specification_models import (
     Capability,
     CodeExecutionSpecification,
     DoclingSpecification,
+    DocumentsSpecification,
     HaproxyBackend,
     HaproxySpecification,
     JinaReaderSpecification,
@@ -252,6 +253,17 @@ def get_resolved_environs_for_docling(
     return _get_resolved_environs(specification.docling.environs)
 
 
+def get_resolved_environs_for_documents(
+    specification: MetisaSpecification,
+) -> list[str]:
+    """Resolve environment variables specified for the Documents container."""
+    if not specification.documents:
+        return []
+    if not specification.documents.environs:
+        return []
+    return _get_resolved_environs(specification.documents.environs)
+
+
 def _get_resolved_environs(
     environs: frozenset[str],
 ) -> list[str]:
@@ -364,6 +376,7 @@ def _create_metisa_specification(
             "jina_reader",
             "code_execution",
             "docling",
+            "documents",
         }
     )
 
@@ -383,6 +396,7 @@ def _create_metisa_specification(
     jina_reader = _get_jina_reader_specification(toml)
     code_execution = _get_code_execution_specification(toml)
     docling = _get_docling_specification(toml)
+    documents = _get_documents_specification(toml)
     specification = MetisaSpecification(
         agent_name=agent_name,
         capabilities=capabilities,
@@ -397,6 +411,7 @@ def _create_metisa_specification(
         jina_reader=jina_reader,
         code_execution=code_execution,
         docling=docling,
+        documents=documents,
     )
 
     validate_specification(specification)
@@ -854,6 +869,37 @@ def _get_docling_specification(
     environs = _get_environs(docling, "Docling environs")
 
     return DoclingSpecification(environs=environs)
+
+
+def _get_documents_specification(
+    toml: dict[str, object],
+) -> DocumentsSpecification | None:
+    documents = toml.get("documents")
+    if not documents:
+        return None
+
+    if not isinstance(documents, dict):
+        raise SpecificationValidationError(
+            "TOML specification documents must be a table."
+        )
+
+    DOCUMENTS_KEYS = frozenset(
+        {
+            "environs",
+            "local_directory",
+        }
+    )
+
+    _validate_known_keys(documents, "documents", DOCUMENTS_KEYS)
+
+    environs = _get_environs(documents, "Documents environs")
+    local_directory = documents.get("local_directory")
+    if not isinstance(local_directory, str):
+        raise SpecificationValidationError(
+            "TOML specification documents local_directory must be a string."
+        )
+
+    return DocumentsSpecification(environs=environs, local_directory=local_directory)
 
 
 def _get_code_execution_specification(
