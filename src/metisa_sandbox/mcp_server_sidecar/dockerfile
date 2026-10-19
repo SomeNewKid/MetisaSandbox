@@ -138,14 +138,14 @@ HEALTHCHECK \
         "import http.client, sys; connection = http.client.HTTPConnection('127.0.0.1', 8000, timeout=2); connection.request('GET', '/health'); response = connection.getresponse(); status = response.status; connection.close(); sys.exit(0 if status == 200 else 1)" \
         ]
 
-# Create non-root sandbox group and user
-RUN groupadd --gid 10001 sandbox \
+# Create non-root warden group and user
+RUN groupadd --gid 10004 warden \
     && useradd \
-     --uid 10001 \
-     --gid 10001 \
+     --uid 10004 \
+     --gid 10004 \
      --create-home \
      --shell /usr/sbin/nologin \
-     sandbox
+     warden
 
 # Set the default Linux identity for processes executed in the image.
-USER sandbox
+USER warden

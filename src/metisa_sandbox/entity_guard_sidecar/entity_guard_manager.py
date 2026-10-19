@@ -18,6 +18,9 @@ from ..docker.docker_container import (
     inspect_docker_container,
     start_docker_container,
 )
+from ..docker.docker_hardening import (
+    harden_docker_container,
+)
 from ..docker.docker_image import (
     build_docker_image,
     docker_image_exists,
@@ -100,139 +103,16 @@ def create_entity_guard_container(
         ]
     )
 
-    # Mount the container's root filesystem as strictly read-only
-    # Couple with in memory temporary writes (--tmpfs)
-    # or with read-write mounted volumes (-volume /host/path:/volume:rw).
-    arguments.extend(
-        [
-            "--read-only",
-        ]
+    # Harden the container
+    harden_docker_container(
+        arguments=arguments,
+        environs=environs,
+        username="guardian",
+        cpu_count=2,
+        memory="3g",
+        number_of_files=512,
+        health_start_seconds=360,
     )
-
-    # Linux control groups, or cgroups, organize processes and
-    # enforce resource accounting and limits such as:
-    # - Memory usage
-    # - CPU allocation
-    # - Process counts
-    # - I/O limits
-    # Docker already places each container into one or more cgroups.
-    # A cgroup namespace controls how much of that cgroup hierarchy a process can see.
-    arguments.extend(
-        [
-            "--cgroupns",
-            "private",
-        ]
-    )
-
-    # Allow the container more time to start.
-    # The model is loaded eagerly, which can take some time.
-    arguments.extend(
-        [
-            "--health-start-period",
-            "360s",
-        ]
-    )
-
-    # Executing another program cannot grant the process privileges
-    # it did not already have.  It prevents privilege escalation through:
-    # Set-user-ID,
-    # Set-group-ID,
-    # Executables with Linux file capabilities.
-    arguments.extend(
-        [
-            "--security-opt",
-            "no-new-privileges=true",
-        ]
-    )
-
-    # Drop all Linux capabilities for the container.
-    # https://man7.org/linux/man-pages/man7/capabilities.7.html
-    # Docker already excludes more dangerous capabilities such as
-    # SYS_ADMIN, NET_ADMIN, SYS_PTRACE, and SYS_MODULE by default.
-    arguments.extend(["--cap-drop", "ALL"])
-
-    # Without --init, the command supplied after the image
-    # becomes PID 1 inside the container.
-    # PID 1 has special responsibilities on Linux.
-    # In particular, it inherits orphaned descendant processes and
-    # must collect, or “reap,” processes that have exited.
-    # Ordinary applications are not always designed to perform that role correctly.
-    # With --init, Docker inserts its small docker-init process as PID 1.
-    arguments.extend(
-        [
-            "--init",  # correctly reaps exited and orphaned processes.
-            "--pids-limit",  # Bounds how many processes the container may have at once
-            "64",
-        ]
-    )
-
-    # Set CPU limits for the container.
-    arguments.extend(
-        [
-            "--cpus",
-            "2",
-        ]
-    )
-
-    # Set memory limits for the container.
-    arguments.extend(
-        [
-            "--memory",
-            "3g",
-            "--memory-swap",  # no additional swap beyond the memory limit
-            "3g",
-        ]
-    )
-
-    # Set the open file descriptor limits for the container.
-    # A file descriptor is a small non-negative integer that
-    # a Unix process uses as a handle to an open operating-system resource.
-    # Limiting descriptors protects against accidental or hostile resource exhaustion.
-    arguments.extend(
-        [
-            "--ulimit",
-            "nofile=512:512",
-        ]
-    )
-
-    # Set the per-user process limits for the container.
-    arguments.extend(
-        [
-            "--ulimit",
-            "nproc=64:64",
-        ]
-    )
-
-    # Set the file size limits for the container.
-    arguments.extend(
-        [
-            "--ulimit",
-            "fsize=1048576:1048576",
-        ]
-    )
-
-    # Require privileges when binding ports below 1024.
-    arguments.extend(
-        [
-            "--sysctl",
-            "net.ipv4.ip_unprivileged_port_start=1024",
-        ]
-    )
-
-    # Run as the guardian user
-    uid = 10001  # guardian user
-    gid = 10001  # guardian group
-    arguments.extend(
-        ["--user", f"{uid}:{gid}"],
-    )
-
-    for environ in environs:
-        arguments.extend(
-            [
-                "--env",
-                environ,
-            ]
-        )
 
     # The image name must be specified last in the arguments list.
     arguments.extend(

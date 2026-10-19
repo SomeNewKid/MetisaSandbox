@@ -139,10 +139,10 @@ HEALTHCHECK \
         ]
 
 # Create non-root broker group and user
-RUN groupadd --gid 10001 broker \
+RUN groupadd --gid 10005 broker \
     && useradd \
-     --uid 10001 \
-     --gid 10001 \
+     --uid 10005 \
+     --gid 10005 \
      --create-home \
      --shell /usr/sbin/nologin \
      broker

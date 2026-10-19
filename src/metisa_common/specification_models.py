@@ -11,6 +11,7 @@ class Capability(StrEnum):
     """Represents the declared capabilities of a Metisa workload."""
 
     CODE_EXECUTION = "code_execution"
+    DOCLING = "docling"
     INTERACTIVE = "interactive"  # Legacy, but helpful with unit testing
     INTERNET = "internet"
     JINA_READER = "jina_reader"
@@ -45,6 +46,7 @@ class MetisaSpecification:
     mcp_server: McpServerSpecification | None
     jina_reader: JinaReaderSpecification | None
     code_execution: CodeExecutionSpecification | None
+    docling: DoclingSpecification | None
 
 
 @dataclass(frozen=True)
@@ -109,6 +111,13 @@ class LlmBrokerSpecification:
 @dataclass(frozen=True)
 class JinaReaderSpecification:
     """Represents the Jina Reader section of the Metisa specification."""
+
+    environs: frozenset[str]
+
+
+@dataclass(frozen=True)
+class DoclingSpecification:
+    """Represents the Docling section of the Metisa specification."""
 
     environs: frozenset[str]
 

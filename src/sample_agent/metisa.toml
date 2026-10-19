@@ -10,6 +10,7 @@ capabilities = [
     # "code_execution",
     # "llm_server",
     # "llm_broker",
+    "docling",
 ]
 dependencies = [
     "requests==2.34.2",
@@ -49,6 +50,7 @@ tools = [
     "classify_text",
     "moderate_text",
     "anonymize_text",
+    "convert_to_markdown",
 ]
 resources = [
     "test_resource_2",
@@ -60,7 +62,7 @@ resources = [
 # [llm_server]
 # models = [
 #     { alias="granite-4-1b", repo = "ibm-granite/granite-4.0-1b-GGUF", revision = "b27c2fe3f211b7f44e80fa620177aea371099aaa", filename = "granite-4.0-1b-Q4_K_M.gguf" },
-#     # { alias="qwen-3-small", repo = "bartowski/Qwen_Qwen3-1.7B-GGUF", revision = "dcb19155b962dbb6389f4691a982043a8e651022", filename = "Qwen_Qwen3-1.7B-Q4_K_M.gguf" },
+#     { alias="qwen-3-small", repo = "bartowski/Qwen_Qwen3-1.7B-GGUF", revision = "dcb19155b962dbb6389f4691a982043a8e651022", filename = "Qwen_Qwen3-1.7B-Q4_K_M.gguf" },
 # ]
 
 # [llm_broker]
@@ -69,8 +71,11 @@ resources = [
 # ]
 # local_models = [
 #     "granite-4-1b",
-#     # "qwen-3-small",
+#     "qwen-3-small",
 # ]
 # online_models = [
 #     "gpt-4o",
 # ]
+
+[docling]
+environs = []

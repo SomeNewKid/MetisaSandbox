@@ -20,6 +20,10 @@ from .docker.docker_container import (
 from .docker.docker_network import (
     get_docker_container_ip_address,
 )
+from .docling_sidecar.docling_manager import (
+    create_docling_container,
+    create_docling_definition,
+)
 from .entity_guard_sidecar.entity_guard_manager import (
     create_entity_guard_container,
     create_entity_guard_definition,
@@ -111,6 +115,7 @@ def run_metisa_container_workload_in_sandbox(
     llm_broker_container = create_llm_broker_definition()
     prompt_guard_container = create_prompt_guard_definition()
     entity_guard_container = create_entity_guard_definition()
+    docling_container = create_docling_definition()
 
     all_containers = [
         metisa_workload_container,
@@ -122,6 +127,7 @@ def run_metisa_container_workload_in_sandbox(
         llm_broker_container,
         prompt_guard_container,
         entity_guard_container,
+        docling_container,
     ]
 
     try:
@@ -181,6 +187,14 @@ def run_metisa_container_workload_in_sandbox(
                 sandbox_context,
                 squid_proxy_container,
                 mcp_server_container,
+            )
+
+        if sandbox_requirements.is_docling_required:
+            _create_docling_container(
+                specification,
+                sandbox_context,
+                squid_proxy_container,
+                docling_container,
             )
 
         if (
@@ -442,6 +456,29 @@ def _create_jina_reader_container(
             specification, sandbox_context, jina_reader_creation_context
         )
         jina_reader_container.set_created(jina_reader_creation)
+
+
+def _create_docling_container(
+    specification: MetisaSpecification,
+    sandbox_context: SandboxContext,
+    squid_proxy_container: SandboxContainer,
+    docling_container: SandboxContainer,
+) -> None:
+    with terminal_status(
+        running="Creating Docling container...",
+        success="Created Docling container.",
+        failure="Could not create Docling container.",
+    ):
+        docling_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.backend_network_name,
+            ],
+        )
+        docling_creation = create_docling_container(
+            specification, sandbox_context, docling_creation_context
+        )
+        docling_container.set_created(docling_creation)
 
 
 def _create_llm_server_containers(

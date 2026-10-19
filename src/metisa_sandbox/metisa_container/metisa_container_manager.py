@@ -8,6 +8,10 @@ from metisa_common.specification_helper import get_resolved_environs_for_metisa
 from metisa_common.specification_models import MetisaSpecification
 from metisa_sandbox.docker.docker_container import create_docker_container
 
+from ..docker.docker_hardening import (
+    configure_http_proxy,
+    harden_docker_container,
+)
 from ..sandbox_models import (
     ContainerCreationContext,
     ContainerCreationResult,
@@ -79,6 +83,13 @@ def create_metisa_workload_container(
         sandbox_context.workload_container_name,
     ]
 
+    # Specify a seccomp (secure computing mode) profile for the container.
+    # The seccomp profile defines a set of system calls that the container
+    # is allowed to make (that is, it is a whitelist).
+    # This custom seccomp profile started as a copy of the default Docker
+    # seccomp profile from commit 6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef.
+    seccomp_path = Path(__file__).resolve().with_name("seccomp.json")
+
     # Configure the network settings for the container
     # based on whether a network is required.
     if is_network_required:
@@ -94,26 +105,7 @@ def create_metisa_workload_container(
             container_creation_context.squid_proxy_url if is_network_required else None
         )
         if use_squid_proxy and squid_proxy_url is not None:
-            no_proxy_destinations = ",".join(
-                [
-                    "localhost",
-                    "127.0.0.1",
-                    "::1",
-                    "metisa-workload",
-                    "metisa-squid",
-                    "metisa-mcp-server",
-                ]
-            )
-            environs.extend(
-                [
-                    f"HTTP_PROXY={squid_proxy_url}",
-                    f"HTTPS_PROXY={squid_proxy_url}",
-                    f"NO_PROXY={no_proxy_destinations}",
-                    f"http_proxy={squid_proxy_url}",
-                    f"https_proxy={squid_proxy_url}",
-                    f"no_proxy={no_proxy_destinations}",
-                ]
-            )
+            configure_http_proxy(environs, squid_proxy_url)
     else:
         arguments.extend(
             [
@@ -121,74 +113,6 @@ def create_metisa_workload_container(
                 "none",
             ]
         )
-
-    # Mount the container's root filesystem as strictly read-only
-    # Couple with in memory temporary writes (--tmpfs)
-    # or with read-write mounted volumes (-volume /host/path:/volume:rw).
-    arguments.extend(
-        [
-            "--read-only",
-        ]
-    )
-
-    # Linux control groups, or cgroups, organize processes and
-    # enforce resource accounting and limits such as:
-    # - Memory usage
-    # - CPU allocation
-    # - Process counts
-    # - I/O limits
-    # Docker already places each container into one or more cgroups.
-    # A cgroup namespace controls how much of that cgroup hierarchy a process can see.
-    arguments.extend(
-        [
-            "--cgroupns",
-            "private",
-        ]
-    )
-
-    # Run as the sandbox user
-    uid = 10001  # sandbox user
-    gid = 10001  # sandbox group
-    arguments.extend(
-        ["--user", f"{uid}:{gid}"],
-    )
-
-    # Executing another program cannot grant the process privileges
-    # it did not already have.  It prevents privilege escalation through:
-    # Set-user-ID,
-    # Set-group-ID,
-    # Executables with Linux file capabilities.
-    arguments.extend(
-        [
-            "--security-opt",
-            "no-new-privileges=true",
-        ]
-    )
-
-    # Specify a seccomp (secure computing mode) profile for the container.
-    # The seccomp profile defines a set of system calls that the container
-    # is allowed to make (that is, it is a whitelist).
-    # This custom seccomp profile started as a copy of the default Docker
-    # seccomp profile from commit 6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef.
-    seccomp_path = Path(__file__).resolve().with_name("seccomp.json")
-    if not seccomp_path.is_file():
-        raise ValueError(f"Seccomp profile not found at {seccomp_path}")
-    arguments.extend(["--security-opt", f"seccomp={seccomp_path}"])
-
-    # Allocate a pseudo-terminal.
-    # Allows Python `input` to get user input from the terminal.
-    arguments.extend(
-        [
-            "--interactive",  # keeps stdin open
-            "--tty",  # allocates a pseudo-terminal
-        ]
-    )
-
-    # Drop all Linux capabilities for the container.
-    # https://man7.org/linux/man-pages/man7/capabilities.7.html
-    # Docker already excludes more dangerous capabilities such as
-    # SYS_ADMIN, NET_ADMIN, SYS_PTRACE, and SYS_MODULE by default.
-    arguments.extend(["--cap-drop", "ALL"])
 
     # Mount the necessary volumes.
     arguments.extend(
@@ -226,85 +150,18 @@ def create_metisa_workload_container(
         ]
     )
 
-    # Without --init, the command supplied after the image
-    # becomes PID 1 inside the container.
-    # PID 1 has special responsibilities on Linux.
-    # In particular, it inherits orphaned descendant processes and
-    # must collect, or “reap,” processes that have exited.
-    # Ordinary applications are not always designed to perform that role correctly.
-    # With --init, Docker inserts its small docker-init process as PID 1.
-    arguments.extend(
-        [
-            "--init",  # correctly reaps exited and orphaned processes.
-            "--pids-limit",  # Bounds how many processes the container may have at once
-            "64",
-        ]
-    )
-
-    # Set CPU limits for the container.
-    arguments.extend(
-        [
-            "--cpus",
-            "1",
-        ]
-    )
-
-    # Set memory limits for the container.
-    arguments.extend(
-        [
-            "--memory",
-            "128m",
-            "--memory-swap",  # no additional swap beyond the memory limit
-            "128m",
-        ]
-    )
-
-    # Set the open file descriptor limits for the container.
-    # A file descriptor is a small non-negative integer that
-    # a Unix process uses as a handle to an open operating-system resource.
-    # Limiting descriptors protects against accidental or hostile resource exhaustion.
-    arguments.extend(
-        [
-            "--ulimit",
-            "nofile=256:256",
-        ]
-    )
-
-    # Set the per-user process limits for the container.
-    arguments.extend(
-        [
-            "--ulimit",
-            "nproc=64:64",
-        ]
-    )
-
-    # Set the file size limits for the container.
-    # (Applies to file writes, not to existing files.)
-    arguments.extend(
-        [
-            "--ulimit",
-            "fsize=1048576:1048576",
-        ]
-    )
-
-    # Require privileges when binding ports below 1024.
-    arguments.extend(
-        [
-            "--sysctl",
-            "net.ipv4.ip_unprivileged_port_start=1024",
-        ]
-    )
-
     specified_environs = get_resolved_environs_for_metisa(specification)
     environs.extend(specified_environs)
 
-    for environ in environs:
-        arguments.extend(
-            [
-                "--env",
-                environ,
-            ]
-        )
+    # Harden the container
+    harden_docker_container(
+        arguments=arguments,
+        environs=environs,
+        username="sandbox",
+        interactive=True,
+        seccomp_path=seccomp_path,
+        number_user_processes=64,
+    )
 
     # ---------------- The following switches must be last ----------------
 

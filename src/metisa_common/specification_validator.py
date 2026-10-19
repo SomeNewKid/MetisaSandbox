@@ -7,6 +7,7 @@ import re
 from .specification_models import (
     Capability,
     CodeExecutionSpecification,
+    DoclingSpecification,
     HaproxySpecification,
     JinaReaderSpecification,
     LlmBrokerSpecification,
@@ -57,6 +58,11 @@ def validate_specification(
     _validate_code_execution_specification(
         specification.capabilities,
         specification.code_execution,
+    )
+
+    _validate_docling_specification(
+        specification.capabilities,
+        specification.docling,
     )
 
 
@@ -200,6 +206,12 @@ def _validate_capabilities(
                 '"llm_broker" capability requires "entity_guard" capability.'
             )
 
+    if Capability.DOCLING in capabilities:
+        if Capability.MCP_SERVER not in capabilities:
+            raise SpecificationValidationError(
+                '"docling" capability requires "mcp_server" capability.'
+            )
+
 
 def _validate_squid_proxy_specification(
     capabilities: frozenset[Capability],
@@ -312,6 +324,19 @@ def _validate_code_execution_specification(
     if Capability.CODE_EXECUTION not in capabilities:
         raise SpecificationValidationError(
             '"[code_execution]" table requires "code_execution" capability.'
+        )
+
+
+def _validate_docling_specification(
+    capabilities: frozenset[Capability],
+    docling_specification: DoclingSpecification | None,
+):
+    if docling_specification is None:
+        return
+
+    if Capability.DOCLING not in capabilities:
+        raise SpecificationValidationError(
+            '"[docling]" table requires "docling" capability.'
         )
 
 

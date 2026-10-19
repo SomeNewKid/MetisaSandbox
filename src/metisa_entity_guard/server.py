@@ -84,7 +84,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
         try:
             anonymized = anonymize(text)
         except Exception:
-            self.send_error(_CODE_500_INTERNAL_SERVER_ERROR, "Classification failed")
+            self.send_error(_CODE_500_INTERNAL_SERVER_ERROR, "Anonymization failed")
             return
 
         result = {"anonymized": anonymized}

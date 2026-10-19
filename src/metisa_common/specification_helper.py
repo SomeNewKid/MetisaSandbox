@@ -13,6 +13,7 @@ from pathlib import Path
 from .specification_models import (
     Capability,
     CodeExecutionSpecification,
+    DoclingSpecification,
     HaproxyBackend,
     HaproxySpecification,
     JinaReaderSpecification,
@@ -351,6 +352,7 @@ def _create_metisa_specification(
             "mcp_server",
             "jina_reader",
             "code_execution",
+            "docling",
         }
     )
 
@@ -369,6 +371,7 @@ def _create_metisa_specification(
     mcp_server = _get_mcp_server_specification(toml)
     jina_reader = _get_jina_reader_specification(toml)
     code_execution = _get_code_execution_specification(toml)
+    docling = _get_docling_specification(toml)
     specification = MetisaSpecification(
         agent_name=agent_name,
         capabilities=capabilities,
@@ -382,6 +385,7 @@ def _create_metisa_specification(
         mcp_server=mcp_server,
         jina_reader=jina_reader,
         code_execution=code_execution,
+        docling=docling,
     )
 
     validate_specification(specification)
@@ -814,6 +818,31 @@ def _get_jina_reader_specification(
     environs = _get_environs(jina_reader, "Jina Reader environs")
 
     return JinaReaderSpecification(environs=environs)
+
+
+def _get_docling_specification(
+    toml: dict[str, object],
+) -> DoclingSpecification | None:
+    docling = toml.get("docling")
+    if not docling:
+        return None
+
+    if not isinstance(docling, dict):
+        raise SpecificationValidationError(
+            "TOML specification docling must be a table."
+        )
+
+    DOCLING_KEYS = frozenset(
+        {
+            "environs",
+        }
+    )
+
+    _validate_known_keys(docling, "docling", DOCLING_KEYS)
+
+    environs = _get_environs(docling, "Docling environs")
+
+    return DoclingSpecification(environs=environs)
 
 
 def _get_code_execution_specification(

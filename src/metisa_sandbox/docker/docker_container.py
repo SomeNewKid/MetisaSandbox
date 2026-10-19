@@ -9,12 +9,16 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .docker_engine import get_docker_command_location
+from .docker_hardening import HARDENING_LABEL
 
 
 def create_docker_container(
     arguments: Sequence[str],
 ) -> None:
     """Create a Docker container."""
+    if HARDENING_LABEL not in arguments:
+        raise RuntimeError("Docker creation arguments have not been hardened.")
+
     docker_command_location = get_docker_command_location()
 
     command = [
@@ -132,7 +136,7 @@ def inspect_docker_container(
 
     # Jina Reader can be very slow to start.
     # LLM Servers can be very slow to start.
-    deadline = time.monotonic() + 360
+    deadline = time.monotonic() + 600
     attempt = 1
 
     while time.monotonic() < deadline:

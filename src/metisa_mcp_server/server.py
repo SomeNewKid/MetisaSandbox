@@ -30,6 +30,7 @@ from .resources import (
 from .tools import (
     anonymize_text,
     classify_text,
+    convert_to_markdown,
     execute_starlark_code,
     get_active_items,
     get_title_from_url,
@@ -123,6 +124,7 @@ TOOL_REGISTRY = _create_tool_registry(
         classify_text,
         moderate_text,
         anonymize_text,
+        convert_to_markdown,
     ],
 )
 

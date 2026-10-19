@@ -15,6 +15,9 @@ from ..docker.docker_container import (
     inspect_docker_container,
     start_docker_container,
 )
+from ..docker.docker_hardening import (
+    harden_docker_container,
+)
 from ..docker.docker_image import (
     build_docker_image,
     docker_image_exists,
@@ -67,76 +70,16 @@ def create_code_execution_container(
         _CODE_EXECUTION_ALIAS,
     ]
 
-    # Mount the container's root filesystem as strictly read-only
-    # Couple with in memory temporary writes (--tmpfs)
-    # or with read-write mounted volumes (-volume /host/path:/volume:rw).
-    arguments.extend(
-        [
-            "--read-only",
-        ]
-    )
-
-    # Executing another program cannot grant the process privileges
-    # it did not already have.  It prevents privilege escalation through:
-    # Set-user-ID,
-    # Set-group-ID,
-    # Executables with Linux file capabilities.
-    arguments.extend(
-        [
-            "--security-opt",
-            "no-new-privileges=true",
-        ]
-    )
-
-    # Drop all Linux capabilities for the container.
-    # https://man7.org/linux/man-pages/man7/capabilities.7.html
-    # Docker already excludes more dangerous capabilities such as
-    # SYS_ADMIN, NET_ADMIN, SYS_PTRACE, and SYS_MODULE by default.
-    arguments.extend(["--cap-drop", "ALL"])
-
-    # Without --init, the command supplied after the image
-    # becomes PID 1 inside the container.
-    # PID 1 has special responsibilities on Linux.
-    # In particular, it inherits orphaned descendant processes and
-    # must collect, or “reap,” processes that have exited.
-    # Ordinary applications are not always designed to perform that role correctly.
-    # With --init, Docker inserts its small docker-init process as PID 1.
-    arguments.extend(
-        [
-            "--init",  # correctly reaps exited and orphaned processes.
-            "--pids-limit",  # Bounds how many processes the container may have at once
-            "64",
-        ]
-    )
-
-    # Set CPU limits for the container.
-    arguments.extend(
-        [
-            "--cpus",
-            "1",
-        ]
-    )
-
-    # Set memory limits for the container.
-    arguments.extend(
-        [
-            "--memory",
-            "128m",
-            "--memory-swap",  # no additional swap beyond the memory limit
-            "128m",
-        ]
-    )
-
     specified_environs = get_resolved_environs_for_code_execution(specification)
     environs.extend(specified_environs)
 
-    for environ in environs:
-        arguments.extend(
-            [
-                "--env",
-                environ,
-            ]
-        )
+    # Harden the container
+    harden_docker_container(
+        arguments=arguments,
+        environs=environs,
+        username="coder",
+        health_start_seconds=30,
+    )
 
     # The image name must be specified last in the arguments list.
     arguments.extend(

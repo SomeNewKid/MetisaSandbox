@@ -45,4 +45,5 @@ HEALTHCHECK \
     CMD ["/run-starlark-code", "healthcheck"]
 
 # Run the service and its health checks without root privileges.
-USER 10001:10001
+# CODER user
+USER 10006:10006 

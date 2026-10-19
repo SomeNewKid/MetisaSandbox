@@ -17,6 +17,9 @@ from ..docker.docker_container import (
     inspect_docker_container,
     start_docker_container,
 )
+from ..docker.docker_hardening import (
+    harden_docker_container,
+)
 from ..docker.docker_image import (
     build_docker_image,
     docker_image_exists,
@@ -98,30 +101,6 @@ def create_haproxy_container(
             ]
         )
 
-    # Mount the container's root filesystem as strictly read-only
-    # Couple with in memory temporary writes (--tmpfs)
-    # or with read-write mounted volumes (-volume /host/path:/volume:rw).
-    arguments.extend(
-        [
-            "--read-only",
-        ]
-    )
-
-    # Linux control groups, or cgroups, organize processes and
-    # enforce resource accounting and limits such as:
-    # - Memory usage
-    # - CPU allocation
-    # - Process counts
-    # - I/O limits
-    # Docker already places each container into one or more cgroups.
-    # A cgroup namespace controls how much of that cgroup hierarchy a process can see.
-    arguments.extend(
-        [
-            "--cgroupns",
-            "private",
-        ]
-    )
-
     # Mount temporary (in memory) filesystems.
     arguments.extend(
         [
@@ -130,91 +109,14 @@ def create_haproxy_container(
         ]
     )
 
-    # Executing another program cannot grant the process privileges
-    # it did not already have.  It prevents privilege escalation through:
-    # Set-user-ID,
-    # Set-group-ID,
-    # Executables with Linux file capabilities.
-    arguments.extend(
-        [
-            "--security-opt",
-            "no-new-privileges=true",
-        ]
-    )
-
-    # Drop all Linux capabilities for the container.
-    # https://man7.org/linux/man-pages/man7/capabilities.7.html
-    # Docker already excludes more dangerous capabilities such as
-    # SYS_ADMIN, NET_ADMIN, SYS_PTRACE, and SYS_MODULE by default.
-    arguments.extend(["--cap-drop", "ALL"])
-
-    # Without --init, the command supplied after the image
-    # becomes PID 1 inside the container.
-    # PID 1 has special responsibilities on Linux.
-    # In particular, it inherits orphaned descendant processes and
-    # must collect, or “reap,” processes that have exited.
-    # Ordinary applications are not always designed to perform that role correctly.
-    # With --init, Docker inserts its small docker-init process as PID 1.
-    arguments.extend(
-        [
-            "--init",  # correctly reaps exited and orphaned processes.
-            "--pids-limit",  # Bounds how many processes the container may have at once
-            "64",
-        ]
-    )
-
-    # Set CPU limits for the container.
-    arguments.extend(
-        [
-            "--cpus",
-            "1",
-        ]
-    )
-
-    # Set memory limits for the container.
-    arguments.extend(
-        [
-            "--memory",
-            "128m",
-            "--memory-swap",  # no additional swap beyond the memory limit
-            "128m",
-        ]
-    )
-
-    # Set the open file descriptor limits for the container.
-    # A file descriptor is a small non-negative integer that
-    # a Unix process uses as a handle to an open operating-system resource.
-    # Limiting descriptors protects against accidental or hostile resource exhaustion.
-    arguments.extend(
-        [
-            "--ulimit",
-            "nofile=512:512",
-        ]
-    )
-
-    # Set the per-user process limits for the container.
-    arguments.extend(
-        [
-            "--ulimit",
-            "nproc=64:64",
-        ]
-    )
-
-    # Set the file size limits for the container.
-    # (Applies to file writes, not to existing files.)
-    arguments.extend(
-        [
-            "--ulimit",
-            "fsize=1048576:1048576",
-        ]
-    )
-
-    # Require privileges when binding ports below 1024.
-    arguments.extend(
-        [
-            "--sysctl",
-            "net.ipv4.ip_unprivileged_port_start=1024",
-        ]
+    # Harden the container
+    harden_docker_container(
+        arguments=arguments,
+        environs=[],
+        username="haproxy",
+        cpu_count=1,
+        memory="128m",
+        number_of_files=512,
     )
 
     # The image name must be specified last in the arguments list.

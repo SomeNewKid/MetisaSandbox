@@ -61,6 +61,11 @@ class SandboxRequirements:
         return Capability.LLM_SERVER in self._specification.capabilities
 
     @property
+    def is_docling_required(self) -> bool:
+        """Returns a flag indicating if Docling sidecar is required."""
+        return Capability.DOCLING in self._specification.capabilities
+
+    @property
     def is_internet_access_required(self) -> bool:
         """Returns a flag indicating if internet access is required."""
         return Capability.INTERNET in self._specification.capabilities

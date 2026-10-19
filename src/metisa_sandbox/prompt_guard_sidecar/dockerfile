@@ -149,10 +149,10 @@ HEALTHCHECK \
         || exit 1
 
 # Create non-root guardian group and user
-RUN groupadd --gid 10001 guardian \
+RUN groupadd --gid 10008 guardian \
     && useradd \
-     --uid 10001 \
-     --gid 10001 \
+     --uid 10008 \
+     --gid 10008 \
      --create-home \
      --shell /usr/sbin/nologin \
      guardian
