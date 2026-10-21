@@ -1,0 +1,40 @@
+# Accepts OTLP over HTTP, normally at /v1/traces
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+# Batches received spans before export.
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 128
+
+# Writes the same spans to structured JSON and detailed text.
+exporters:
+  file:
+    path: /telemetry/traces.jsonl
+    format: json
+    flush_interval: 1s
+
+  debug:
+    verbosity: detailed
+    use_internal_logger: false
+    output_paths:
+      - /telemetry/spans.txt
+
+# Provides an HTTP health endpoint.
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+# Activates these components and connects the trace pipeline.
+service:
+  extensions: [health_check]
+
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file, debug]

@@ -3,19 +3,24 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
 from jsonschema import ValidationError, validate
 from mcp import types
 from mcp.server import Server, ServerRequestContext
+from mcp.server.context import CallNext, HandlerResult
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.shared.exceptions import MCPError
+from opentelemetry.context import Context, attach, detach
+from opentelemetry.propagate import extract
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 
+from ._telemetry import initialize_tracing
 from .helper import (
     create_declared_resource,
     create_declared_tool,
@@ -237,14 +242,50 @@ async def _health(
     return PlainTextResponse("OK", status_code=200)
 
 
+@asynccontextmanager
+async def _server_lifespan(
+    _server: Server,
+) -> AsyncGenerator[dict[str, object]]:
+    provider = initialize_tracing()
+
+    try:
+        yield {}
+    finally:
+        provider.shutdown()
+
+
+async def _http_trace_context(
+    ctx: ServerRequestContext,
+    call_next: CallNext,
+) -> HandlerResult:
+    request = ctx.request
+
+    if not isinstance(request, Request):
+        return await call_next(ctx)
+
+    # Reconstructs the remote parent from the HTTP headers
+    parent_content = extract(
+        carrier=request.headers,
+        context=Context(),
+    )
+    token = attach(parent_content)  # make the remote parent current
+
+    try:
+        return await call_next(ctx)
+    finally:
+        detach(token)
+
+
 server = Server(
     "Metisa MCP Server",
+    lifespan=_server_lifespan,
     on_list_tools=_list_tools,
     on_call_tool=_call_tool,
     on_list_resources=_list_resources,
     on_read_resource=_read_resource,
 )
 
+server.middleware.insert(0, _http_trace_context)
 
 app = server.streamable_http_app(
     streamable_http_path="/mcp",

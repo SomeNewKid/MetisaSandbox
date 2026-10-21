@@ -81,6 +81,11 @@ class SandboxRequirements:
         return Capability.EMBEDDINGS in self._specification.capabilities
 
     @property
+    def is_otel_collector_required(self) -> bool:
+        """Returns a flag indicating if the OTel Collector sidecar is required."""
+        return Capability.OTEL_COLLECTOR in self._specification.capabilities
+
+    @property
     def is_internet_access_required(self) -> bool:
         """Returns a flag indicating if internet access is required."""
         return Capability.INTERNET in self._specification.capabilities

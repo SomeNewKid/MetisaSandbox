@@ -24,6 +24,7 @@ from .specification_models import (
     LlmServerSpecification,
     McpServerSpecification,
     MetisaSpecification,
+    OpenTelemetrySpecification,
     QdrantSpecification,
     SpecificationValidationError,
     SquidProxySpecification,
@@ -288,6 +289,17 @@ def get_resolved_environs_for_embeddings(
     return _get_resolved_environs(specification.embeddings.environs)
 
 
+def get_resolved_environs_for_otel_collector(
+    specification: MetisaSpecification,
+) -> list[str]:
+    """Resolve environment variables specified for the OTel Collector container."""
+    if not specification.otel_collector:
+        return []
+    if not specification.otel_collector.environs:
+        return []
+    return _get_resolved_environs(specification.otel_collector.environs)
+
+
 def _get_resolved_environs(
     environs: frozenset[str],
 ) -> list[str]:
@@ -403,6 +415,7 @@ def _create_metisa_specification(
             "documents",
             "qdrant",
             "embeddings",
+            "otel_collector",
         }
     )
 
@@ -425,6 +438,7 @@ def _create_metisa_specification(
     documents = _get_documents_specification(toml)
     qdrant = _get_qdrant_specification(toml)
     embeddings = _get_embeddings_specification(toml)
+    otel_collector = _get_otel_collector_specification(toml)
 
     specification = MetisaSpecification(
         agent_name=agent_name,
@@ -443,6 +457,7 @@ def _create_metisa_specification(
         documents=documents,
         qdrant=qdrant,
         embeddings=embeddings,
+        otel_collector=otel_collector,
     )
 
     validate_specification(specification)
@@ -971,6 +986,31 @@ def _get_code_execution_specification(
     environs = _get_environs(code_execution, "Code Execution environs")
 
     return CodeExecutionSpecification(environs=environs)
+
+
+def _get_otel_collector_specification(
+    toml: dict[str, object],
+) -> OpenTelemetrySpecification | None:
+    otel_collector = toml.get("otel_collector")
+    if not otel_collector:
+        return None
+
+    if not isinstance(otel_collector, dict):
+        raise SpecificationValidationError(
+            "TOML specification otel_collector must be a table."
+        )
+
+    OTEL_COLLECTOR_KEYS = frozenset(
+        {
+            "environs",
+        }
+    )
+
+    _validate_known_keys(otel_collector, "otel_collector", OTEL_COLLECTOR_KEYS)
+
+    environs = _get_environs(otel_collector, "OpenTelemetry Collector environs")
+
+    return OpenTelemetrySpecification(environs=environs)
 
 
 def _get_qdrant_specification(

@@ -10,6 +10,9 @@ from contextlib import contextmanager
 import httpx2
 from mcp import Client, types
 from mcp.client.streamable_http import streamable_http_client
+from opentelemetry import trace
+from opentelemetry.propagate import inject
+from opentelemetry.trace import SpanKind
 
 _RESET = "\033[0m"
 _GREEN = "\033[32m"
@@ -46,7 +49,23 @@ def _format_elapsed_time(elapsed_seconds: float) -> str:
 
 
 def get_mcp_server_tool_result(
-    tool_name: str, params: dict[str, object] | None = None
+    tool_name: str,
+    params: dict[str, object] | None = None,
+) -> str:
+    """Get the result of calling a tool on the MCP Server."""
+    tracer = trace.get_tracer("sample_agent.tools")
+
+    with tracer.start_as_current_span(
+        f"tool.call {tool_name}",
+        kind=SpanKind.CLIENT,
+        attributes={"metisa.tool.name": tool_name},
+    ):
+        return _get_mcp_server_tool_result(tool_name, params)
+
+
+def _get_mcp_server_tool_result(
+    tool_name: str,
+    params: dict[str, object] | None = None,
 ) -> str:
     """Get the result of calling a tool on the MCP Server."""
     url = "http://metisa-mcp-server:8000/mcp"
@@ -56,8 +75,13 @@ def get_mcp_server_tool_result(
         async with asyncio.timeout(timeout_seconds):
             # private-network traffic cannot use workload's internet proxy
             trust_env = False
+            headers: dict[str, str] = {}
+
+            # read the current tool span and add trace-context headers
+            inject(headers)
 
             async with httpx2.AsyncClient(
+                headers=headers,
                 trust_env=trust_env,
                 timeout=timeout_seconds,
             ) as http_client:

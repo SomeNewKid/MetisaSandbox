@@ -27,6 +27,7 @@ class Capability(StrEnum):
     ENTITY_GUARD = "entity_guard"
     QDRANT = "qdrant"
     EMBEDDINGS = "embeddings"
+    OTEL_COLLECTOR = "otel_collector"
 
 
 class SpecificationValidationError(ValueError):
@@ -53,6 +54,7 @@ class MetisaSpecification:
     documents: DocumentsSpecification | None
     qdrant: QdrantSpecification | None
     embeddings: EmbeddingsSpecification | None
+    otel_collector: OpenTelemetrySpecification | None
 
 
 @dataclass(frozen=True)
@@ -154,5 +156,12 @@ class QdrantSpecification:
 @dataclass(frozen=True)
 class EmbeddingsSpecification:
     """Represents the Embeddings section of the Metisa specification."""
+
+    environs: frozenset[str]
+
+
+@dataclass(frozen=True)
+class OpenTelemetrySpecification:
+    """Represents the OpenTelemetry section of the Metisa specification."""
 
     environs: frozenset[str]

@@ -153,6 +153,8 @@ def create_metisa_workload_container(
     specified_environs = get_resolved_environs_for_metisa(specification)
     environs.extend(specified_environs)
 
+    environs.append(f"METISA_RUN_ID={sandbox_context.run_identifier}")
+
     # Harden the container
     harden_docker_container(
         arguments=arguments,

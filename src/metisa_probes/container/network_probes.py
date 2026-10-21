@@ -19,6 +19,8 @@ _WORKLOAD_NETWORK_ALIAS = "metisa-workload"
 _DOCKER_DNS_RESOLVER = "127.0.0.11"
 _HAPROXY_NETWORK_ALIAS = "metisa-haproxy"
 _HAPROXY_HEALTH_PORT = 8404
+_OTEL_COLLECTOR_NETWORK_ALIAS = "metisa-otel-collector"
+_OTEL_COLLECTOR_HTTP_PORT = 4318
 _TCP_TIMEOUT_SECONDS = 3
 _PROXY_ENVIRONMENT_VARIABLES = frozenset(
     {
@@ -799,6 +801,139 @@ def haproxy_health_endpoint_is_private(probe_context: ProbeContext) -> ProbeResu
     return _assert_haproxy_port_refused(probe_name, _HAPROXY_HEALTH_PORT)
 
 
+def otel_collector_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
+    """Ensure a network-enabled workload can resolve its declared Collector."""
+    probe_name = "container__network__otel_collector_alias_resolves"
+    capabilities = probe_context.specification.capabilities
+    if Capability.NETWORK not in capabilities:
+        return ProbeResult.success(
+            probe_name, "Networking is disabled. Skipping probe."
+        )
+    if Capability.OTEL_COLLECTOR not in capabilities:
+        return ProbeResult.success(
+            probe_name, "OTel Collector is disabled. Skipping probe."
+        )
+    try:
+        addresses = _resolve_network_alias(_OTEL_COLLECTOR_NETWORK_ALIAS)
+    except (OSError, ValueError) as error:
+        return ProbeResult.failure(
+            probe_name, f"OTel Collector alias resolution failed: {error}"
+        )
+    if not addresses:
+        return ProbeResult.failure(
+            probe_name, "OTel Collector alias returned no addresses."
+        )
+    return ProbeResult.success(
+        probe_name, "OTel Collector alias resolves to non-loopback addresses."
+    )
+
+
+def otel_collector_alias_is_absent(probe_context: ProbeContext) -> ProbeResult:
+    """Ensure an undeclared Collector is not discoverable by the workload."""
+    probe_name = "container__network__otel_collector_alias_is_absent"
+    capabilities = probe_context.specification.capabilities
+    if Capability.NETWORK not in capabilities:
+        return ProbeResult.success(
+            probe_name, "Networking is disabled. Skipping probe."
+        )
+    if Capability.OTEL_COLLECTOR in capabilities:
+        return ProbeResult.success(
+            probe_name, "OTel Collector is enabled. Skipping probe."
+        )
+    try:
+        socket.getaddrinfo(_OTEL_COLLECTOR_NETWORK_ALIAS, None, type=socket.SOCK_STREAM)
+    except socket.gaierror as error:
+        return _otel_collector_alias_lookup_failure(probe_name, error)
+    except OSError as error:
+        return ProbeResult.failure(
+            probe_name, f"OTel Collector DNS lookup failed unexpectedly: {error}"
+        )
+    return ProbeResult.failure(
+        probe_name, "OTel Collector alias resolves although the capability is disabled."
+    )
+
+
+def otel_collector_listener_is_reachable(probe_context: ProbeContext) -> ProbeResult:
+    """Ensure the declared Collector accepts OTLP HTTP TCP connections."""
+    probe_name = "container__network__otel_collector_listener_is_reachable"
+    capabilities = probe_context.specification.capabilities
+    if Capability.NETWORK not in capabilities:
+        return ProbeResult.success(
+            probe_name, "Networking is disabled. Skipping probe."
+        )
+    if Capability.OTEL_COLLECTOR not in capabilities:
+        return ProbeResult.success(
+            probe_name, "OTel Collector is disabled. Skipping probe."
+        )
+    try:
+        errors = _tcp_connection_errors(
+            _OTEL_COLLECTOR_NETWORK_ALIAS, _OTEL_COLLECTOR_HTTP_PORT
+        )
+    except OSError as error:
+        return ProbeResult.failure(
+            probe_name, f"OTel Collector listener lookup failed: {error}"
+        )
+    if errors:
+        return ProbeResult.failure(
+            probe_name, f"OTel Collector OTLP HTTP listener is unreachable: {errors}"
+        )
+    return ProbeResult.success(
+        probe_name,
+        "OTel Collector OTLP HTTP listener accepts TCP connections on port 4318; "
+        "trace ingestion and export were not tested.",
+    )
+
+
+def otel_collector_listener_is_unavailable(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Ensure an undeclared Collector cannot accept workload OTLP connections."""
+    probe_name = "container__network__otel_collector_listener_is_unavailable"
+    capabilities = probe_context.specification.capabilities
+    if Capability.NETWORK not in capabilities:
+        return ProbeResult.success(
+            probe_name, "Networking is disabled. Skipping probe."
+        )
+    if Capability.OTEL_COLLECTOR in capabilities:
+        return ProbeResult.success(
+            probe_name, "OTel Collector is enabled. Skipping probe."
+        )
+    try:
+        errors = _tcp_connection_errors(
+            _OTEL_COLLECTOR_NETWORK_ALIAS, _OTEL_COLLECTOR_HTTP_PORT
+        )
+    except socket.gaierror as error:
+        return _otel_collector_alias_lookup_failure(probe_name, error)
+    except OSError as error:
+        return ProbeResult.failure(
+            probe_name, f"OTel Collector listener lookup failed unexpectedly: {error}"
+        )
+    if not errors:
+        return ProbeResult.failure(
+            probe_name, "OTel Collector OTLP HTTP listener is workload-accessible."
+        )
+    unavailable_errors = {
+        errno.ECONNREFUSED,
+        errno.ETIMEDOUT,
+        errno.ENETUNREACH,
+        errno.EHOSTUNREACH,
+        errno.EACCES,
+        errno.EPERM,
+    }
+    if any(
+        not isinstance(error, TimeoutError) and error.errno not in unavailable_errors
+        for error in errors
+    ):
+        return ProbeResult.failure(
+            probe_name, f"OTel Collector listener failed unexpectedly: {errors}"
+        )
+    return ProbeResult.success(
+        probe_name,
+        "OTel Collector OTLP HTTP listener rejects workload connections through "
+        "the alias; this does not distinguish Python guards from network isolation.",
+    )
+
+
 def workload_has_no_default_route(probe_context: ProbeContext) -> ProbeResult:
     """Ensure neither IPv4 nor IPv6 provides a usable workload default route."""
     probe_name = "container__network__workload_has_no_default_route"
@@ -902,6 +1037,43 @@ def _assert_haproxy_port_refused(probe_name: str, port: int) -> ProbeResult:
     )
 
 
+def _otel_collector_alias_lookup_failure(
+    probe_name: str,
+    error: socket.gaierror,
+) -> ProbeResult:
+    if error.errno == socket.EAI_AGAIN:
+        try:
+            workload_addresses = _resolve_network_alias(_WORKLOAD_NETWORK_ALIAS)
+        except (OSError, ValueError) as control_error:
+            return ProbeResult.failure(
+                probe_name,
+                "Cannot confirm OTel Collector alias unavailability because "
+                f"workload DNS resolution failed: {control_error}",
+            )
+        if not workload_addresses:
+            return ProbeResult.failure(
+                probe_name, "Workload DNS lookup returned no addresses."
+            )
+        return ProbeResult.success(
+            probe_name,
+            "OTel Collector alias is unresolvable while the workload alias resolves; "
+            "this does not prove that no DNS record exists or test IP-level isolation.",
+        )
+    absent_codes = {
+        socket.EAI_NONAME,
+        getattr(socket, "EAI_NODATA", socket.EAI_NONAME),
+    }
+    if error.errno in absent_codes:
+        return ProbeResult.success(
+            probe_name,
+            "OTel Collector alias has no DNS record; "
+            "IP-level isolation was not tested.",
+        )
+    return ProbeResult.failure(
+        probe_name, f"OTel Collector DNS lookup failed unexpectedly: {error}"
+    )
+
+
 def _decode_ipv4_proc_endpoint(encoded_endpoint: str) -> tuple[str, int]:
     encoded_host, encoded_port = encoded_endpoint.split(":", maxsplit=1)
     host_bytes = bytes.fromhex(encoded_host)
@@ -945,6 +1117,10 @@ NETWORK_PROBES = ProbeGroup(
         haproxy_declared_listeners_are_unavailable,
         haproxy_undeclared_listener_is_unavailable,
         haproxy_health_endpoint_is_private,
+        otel_collector_alias_resolves,
+        otel_collector_alias_is_absent,
+        otel_collector_listener_is_reachable,
+        otel_collector_listener_is_unavailable,
         workload_has_no_default_route,
     ),
 )

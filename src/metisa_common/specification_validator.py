@@ -15,6 +15,7 @@ from .specification_models import (
     LlmServerSpecification,
     McpServerSpecification,
     MetisaSpecification,
+    OpenTelemetrySpecification,
     QdrantSpecification,
     SpecificationValidationError,
     SquidProxySpecification,
@@ -75,6 +76,11 @@ def validate_specification(
     _validate_qdrant_specification(
         specification.capabilities,
         specification.qdrant,
+    )
+
+    _validate_otel_collector_specification(
+        specification.capabilities,
+        specification.otel_collector,
     )
 
 
@@ -346,6 +352,15 @@ def _validate_qdrant_specification(
     qdrant_specification: QdrantSpecification | None,
 ):
     if qdrant_specification is None:
+        return
+    return
+
+
+def _validate_otel_collector_specification(
+    capabilities: frozenset[Capability],
+    otel_collector_specification: OpenTelemetrySpecification | None,
+):
+    if otel_collector_specification is None:
         return
     return
 

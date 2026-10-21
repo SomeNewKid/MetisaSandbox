@@ -1,0 +1,30 @@
+FROM golang:1.27.2-alpine AS healthcheck-builder
+
+WORKDIR /build
+
+COPY healthcheck.go .
+
+RUN CGO_ENABLED=0 go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o /out/collector-healthcheck \
+    healthcheck.go
+
+# ---------------------------------------------------------------------------
+
+FROM otel/opentelemetry-collector-contrib:0.162.0
+
+COPY --from=healthcheck-builder --chmod=0555 \
+    /out/collector-healthcheck /collector-healthcheck
+
+COPY --chmod=0444 collector.yaml /etc/metisa/collector.yaml
+
+HEALTHCHECK \
+    --start-period=30s \
+    --start-interval=1s \
+    --interval=30s \
+    --timeout=3s \
+    --retries=3 \
+    CMD ["/collector-healthcheck"]
+
+CMD ["--config=/etc/metisa/collector.yaml"]

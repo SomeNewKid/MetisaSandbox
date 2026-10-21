@@ -232,6 +232,8 @@ def _get_uid_gid(
     match username:
         case "sandbox":
             return (10001, 10001)
+        case "collector":
+            return (None, None)  # (10001, 10001) OTel Collector provides non-root user
         case "squid":
             return (None, None)  # (10002, 10002) Squid Proxy provides non-root user
         case "haproxy":
