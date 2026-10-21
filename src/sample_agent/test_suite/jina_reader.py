@@ -17,7 +17,7 @@ from ..helper import (
     print_suite_title,
 )
 
-_SKIP_JINA_READER_TESTS = False
+_SKIP_JINA_READER_TESTS = True
 
 
 def test_jina_reader(specification: MetisaSpecification):

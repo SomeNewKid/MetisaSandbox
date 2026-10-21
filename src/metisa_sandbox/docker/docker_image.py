@@ -32,6 +32,7 @@ def build_docker_image(
     build_context_path: Path,
     *,
     named_build_contexts: Mapping[str, Path] | None = None,
+    build_args: list[str] | None = None,
 ) -> None:
     """Build a Docker image using the specified Dockerfile and build context."""
     docker_command_location = get_docker_command_location()
@@ -44,6 +45,10 @@ def build_docker_image(
     if named_build_contexts:
         for name, path in named_build_contexts.items():
             arguments.extend(["--build-context", f"{name}={str(path)}"])
+
+    if build_args:
+        for build_arg in build_args:
+            arguments.extend(["--build-arg", build_arg])
 
     arguments.extend(
         [

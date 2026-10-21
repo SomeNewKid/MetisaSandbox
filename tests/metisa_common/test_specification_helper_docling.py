@@ -16,6 +16,7 @@ def test_missing_docling_table() -> None:
             "mcp_server", 
             "prompt_guard",
             "entity_guard", 
+            "documents",
             "docling"
         ]
     """
@@ -23,7 +24,7 @@ def test_missing_docling_table() -> None:
     assert specification.docling is None
 
 
-def test_docling_missing_environs() -> None:
+def test_docling_missing_environs_and_embedding_model() -> None:
     toml = """
         agent_name = "sample_agent"
         capabilities = [
@@ -31,6 +32,7 @@ def test_docling_missing_environs() -> None:
             "mcp_server", 
             "prompt_guard", 
             "entity_guard", 
+            "documents",
             "docling"
         ]
 
@@ -55,10 +57,36 @@ def test_docling_invalid_if_no_network_capability() -> None:
 def test_docling_invalid_if_no_mcp_server_capability() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "prompt_guard", "entity_guard", "docling"]
+        capabilities = [
+            "network", 
+            "prompt_guard", 
+            "entity_guard", 
+            "documents",
+            "docling",
+        ]
 
         [docling]
         environs = []
+        embedding_model = "BAAI/bge-small-en-v1.5"        
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
+def test_docling_invalid_if_no_documents_capability() -> None:
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network", 
+            "mcp_server",
+            "prompt_guard", 
+            "entity_guard", 
+            "docling",
+        ]
+
+        [docling]
+        environs = []
+        embedding_model = "BAAI/bge-small-en-v1.5"        
     """
     with pytest.raises(SpecificationValidationError):
         _ = parse_specification(toml)
@@ -67,13 +95,60 @@ def test_docling_invalid_if_no_mcp_server_capability() -> None:
 def test_docling_valid_if_no_docling_capability() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "prompt_guard", "entity_guard"]
+        capabilities = [
+            "network", 
+            "mcp_server",
+            "prompt_guard", 
+            "entity_guard",
+            "documents",
+        ]
 
         [docling]
         environs = []
+        embedding_model = "BAAI/bge-small-en-v1.5" 
     """
     specification = parse_specification(toml)
     assert specification.docling is not None
+    assert specification.docling.embedding_model == "BAAI/bge-small-en-v1.5"
+
+
+def test_docling_invalid_if_empty_embedding_model() -> None:
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network", 
+            "mcp_server",
+            "prompt_guard", 
+            "entity_guard",
+            "documents",
+        ]
+
+        [docling]
+        environs = []
+        embedding_model = "" 
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
+def test_docling_invalid_if_non_string_embedding_model() -> None:
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network", 
+            "mcp_server",
+            "prompt_guard", 
+            "entity_guard",
+            "documents",
+            "docling",
+        ]
+
+        [docling]
+        environs = []
+        embedding_model = 123 
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
 
 
 @pytest.mark.parametrize("key", ["unknown", "tools", "resources"])
@@ -82,10 +157,11 @@ def test_docling_with_unknown_key(key: str) -> None:
         agent_name = "sample_agent"
         capabilities = [
             "network", 
-            "mcp_server", 
+            "mcp_server",
             "prompt_guard", 
-            "entity_guard", 
-            "docling"
+            "entity_guard",
+            "documents",
+            "docling",
         ]
 
         [docling]
@@ -100,14 +176,16 @@ def test_docling_empty_environs() -> None:
         agent_name = "sample_agent"
         capabilities = [
             "network", 
-            "mcp_server", 
+            "mcp_server",
             "prompt_guard", 
-            "entity_guard", 
-            "docling"
+            "entity_guard",
+            "documents",
+            "docling",
         ]
 
         [docling]
         environs = []
+        embedding_model = "BAAI/bge-small-en-v1.5"
     """
     specification = parse_specification(toml)
     assert specification.docling is not None
@@ -119,10 +197,11 @@ def test_docling_valid_environs() -> None:
         agent_name = "sample_agent"
         capabilities = [
             "network", 
-            "mcp_server", 
+            "mcp_server",
             "prompt_guard", 
-            "entity_guard", 
-            "docling"
+            "entity_guard",
+            "documents",
+            "docling",
         ]
         environs = ["WORKLOAD=value"]
 
@@ -136,6 +215,7 @@ def test_docling_valid_environs() -> None:
             "EMPTY=",
             "TOKEN=part1=part2",
         ]
+        embedding_model = "BAAI/bge-small-en-v1.5"
     """
     specification = parse_specification(toml)
     assert specification.docling is not None
@@ -168,14 +248,16 @@ def test_docling_environs_with_invalid_item(item: str) -> None:
         agent_name = "sample_agent"
         capabilities = [
             "network", 
-            "mcp_server", 
+            "mcp_server",
             "prompt_guard", 
-            "entity_guard", 
-            "docling"
+            "entity_guard",
+            "documents",
+            "docling",
         ]
 
         [docling]
         environs = ["VALID=value", {item}, "ALSO_VALID=value"]
+        embedding_model = "BAAI/bge-small-en-v1.5"
     """
     with pytest.raises(SpecificationValidationError) as error:
         _ = parse_specification(toml)

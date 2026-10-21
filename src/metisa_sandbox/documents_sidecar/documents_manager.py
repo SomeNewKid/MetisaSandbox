@@ -56,9 +56,7 @@ def create_documents_container(
     if not specification.documents:
         raise RuntimeError("Metisa specification did not include a document section.")
     image_name = _ensure_documents_image_exists(specification)
-    container_name = _create_documents_container_name(
-        sandbox_context.run_identifier
-    )
+    container_name = _create_documents_container_name(sandbox_context.run_identifier)
 
     if not container_creation_context.network_names:
         raise RuntimeError("No network specified for the Documents container.")

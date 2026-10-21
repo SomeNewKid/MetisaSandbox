@@ -71,7 +71,7 @@ def test_code_execution_valid_if_no_code_execution_capability() -> None:
 
         [code_execution]
         environs = []
-    """    
+    """
     specification = parse_specification(toml)
     assert specification.code_execution is not None
 

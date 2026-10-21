@@ -1,4 +1,4 @@
-"""Server the Entity Guard HTTP endpoints."""
+"""Server for the Entity Guard HTTP endpoints."""
 
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer

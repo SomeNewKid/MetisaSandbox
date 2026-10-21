@@ -5,36 +5,76 @@ from __future__ import annotations
 import os
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import quote
 
 import requests
 from docling.datamodel.backend_options import ThreadedDoclingParseBackendOptions
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
+from docling_core.transforms.chunker.tokenizer.huggingface import (
+    HuggingFaceTokenizer,
+)
+from docling_core.types.doc.document import DoclingDocument
 from docling_core.types.io import DocumentStream
+from transformers import AutoTokenizer
 
 
-def extract_from_sample_file(
+def extract_markdown_from_document(
     filename: str,
 ) -> str:
     """Retrieve data from sample file."""
-    print("***** Called extract_from_sample_file")
-    file_location = Path(__file__).parent / "examples" / filename
-    print(f"***** File: {file_location}")
-    if not file_location.is_file():
-        raise FileNotFoundError(f"File not found: {filename}")
-    print("***** File exists")
+    if not filename:
+        raise ValueError("Filename is required.")
 
-    artifacts_path = os.environ.get("DOCLING_ARTIFACTS_PATH", None)
-    if not artifacts_path:
-        raise RuntimeError("DOCLING_ARTIFACTS_PATH not set.")
-    if not Path(artifacts_path).is_dir():
-        raise RuntimeError("Artifacts path does not exist.")
+    stream = _get_document_stream(filename)
 
+    document = _convert_pdf_stream_to_docling_document(stream)
+
+    return document.export_to_markdown()
+
+
+def get_chunks_from_document(
+    filename: str,
+) -> list[str]:
+    """Retrieve data from sample file."""
+    if not filename:
+        raise ValueError("Filename is required.")
+
+    stream = _get_document_stream(filename)
+
+    document = _convert_pdf_stream_to_docling_document(stream)
+
+    hf_tokenizer = AutoTokenizer.from_pretrained(
+        "/models/embedding",
+        local_files_only=True,
+    )
+
+    tokenizer = HuggingFaceTokenizer(
+        tokenizer=hf_tokenizer,
+        max_tokens=256,
+    )
+
+    chunker = HybridChunker(
+        tokenizer=tokenizer,
+        merge_peers=True,
+    )
+
+    chunks: list[str] = []
+    for chunk in chunker.chunk(dl_doc=document):
+        chunk_text = chunker.contextualize(chunk=chunk)
+        chunks.append(chunk_text)
+
+    return chunks
+
+
+def _convert_pdf_stream_to_docling_document(
+    document_source: DocumentStream,
+) -> DoclingDocument:
     pipeline_options = PdfPipelineOptions(
         do_ocr=False,
     )
-    print("***** Debug 1")
 
     backend_options = ThreadedDoclingParseBackendOptions.model_validate(
         {"parser_threads": 1}
@@ -44,34 +84,46 @@ def extract_from_sample_file(
         pipeline_options=pipeline_options,
         backend_options=backend_options,
     )
-    print("***** Debug 2")
 
     converter = DocumentConverter(
         allowed_formats=[InputFormat.PDF], format_options={InputFormat.PDF: pdf_options}
     )
-    print("***** Debug 3")
 
-    try:
-        result = converter.convert(file_location)
-        print("***** Debug 4")
-    except Exception as error:
-        print("***** Debug 5", error)
-        raise
+    result = converter.convert(document_source)
 
-    if not result:
-        print("***** Debug 6")
+    return result.document
 
-    if not result.document:
-        print("***** Debug 7")
 
-    markdown = result.document.export_to_markdown()
+def _get_document_stream(
+    filename: str,
+) -> DocumentStream:
+    if not filename:
+        raise ValueError("Filename is required.")
 
-    if not markdown:
-        print("***** Debug 8")
+    artifacts_path = os.environ.get("DOCLING_ARTIFACTS_PATH", None)
+    if not artifacts_path:
+        raise RuntimeError("DOCLING_ARTIFACTS_PATH not set.")
+    if not Path(artifacts_path).is_dir():
+        raise RuntimeError("Artifacts path does not exist.")
 
-    print(markdown)
+    encoded_filename = quote(filename, safe="/")
+    document_url = f"http://metisa-documents:8080/{encoded_filename}"
 
-    return markdown
+    with requests.Session() as session:
+        # Internal container traffic must bypass Squid.
+        session.trust_env = False
+        response = session.get(document_url, timeout=(5, 240))
+        response.raise_for_status()
+        document_bytes = response.content
+
+    if not document_bytes:
+        raise RuntimeError("Documents server returned an empty document.")
+
+    document_buffer = BytesIO(document_bytes)
+    return DocumentStream(
+        name=filename,
+        stream=document_buffer,
+    )
 
 
 # Docling's Quickstart guide shows the following code:

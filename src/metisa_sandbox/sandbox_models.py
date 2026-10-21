@@ -70,6 +70,15 @@ class SandboxRequirements:
         """Returns a flag indicating if the Documents sidecar is required."""
         return Capability.DOCUMENTS in self._specification.capabilities
 
+    @property
+    def is_qdrant_required(self) -> bool:
+        """Returns a flag indicating if the Qdrant sidecar is required."""
+        return Capability.QDRANT in self._specification.capabilities
+
+    @property
+    def is_embeddings_required(self) -> bool:
+        """Returns a flag indicating if the Embeddings sidecar is required."""
+        return Capability.EMBEDDINGS in self._specification.capabilities
 
     @property
     def is_internet_access_required(self) -> bool:

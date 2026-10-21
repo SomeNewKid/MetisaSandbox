@@ -28,6 +28,10 @@ from .documents_sidecar.documents_manager import (
     create_documents_container,
     create_documents_definition,
 )
+from .embeddings_sidecar.embeddings_manager import (
+    create_embeddings_container,
+    create_embeddings_definition,
+)
 from .entity_guard_sidecar.entity_guard_manager import (
     create_entity_guard_container,
     create_entity_guard_definition,
@@ -59,6 +63,10 @@ from .metisa_container.metisa_container_manager import (
 from .prompt_guard_sidecar.prompt_guard_manager import (
     create_prompt_guard_container,
     create_prompt_guard_definition,
+)
+from .qdrant_sidecar.qdrant_manager import (
+    create_qdrant_container,
+    create_qdrant_definition,
 )
 from .sandbox_container import (
     stop_and_remove_containers,
@@ -121,6 +129,8 @@ def run_metisa_container_workload_in_sandbox(
     entity_guard_container = create_entity_guard_definition()
     docling_container = create_docling_definition()
     documents_container = create_documents_definition()
+    qdrant_container = create_qdrant_definition()
+    embeddings_container = create_embeddings_definition()
 
     all_containers = [
         metisa_workload_container,
@@ -134,6 +144,8 @@ def run_metisa_container_workload_in_sandbox(
         entity_guard_container,
         docling_container,
         documents_container,
+        qdrant_container,
+        embeddings_container,
     ]
 
     try:
@@ -239,6 +251,22 @@ def run_metisa_container_workload_in_sandbox(
                 haproxy_container,
             )
 
+        if sandbox_requirements.is_qdrant_required:
+            _create_qdrant_container(
+                specification,
+                sandbox_context,
+                squid_proxy_container,
+                qdrant_container,
+            )
+
+        if sandbox_requirements.is_embeddings_required:
+            _create_embeddings_container(
+                specification,
+                sandbox_context,
+                squid_proxy_container,
+                embeddings_container,
+            )
+
         _create_metisa_workload_container(
             specification,
             image_reference,
@@ -262,7 +290,10 @@ def run_metisa_container_workload_in_sandbox(
                     all_containers,
                 )
 
-                remove_sandbox_networks(all_networks, cleanup_errors)
+                remove_sandbox_networks(
+                    all_networks,
+                    cleanup_errors,
+                )
 
                 for cleanup_error in cleanup_errors:
                     print(f"{FAILURE_INDICATOR} {cleanup_error}", file=sys.stderr)
@@ -478,6 +509,13 @@ def _create_docling_container(
     squid_proxy_container: SandboxContainer,
     docling_container: SandboxContainer,
 ) -> None:
+    if not specification.docling:
+        raise RuntimeError("Docling specification must be provided.")
+    embedding_model = specification.docling.embedding_model
+    if not embedding_model:
+        error = "Embedding model must be specified for the Docling container."
+        raise RuntimeError(error)
+
     with terminal_status(
         running="Creating Docling container...",
         success="Created Docling container.",
@@ -489,6 +527,7 @@ def _create_docling_container(
                 sandbox_context.backend_network_name,
             ],
         )
+        docling_creation_context.settings["embedding_model"] = embedding_model
         docling_creation = create_docling_container(
             specification, sandbox_context, docling_creation_context
         )
@@ -516,6 +555,29 @@ def _create_documents_container(
             specification, sandbox_context, documents_creation_context
         )
         documents_container.set_created(documents_creation)
+
+
+def _create_qdrant_container(
+    specification: MetisaSpecification,
+    sandbox_context: SandboxContext,
+    squid_proxy_container: SandboxContainer,
+    qdrant_container: SandboxContainer,
+) -> None:
+    with terminal_status(
+        running="Creating Qdrant container...",
+        success="Created Qdrant container.",
+        failure="Could not create Qdrant container.",
+    ):
+        qdrant_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.backend_network_name,
+            ],
+        )
+        qdrant_creation = create_qdrant_container(
+            specification, sandbox_context, qdrant_creation_context
+        )
+        qdrant_container.set_created(qdrant_creation)
 
 
 def _create_llm_server_containers(
@@ -602,6 +664,37 @@ def _create_squid_proxy_container(
             specification, sandbox_context, squid_creation_context
         )
         squid_proxy_container.set_created(squid_proxy_creation)
+
+
+def _create_embeddings_container(
+    specification: MetisaSpecification,
+    sandbox_context: SandboxContext,
+    squid_proxy_container: SandboxContainer,
+    embeddings_container: SandboxContainer,
+) -> None:
+    if not specification.docling:
+        raise RuntimeError("Docling specification must be provided.")
+    embedding_model = specification.docling.embedding_model
+    if not embedding_model:
+        error = "Embedding model must be specified for the Docling container."
+        raise RuntimeError(error)
+
+    with terminal_status(
+        running="Creating Embeddings container...",
+        success="Created Embeddings container.",
+        failure="Could not create Embeddings container.",
+    ):
+        embeddings_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.backend_network_name,
+            ],
+        )
+        embeddings_creation_context.settings["embedding_model"] = embedding_model
+        embeddings_creation = create_embeddings_container(
+            specification, sandbox_context, embeddings_creation_context
+        )
+        embeddings_container.set_created(embeddings_creation)
 
 
 def _create_creation_context(

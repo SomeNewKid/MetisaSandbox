@@ -15,6 +15,7 @@ from .specification_models import (
     CodeExecutionSpecification,
     DoclingSpecification,
     DocumentsSpecification,
+    EmbeddingsSpecification,
     HaproxyBackend,
     HaproxySpecification,
     JinaReaderSpecification,
@@ -23,6 +24,7 @@ from .specification_models import (
     LlmServerSpecification,
     McpServerSpecification,
     MetisaSpecification,
+    QdrantSpecification,
     SpecificationValidationError,
     SquidProxySpecification,
 )
@@ -264,6 +266,28 @@ def get_resolved_environs_for_documents(
     return _get_resolved_environs(specification.documents.environs)
 
 
+def get_resolved_environs_for_qdrant(
+    specification: MetisaSpecification,
+) -> list[str]:
+    """Resolve environment variables specified for the Qdrant container."""
+    if not specification.qdrant:
+        return []
+    if not specification.qdrant.environs:
+        return []
+    return _get_resolved_environs(specification.qdrant.environs)
+
+
+def get_resolved_environs_for_embeddings(
+    specification: MetisaSpecification,
+) -> list[str]:
+    """Resolve environment variables specified for the Embeddings container."""
+    if not specification.embeddings:
+        return []
+    if not specification.embeddings.environs:
+        return []
+    return _get_resolved_environs(specification.embeddings.environs)
+
+
 def _get_resolved_environs(
     environs: frozenset[str],
 ) -> list[str]:
@@ -377,6 +401,8 @@ def _create_metisa_specification(
             "code_execution",
             "docling",
             "documents",
+            "qdrant",
+            "embeddings",
         }
     )
 
@@ -397,6 +423,9 @@ def _create_metisa_specification(
     code_execution = _get_code_execution_specification(toml)
     docling = _get_docling_specification(toml)
     documents = _get_documents_specification(toml)
+    qdrant = _get_qdrant_specification(toml)
+    embeddings = _get_embeddings_specification(toml)
+
     specification = MetisaSpecification(
         agent_name=agent_name,
         capabilities=capabilities,
@@ -412,6 +441,8 @@ def _create_metisa_specification(
         code_execution=code_execution,
         docling=docling,
         documents=documents,
+        qdrant=qdrant,
+        embeddings=embeddings,
     )
 
     validate_specification(specification)
@@ -861,6 +892,7 @@ def _get_docling_specification(
     DOCLING_KEYS = frozenset(
         {
             "environs",
+            "embedding_model",
         }
     )
 
@@ -868,7 +900,21 @@ def _get_docling_specification(
 
     environs = _get_environs(docling, "Docling environs")
 
-    return DoclingSpecification(environs=environs)
+    embedding_model = docling.get("embedding_model", None)
+    if embedding_model is None:
+        raise SpecificationValidationError(
+            "TOML specification docling embedding_model must be specified."
+        )
+    if not isinstance(embedding_model, str):
+        raise SpecificationValidationError(
+            "TOML specification docling embedding_model must be a string."
+        )
+    if not embedding_model:
+        raise SpecificationValidationError(
+            "TOML specification docling embedding_model must be a non-empty string."
+        )
+
+    return DoclingSpecification(environs=environs, embedding_model=embedding_model)
 
 
 def _get_documents_specification(
@@ -927,6 +973,54 @@ def _get_code_execution_specification(
     return CodeExecutionSpecification(environs=environs)
 
 
+def _get_qdrant_specification(
+    toml: dict[str, object],
+) -> QdrantSpecification | None:
+    qdrant = toml.get("qdrant")
+    if not qdrant:
+        return None
+
+    if not isinstance(qdrant, dict):
+        raise SpecificationValidationError("TOML specification qdrant must be a table.")
+
+    QDRANT_KEYS = frozenset(
+        {
+            "environs",
+        }
+    )
+
+    _validate_known_keys(qdrant, "qdrant", QDRANT_KEYS)
+
+    environs = _get_environs(qdrant, "Qdrant environs")
+
+    return QdrantSpecification(environs=environs)
+
+
+def _get_embeddings_specification(
+    toml: dict[str, object],
+) -> EmbeddingsSpecification | None:
+    embeddings = toml.get("embeddings")
+    if not embeddings:
+        return None
+
+    if not isinstance(embeddings, dict):
+        raise SpecificationValidationError(
+            "TOML specification embeddings must be a table."
+        )
+
+    EMBEDDINGS_KEYS = frozenset(
+        {
+            "environs",
+        }
+    )
+
+    _validate_known_keys(embeddings, "embeddings", EMBEDDINGS_KEYS)
+
+    environs = _get_environs(embeddings, "Embeddings environs")
+
+    return EmbeddingsSpecification(environs=environs)
+
+
 def _validate_known_keys(
     table: dict[str, object],
     table_name: str,
@@ -937,8 +1031,9 @@ def _validate_known_keys(
         return
 
     formatted_keys = ", ".join(sorted(unknown_keys))
+    prefix = "TOML specification " if table_name != "TOML specification" else ""
     raise SpecificationValidationError(
-        f"TOML specification {table_name} contains unknown keys: {formatted_keys}."
+        f"{prefix}{table_name} contains unknown keys: {formatted_keys}."
     )
 
 

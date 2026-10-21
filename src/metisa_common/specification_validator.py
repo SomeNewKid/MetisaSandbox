@@ -15,6 +15,7 @@ from .specification_models import (
     LlmServerSpecification,
     McpServerSpecification,
     MetisaSpecification,
+    QdrantSpecification,
     SpecificationValidationError,
     SquidProxySpecification,
 )
@@ -69,6 +70,11 @@ def validate_specification(
     _validate_documents_specification(
         specification.capabilities,
         specification.documents,
+    )
+
+    _validate_qdrant_specification(
+        specification.capabilities,
+        specification.qdrant,
     )
 
 
@@ -217,6 +223,16 @@ def _validate_capabilities(
             raise SpecificationValidationError(
                 '"docling" capability requires "mcp_server" capability.'
             )
+        if Capability.DOCUMENTS not in capabilities:
+            raise SpecificationValidationError(
+                '"docling" capability requires "documents" capability.'
+            )
+
+    if Capability.EMBEDDINGS in capabilities:
+        if Capability.DOCLING not in capabilities:
+            raise SpecificationValidationError(
+                '"embeddings" capability requires "docling" capability.'
+            )
 
 
 def _validate_squid_proxy_specification(
@@ -321,6 +337,15 @@ def _validate_documents_specification(
     documents_specification: DocumentsSpecification | None,
 ):
     if documents_specification is None:
+        return
+    return
+
+
+def _validate_qdrant_specification(
+    capabilities: frozenset[Capability],
+    qdrant_specification: QdrantSpecification | None,
+):
+    if qdrant_specification is None:
         return
     return
 

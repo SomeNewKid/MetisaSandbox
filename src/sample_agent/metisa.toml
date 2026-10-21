@@ -10,8 +10,10 @@ capabilities = [
     # "code_execution",
     # "llm_server",
     # "llm_broker",
-    # "docling",
+    "docling",
     "documents",
+    "qdrant",
+    "embeddings",
 ]
 dependencies = [
     "requests==2.34.2",
@@ -51,8 +53,9 @@ tools = [
     "classify_text",
     "moderate_text",
     "anonymize_text",
-    "retrieve_from_docling_sample",
+    "extract_markdown_from_document",
     "retrieve_from_documents",
+    "get_matching_chunks",
 ]
 resources = [
     "test_resource_2",
@@ -88,7 +91,14 @@ environs = [
     "MKL_NUM_THREADS=1",
     "DOCLING_NUM_THREADS=1",
 ]
+embedding_model = "BAAI/bge-small-en-v1.5"
 
 [documents]
 environs = []
 local_directory = ".docs"
+
+[qdrant]
+environs = []
+
+[embeddings]
+environs = []

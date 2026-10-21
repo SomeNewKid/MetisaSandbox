@@ -1,0 +1,36 @@
+FROM qdrant/qdrant:v1.19.2-unprivileged
+
+# Install the HTTP client used by the health check.
+USER root
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --chmod=0444 qdrant.yaml /qdrant/config/metisa.yaml
+
+# Keep the initialization marker on writable storage.
+ENV QDRANT_INIT_FILE_PATH=/qdrant/storage/.qdrant-initialized
+
+# The official unprivileged image uses UID/GID 1000.
+USER 1000:1000
+
+HEALTHCHECK \
+    --start-period=30s \
+    --start-interval=1s \
+    --interval=30s \
+    --timeout=3s \
+    --retries=3 \
+    CMD curl \
+        --fail \
+        --silent \
+        --show-error \
+        --noproxy '*' \
+        --max-time 2 \
+        --output /dev/null \
+        http://127.0.0.1:6333/readyz \
+        || exit 1
+
+ENTRYPOINT ["/qdrant/qdrant"]
+
+CMD ["--config-path", "/qdrant/config/metisa.yaml"]

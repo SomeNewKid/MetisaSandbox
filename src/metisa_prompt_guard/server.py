@@ -1,4 +1,4 @@
-"""Server the Prompt Guard HTTP endpoints."""
+"""Server for the Prompt Guard HTTP endpoints."""
 
 import json
 from dataclasses import asdict

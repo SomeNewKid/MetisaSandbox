@@ -245,7 +245,9 @@ def _generate_image_tag(
     return f"{_IMAGE_FORMAT_VERSION}-{hash}"
 
 
-def _create_metisa_json(llm_broker: LlmBrokerSpecification | None) -> str:
+def _create_metisa_json(
+    llm_broker: LlmBrokerSpecification | None,
+) -> str:
     local_models: list[str] = []
     if llm_broker is not None:
         for alias in llm_broker.local_models:

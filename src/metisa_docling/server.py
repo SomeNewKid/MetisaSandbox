@@ -1,9 +1,12 @@
-"""Server the Docling HTTP endpoints."""
+"""Server for the Docling HTTP endpoints."""
 
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .converter import extract_from_sample_file
+from .converter import (
+    extract_markdown_from_document,
+    get_chunks_from_document,
+)
 
 _MAX_REQUEST_BYTES = 1024 * 1024  # 1 MiB
 _CODE_200_OK = 200
@@ -29,7 +32,10 @@ class _RequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:
-        if self.path != "/retrieve-from-sample":
+        if self.path not in [
+            "/extract-markdown-from-document",
+            "/get-chunks-from-document",
+        ]:
             self.send_error(_CODE_404_NOT_FOUND)
             return
 
@@ -82,7 +88,13 @@ class _RequestHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            data = extract_from_sample_file(filename)
+            if self.path == "/extract-markdown-from-document":
+                data = extract_markdown_from_document(filename)
+            elif self.path == "/get-chunks-from-document":
+                data = get_chunks_from_document(filename)
+            else:
+                self.send_error(_CODE_404_NOT_FOUND)
+                return
         except Exception:
             self.send_error(_CODE_500_INTERNAL_SERVER_ERROR, "Conversion failed")
             return

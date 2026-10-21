@@ -250,5 +250,9 @@ def _get_uid_gid(
             return (None, None)  # (10009, 10009) Jina Reader provides non-root user
         case "llama":
             return (None, None)  # (10010, 10010) Llama.pp provides non-root user
+        case "qdrant":
+            return (None, None)  # (1000, 1000) Qdrant provides non-root user
+        case "searcher":
+            return (10011, 10011)
         case _:
             raise ValueError(f"Unknown username: {username}")

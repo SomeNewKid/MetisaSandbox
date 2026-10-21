@@ -62,7 +62,18 @@ def create_docling_container(
     container_creation_context: ContainerCreationContext,
 ) -> ContainerCreationResult:
     """Create the Docling container and connect it to the Docker network."""
-    image_name = _ensure_docling_image_exists(specification)
+    embedding_model = container_creation_context.settings.get("embedding_model", None)
+    if embedding_model is None:
+        error = "Embedding model must be specified for the Docling container."
+        raise RuntimeError(error)
+    if not isinstance(embedding_model, str):
+        error = "Embedding model must be a string for the Docling container."
+        raise RuntimeError(error)
+    if not embedding_model:
+        error = "Embedding model cannot be empty for the Docling container."
+        raise RuntimeError(error)
+
+    image_name = _ensure_docling_image_exists(specification, embedding_model)
     container_name = _create_docling_container_name(sandbox_context.run_identifier)
 
     if not container_creation_context.network_names:
@@ -156,11 +167,16 @@ def create_docling_container(
 
 def _ensure_docling_image_exists(
     specification: MetisaSpecification,
+    embedding_model: str,
 ) -> str:
-    image_tag = _generate_image_tag(specification)
+    if not embedding_model:
+        error = "Embedding model must be specified for the Docling container."
+        raise RuntimeError(error)
+
+    image_tag = _generate_image_tag(specification, embedding_model)
     image_reference = f"{_DOCLING_IMAGE_NAME}:{image_tag}"
     if not docker_image_exists(image_reference):
-        _create_docling_image(specification, image_reference)
+        _create_docling_image(specification, image_reference, embedding_model)
     return image_reference
 
 
@@ -173,7 +189,12 @@ def _create_docling_container_name(
 def _create_docling_image(
     specification: MetisaSpecification,
     image_reference: str,
+    embedding_model: str,
 ) -> None:
+    if not embedding_model:
+        error = "Embedding model must be specified for the Docling container."
+        raise RuntimeError(error)
+
     dockerfile_location = _get_dockerfile_location()
     build_context_path = dockerfile_location.parent
 
@@ -188,6 +209,7 @@ def _create_docling_image(
             dockerfile_path=dockerfile_location,
             build_context_path=build_context_path,
             named_build_contexts={"temporary_dir": Path(temporary_dir)},
+            build_args=[f"TOKENIZER_MODEL={embedding_model}"],
         )
     finally:
         shutil.rmtree(temporary_dir)
@@ -202,7 +224,8 @@ def _get_dockerfile_location() -> Path:
 
 def _generate_image_tag(
     specification: MetisaSpecification,
+    embedding_model: str,
 ) -> str:
-    collection: list[str] = []
+    collection: list[str] = [embedding_model]
     hash = generate_image_tag(collection)
     return f"{_IMAGE_FORMAT_VERSION}-{hash}"

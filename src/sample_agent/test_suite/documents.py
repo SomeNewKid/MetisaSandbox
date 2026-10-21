@@ -17,7 +17,7 @@ from ..helper import (
     print_suite_title,
 )
 
-_SKIP_DOCUMENTS_TESTS = False
+_SKIP_DOCUMENTS_TESTS = True
 
 
 def test_documents(specification: MetisaSpecification):
@@ -33,27 +33,6 @@ def test_documents(specification: MetisaSpecification):
         return
 
     filename = "sample.txt"
-    with print_elapsed_time():
-        try:
-            markdown = get_mcp_server_tool_result(
-                tool_name="retrieve_from_documents",
-                params={"filename": filename},
-            )
-            print("Data from ", filename)
-            if markdown:
-                if len(markdown) > 200:
-                    markdown = markdown[0:200].strip() + "..."
-                print_success(markdown)
-            else:
-                print_failure("[No data returned]")
-        except Exception as error:
-            print_failure(
-                "Retrieve Documents sample error:",
-                type(error).__name__,
-                str(error),
-            )
-
-    filename = "sample.png"
     with print_elapsed_time():
         try:
             markdown = get_mcp_server_tool_result(

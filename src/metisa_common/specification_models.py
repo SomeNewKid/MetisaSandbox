@@ -25,6 +25,8 @@ class Capability(StrEnum):
     PLAYWRIGHT_CHROMIUM = "playwright_chromium"
     PROMPT_GUARD = "prompt_guard"
     ENTITY_GUARD = "entity_guard"
+    QDRANT = "qdrant"
+    EMBEDDINGS = "embeddings"
 
 
 class SpecificationValidationError(ValueError):
@@ -49,6 +51,8 @@ class MetisaSpecification:
     code_execution: CodeExecutionSpecification | None
     docling: DoclingSpecification | None
     documents: DocumentsSpecification | None
+    qdrant: QdrantSpecification | None
+    embeddings: EmbeddingsSpecification | None
 
 
 @dataclass(frozen=True)
@@ -130,10 +134,25 @@ class DoclingSpecification:
     """Represents the Docling section of the Metisa specification."""
 
     environs: frozenset[str]
+    embedding_model: str
 
 
 @dataclass(frozen=True)
 class CodeExecutionSpecification:
     """Represents the Code Execution section of the Metisa specification."""
+
+    environs: frozenset[str]
+
+
+@dataclass(frozen=True)
+class QdrantSpecification:
+    """Represents the Qdrant section of the Metisa specification."""
+
+    environs: frozenset[str]
+
+
+@dataclass(frozen=True)
+class EmbeddingsSpecification:
+    """Represents the Embeddings section of the Metisa specification."""
 
     environs: frozenset[str]
