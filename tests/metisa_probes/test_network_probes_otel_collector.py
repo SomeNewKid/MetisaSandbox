@@ -9,16 +9,16 @@ import pytest
 
 from metisa_common.specification_helper import parse_specification
 from metisa_common.specification_models import Capability
-from metisa_probes.container import network_probes
-from metisa_probes.probe_models import ProbeContext, ProbeFunction
+from metisa_probes._container import _network_probes
+from metisa_probes._probe_models import ProbeContext, ProbeFunction
 
 _PRESENCE_PROBES = (
-    network_probes.otel_collector_alias_resolves,
-    network_probes.otel_collector_listener_is_reachable,
+    _network_probes.otel_collector_alias_resolves,
+    _network_probes.otel_collector_listener_is_reachable,
 )
 _ABSENCE_PROBES = (
-    network_probes.otel_collector_alias_is_absent,
-    network_probes.otel_collector_listener_is_unavailable,
+    _network_probes.otel_collector_alias_is_absent,
+    _network_probes.otel_collector_listener_is_unavailable,
 )
 
 
@@ -32,7 +32,7 @@ def test_no_network_skips_without_io(
     lookup = Mock(side_effect=AssertionError("Unexpected DNS lookup"))
     connection = Mock(side_effect=AssertionError("Unexpected TCP connection"))
     monkeypatch.setattr(socket, "getaddrinfo", lookup)
-    monkeypatch.setattr(network_probes, "_tcp_connection_errors", connection)
+    monkeypatch.setattr(_network_probes, "_tcp_connection_errors", connection)
     capabilities = {Capability.OTEL_COLLECTOR} if collector_enabled else set()
 
     result = probe(_context(capabilities))
@@ -57,7 +57,7 @@ def test_inapplicable_capability_skips_without_io(
         socket, "getaddrinfo", Mock(side_effect=AssertionError("Unexpected lookup"))
     )
     monkeypatch.setattr(
-        network_probes,
+        _network_probes,
         "_tcp_connection_errors",
         Mock(side_effect=AssertionError("Unexpected connection")),
     )
@@ -81,7 +81,7 @@ def test_alias_requires_non_loopback_address(
     addresses = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (address, 0))]
     monkeypatch.setattr(socket, "getaddrinfo", Mock(return_value=addresses))
 
-    result = network_probes.otel_collector_alias_resolves(
+    result = _network_probes.otel_collector_alias_resolves(
         _context({Capability.NETWORK, Capability.OTEL_COLLECTOR})
     )
 
@@ -111,7 +111,7 @@ def test_absence_distinguishes_missing_alias_from_dns_failure(
     control = Mock(return_value=control_addresses)
     if isinstance(control_addresses, OSError):
         control.side_effect = control_addresses
-    monkeypatch.setattr(network_probes, "_resolve_network_alias", control)
+    monkeypatch.setattr(_network_probes, "_resolve_network_alias", control)
 
     result = probe(_context({Capability.NETWORK}))
 
@@ -126,7 +126,7 @@ def test_absence_rejects_a_resolvable_alias(monkeypatch: pytest.MonkeyPatch) -> 
     addresses = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("172.20.0.2", 0))]
     monkeypatch.setattr(socket, "getaddrinfo", Mock(return_value=addresses))
 
-    result = network_probes.otel_collector_alias_is_absent(
+    result = _network_probes.otel_collector_alias_is_absent(
         _context({Capability.NETWORK})
     )
 
@@ -150,12 +150,12 @@ def test_listener_checks_the_otlp_port(
     unavailable: bool,
 ) -> None:
     connection = Mock(return_value=errors)
-    monkeypatch.setattr(network_probes, "_tcp_connection_errors", connection)
+    monkeypatch.setattr(_network_probes, "_tcp_connection_errors", connection)
 
-    presence = network_probes.otel_collector_listener_is_reachable(
+    presence = _network_probes.otel_collector_listener_is_reachable(
         _context({Capability.NETWORK, Capability.OTEL_COLLECTOR})
     )
-    absence = network_probes.otel_collector_listener_is_unavailable(
+    absence = _network_probes.otel_collector_listener_is_unavailable(
         _context({Capability.NETWORK})
     )
 
@@ -167,7 +167,7 @@ def test_listener_checks_the_otlp_port(
 
 def test_collector_probes_are_registered() -> None:
     for probe in _PRESENCE_PROBES + _ABSENCE_PROBES:
-        assert probe in network_probes.NETWORK_PROBES.probes
+        assert probe in _network_probes.NETWORK_PROBES.probes
 
 
 def _context(capabilities: set[Capability]) -> ProbeContext:

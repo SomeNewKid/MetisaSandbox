@@ -10,6 +10,9 @@ import tomllib
 from importlib.util import find_spec
 from pathlib import Path
 
+from ._specification_validator import (
+    validate_specification,
+)
 from .specification_models import (
     Capability,
     CodeExecutionSpecification,
@@ -28,9 +31,6 @@ from .specification_models import (
     QdrantSpecification,
     SpecificationValidationError,
     SquidProxySpecification,
-)
-from .specification_validator import (
-    validate_specification,
 )
 
 _IMAGE_FORMAT_VERSION = 1

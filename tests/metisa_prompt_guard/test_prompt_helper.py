@@ -4,7 +4,7 @@ import base64
 
 import pytest
 
-from metisa_prompt_guard.helper import (
+from metisa_prompt_guard._helper import (
     expand_base64_encoded_text,
     expand_hex_encoded_text,
     get_normalized_words,

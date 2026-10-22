@@ -20,19 +20,19 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 
-from ._telemetry import initialize_tracing
-from .helper import (
+from ._helper import (
     create_declared_resource,
     create_declared_tool,
     create_resource,
     create_tool,
 )
-from .resources import (
+from ._resources import (
     test_resource_1,
     test_resource_2,
     test_resource_3,
 )
-from .tools import (
+from ._telemetry import initialize_tracing
+from ._tools import (
     anonymize_text,
     classify_text,
     execute_starlark_code,

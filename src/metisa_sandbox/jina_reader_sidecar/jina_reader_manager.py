@@ -10,20 +10,20 @@ from metisa_common.specification_helper import (
 )
 from metisa_common.specification_models import MetisaSpecification
 
-from ..docker.docker_container import (
+from .._docker._docker_container import (
     create_docker_container,
     inspect_docker_container,
     start_docker_container,
 )
-from ..docker.docker_hardening import (
+from .._docker._docker_hardening import (
     configure_http_proxy,
     harden_docker_container,
 )
-from ..docker.docker_image import (
+from .._docker._docker_image import (
     build_docker_image,
     docker_image_exists,
 )
-from ..sandbox_models import (
+from .._sandbox_models import (
     ContainerCreationContext,
     ContainerCreationResult,
     SandboxContainer,
@@ -104,7 +104,7 @@ def create_jina_reader_container(
         number_container_processes=512,
         file_size_limit=None,
         number_of_files=1024,
-        health_start_seconds=120,
+        health_start_seconds=360,
     )
 
     # The image name must be specified last in the arguments list.

@@ -4,10 +4,10 @@ import json
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .checker import run_checks
-from .koala_moderation import initialize_classifier as initialize_koala_classifier
-from .meta_llama import initialize_classifier as initialize_llama_classifier
-from .moderator import get_labels
+from ._checker import run_checks
+from ._koala_moderation import initialize_classifier as initialize_koala_classifier
+from ._meta_llama import initialize_classifier as initialize_llama_classifier
+from ._moderator import get_labels
 
 _MAX_REQUEST_BYTES = 1024 * 1024  # 1 MiB
 _CODE_200_OK = 200

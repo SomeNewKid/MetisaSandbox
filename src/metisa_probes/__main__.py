@@ -1,12 +1,6 @@
-"""Bootstrap the command-line application."""
+"""Execute the sandbox probe suite."""
 
-from . import cli
-
-
-def main() -> None:
-    """Run the command-line application."""
-    raise SystemExit(cli.main())
-
+from .runner import main
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from metisa_prompt_guard.checks.direct_prompt_injections import (
+from metisa_prompt_guard._checks._direct_prompt_injections import (
     has_attempt_to_change_authority,
     has_attempt_to_ignore_instructions,
     has_attempt_to_reveal_system_prompt,

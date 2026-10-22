@@ -6,19 +6,19 @@ from pathlib import Path
 
 from metisa_common.specification_helper import get_resolved_environs_for_metisa
 from metisa_common.specification_models import MetisaSpecification
-from metisa_sandbox.docker.docker_container import create_docker_container
+from metisa_sandbox._docker._docker_container import create_docker_container
 
-from ..docker.docker_hardening import (
+from .._docker._docker_hardening import (
     configure_http_proxy,
     harden_docker_container,
 )
-from ..sandbox_models import (
+from .._sandbox_models import (
     ContainerCreationContext,
     ContainerCreationResult,
     SandboxContainer,
     SandboxContext,
 )
-from .metisa_container_workspace import (
+from ._metisa_container_workspace import (
     LANDLOCK_MODULE_NAME,
     create_staged_source_directory,
 )

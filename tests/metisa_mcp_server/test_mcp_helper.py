@@ -5,7 +5,7 @@ from typing import Annotated
 
 from pydantic import Field
 
-from metisa_mcp_server.helper import (
+from metisa_mcp_server._helper import (
     create_declared_resource,
     create_declared_tool,
     create_input_schema,

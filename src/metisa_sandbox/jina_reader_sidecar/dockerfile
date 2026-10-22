@@ -3,17 +3,23 @@ FROM ghcr.io/jina-ai/reader:oss
 # Switch to the root user to perform hardening operations.
 USER root
 
-# Forward Chrome's stdout/stderr into the container logs.
+# Enable Chrome diagnostics and allow 60 seconds for browser startup.
 RUN node -e "\
     const fs = require('node:fs'); \
     const path = '/app/build/services/puppeteer.js'; \
     const source = fs.readFileSync(path, 'utf8'); \
-    const needle = 'puppeteer_1.default.launch({'; \
-    if (source.split(needle).length !== 2) { \
+    const launchNeedle = 'puppeteer_1.default.launch({'; \
+    const timeoutNeedle = 'timeout: 10_000,'; \
+    if (source.split(launchNeedle).length !== 2) { \
         throw new Error('Expected exactly one Puppeteer launch call'); \
     } \
-    const replacement = needle + '\n            dumpio: true,'; \
-    fs.writeFileSync(path, source.replace(needle, replacement));"
+    if (source.split(timeoutNeedle).length !== 2) { \
+        throw new Error('Expected exactly one ten-second timeout'); \
+    } \
+    const updated = source \
+        .replace(launchNeedle, launchNeedle + '\n            dumpio: true,') \
+        .replace(timeoutNeedle, 'timeout: 60_000,'); \
+    fs.writeFileSync(path, updated);"
 
 # Document ports 8080 and 8081 as the ports on which Jina Reader exposes its endpoints.
 # This does not publish the ports to the host.

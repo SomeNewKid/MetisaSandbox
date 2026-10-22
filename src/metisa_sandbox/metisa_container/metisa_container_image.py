@@ -9,7 +9,7 @@ from pathlib import Path
 
 from metisa_common.specification_models import MetisaSpecification
 
-from ..docker.docker_image import build_docker_image
+from .._docker._docker_image import build_docker_image
 
 
 def build_metisa_container_image(

@@ -7,7 +7,7 @@ from metisa_common.specification_models import (
     MetisaSpecification,
 )
 
-from ..helper import (
+from .._helper import (
     get_mcp_server_tool_result,
     print_caution,
     print_disabled,

@@ -80,13 +80,6 @@ def get_matching_chunks(
         if not isinstance(chunk_text, str):
             raise RuntimeError("Matching point has no valid chunk text.")
 
-        chunk_index = payload.get("chunk_index")
-        print()
-        print("******************************")
-        print(f"***** Chunk {chunk_index}: score={hit.score:.4f}", flush=True)
-        print()
-        print(payload.get("text"))
-
         matching_chunks.append(chunk_text)
 
     return matching_chunks

@@ -615,7 +615,7 @@ def _is_landlock_bootstrap_import(module_name: str) -> bool:
     while frame is not None:
         caller_module = frame.f_globals.get("__name__")
 
-        if caller_module == "metisa_landlock.landlock":
+        if caller_module == "metisa_landlock._landlock":
             return True
 
         frame = frame.f_back

@@ -11,7 +11,7 @@ from metisa_common.specification_models import (
     MetisaSpecification,
 )
 
-from ..helper import (
+from .._helper import (
     get_mcp_server_tool_result,
     print_caution,
     print_disabled,
@@ -22,7 +22,7 @@ from ..helper import (
     print_suite_title,
 )
 
-_SKIP_EMBEDDINGS_TESTS = True
+_SKIP_EMBEDDINGS_TESTS = False
 
 
 def test_embeddings(specification: MetisaSpecification):

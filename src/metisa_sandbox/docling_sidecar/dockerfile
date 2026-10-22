@@ -153,8 +153,8 @@ RUN set -eu; \
     done
     
 # Remove Python packages 
-RUN --mount=type=bind,source=remove_python_packaging.py,target=/tmp/remove_python_packaging.py,readonly \
-    python /tmp/remove_python_packaging.py
+RUN --mount=type=bind,source=_remove_python_packaging.py,target=/tmp/_remove_python_packaging.py,readonly \
+    python /tmp/_remove_python_packaging.py
 
 # Copy the metisa-source.pth file into the virtual environment's site-packages directory.
 # Allow for discovery of the Metisa source code within the virtual environment.

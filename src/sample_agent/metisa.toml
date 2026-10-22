@@ -1,8 +1,8 @@
 agent_name = "sample_agent"
 capabilities = [
     "network",
-    # "internet",
-    # "localnet",
+    "internet",
+    "localnet",
     "mcp_server",
     "prompt_guard",
     "entity_guard",
@@ -14,7 +14,7 @@ capabilities = [
     "documents",
     "qdrant",
     "embeddings",
-    # "otel_collector",
+    "otel_collector",
 ]
 dependencies = [
     "requests==2.34.2",

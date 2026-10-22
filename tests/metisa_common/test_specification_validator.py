@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from metisa_common.specification_validator import (
+from metisa_common._specification_validator import (
     is_valid_domain_name,
     is_valid_ipv4_address,
     is_valid_ipv6_address,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from metisa_prompt_guard.checker import (
+from metisa_prompt_guard._checker import (
     run_checks,
 )
 

@@ -1,12 +1,6 @@
-"""Bootstrap the command-line application."""
+"""Start the Landlock bootstrap process."""
 
-from . import cli
-
-
-def main() -> None:
-    """Run the command-line application."""
-    raise SystemExit(cli.main())
-
+from .bootstrap import main
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

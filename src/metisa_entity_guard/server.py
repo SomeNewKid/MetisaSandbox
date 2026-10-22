@@ -3,7 +3,7 @@
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .anonymize import anonymize, initialize_anonymizer_engine
+from ._anonymize import anonymize, initialize_anonymizer_engine
 
 _MAX_REQUEST_BYTES = 1024 * 1024  # 1 MiB
 _CODE_200_OK = 200

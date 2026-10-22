@@ -11,23 +11,23 @@ from pathlib import Path
 from metisa_common.specification_helper import generate_image_tag
 from metisa_common.specification_models import MetisaSpecification
 
-from ..docker.docker_container import (
+from .._docker._docker_container import (
     create_docker_container,
     execute_docker_command,
     inspect_docker_container,
     start_docker_container,
 )
-from ..docker.docker_hardening import (
+from .._docker._docker_hardening import (
     harden_docker_container,
 )
-from ..docker.docker_image import (
+from .._docker._docker_image import (
     build_docker_image,
     docker_image_exists,
 )
-from ..docker.docker_network import (
+from .._docker._docker_network import (
     connect_container_to_docker_network,
 )
-from ..sandbox_models import (
+from .._sandbox_models import (
     ContainerCreationContext,
     ContainerCreationResult,
     SandboxContainer,

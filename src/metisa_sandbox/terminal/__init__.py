@@ -1,1 +1,0 @@
-"""Metisa Sandbox Terminal module."""

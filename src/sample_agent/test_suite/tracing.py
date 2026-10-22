@@ -9,7 +9,7 @@ from metisa_common.specification_models import (
     MetisaSpecification,
 )
 
-from ..helper import (
+from .._helper import (
     print_elapsed_time,
     print_failure,
     print_success,

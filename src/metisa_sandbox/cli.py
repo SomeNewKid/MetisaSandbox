@@ -19,26 +19,26 @@ from metisa_common.terminal_helper import (
     terminal_status,
 )
 
-from .docker.docker_engine import (
+from ._docker._docker_engine import (
     docker_engine_started,
     start_docker_desktop,
 )
-from .docker.docker_image import (
+from ._docker._docker_image import (
     create_image_reference,
     docker_image_exists,
 )
-from .metisa_container.metisa_container_image import (
-    build_metisa_container_image,
-)
-from .sandbox_manager import (
+from ._sandbox_manager import (
     run_metisa_container_workload_in_sandbox,
 )
-from .terminal.terminal_helper import (
+from ._utilities._terminal_helper import (
     get_first_argument,
     get_user_approval,
     print_error,
     print_info,
     print_warning,
+)
+from .metisa_container.metisa_container_image import (
+    build_metisa_container_image,
 )
 
 

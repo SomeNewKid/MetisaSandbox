@@ -10,7 +10,7 @@ from metisa_common.specification_models import (
     MetisaSpecification,
 )
 
-from ..helper import (
+from .._helper import (
     print_message,
     print_success,
     print_suite_title,
