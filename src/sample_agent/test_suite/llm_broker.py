@@ -19,7 +19,7 @@ from .._helper import (
     print_suite_title,
 )
 
-_SKIP_LLM_BROKER_TESTS = True
+_SKIP_LLM_BROKER_TESTS = False
 
 
 def test_llm_broker(specification: MetisaSpecification):

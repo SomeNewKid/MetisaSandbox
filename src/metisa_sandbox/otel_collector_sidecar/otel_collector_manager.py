@@ -6,14 +6,12 @@ from pathlib import Path
 
 from metisa_common.specification_helper import (
     generate_image_tag,
-    get_resolved_environs_for_otel_collector,
+    resolve_environs,
 )
 from metisa_common.specification_models import MetisaSpecification
 
 from .._docker._docker_container import (
     create_docker_container,
-    inspect_docker_container,
-    start_docker_container,
 )
 from .._docker._docker_hardening import (
     harden_docker_container,
@@ -82,8 +80,10 @@ def create_otel_collector_container(
         ]
     )
 
-    specified_environs = get_resolved_environs_for_otel_collector(specification)
-    environs.extend(specified_environs)
+    # Get environment variables
+    if specification.otel_collector is not None:
+        resolved_environs = resolve_environs(specification.otel_collector.environs)
+        environs.extend(resolved_environs)
 
     # Harden the container
     harden_docker_container(
@@ -101,11 +101,6 @@ def create_otel_collector_container(
     )
 
     create_docker_container(arguments)
-
-    start_docker_container(container_name)
-    started_successfully = inspect_docker_container(container_name)
-    if not started_successfully:
-        raise RuntimeError("OpenTelemetry Collector sidecar failed to start.")
 
     return ContainerCreationResult(container_name)
 

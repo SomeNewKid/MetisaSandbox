@@ -19,7 +19,7 @@ from .._helper import (
     print_suite_title,
 )
 
-_SKIP_CODE_EXECUTION_TESTS = True
+_SKIP_CODE_EXECUTION_TESTS = False
 
 
 def test_code_execution(specification: MetisaSpecification):

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import http.client
 import json
-import os
 from pathlib import Path
 
 from starlette.applications import Starlette
@@ -12,6 +11,8 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.routing import Route
+
+from metisa_common.secrets_helper import load_secrets
 
 root_directory = Path(__file__).parent
 metisa_json_file = root_directory.with_name("metisa.json")
@@ -607,9 +608,16 @@ def _get_authorization_bearer(
 ) -> str | None:
     match model_alias:
         case "gpt-4o":
-            return os.getenv("OPENAI_API_KEY")
+            return _get_secret_value("OPENAI_API_KEY")
         case _:
             return None
+
+
+def _get_secret_value(
+    secret_name: str,
+) -> str:
+    secrets = load_secrets()
+    return secrets[secret_name]
 
 
 app = Starlette(

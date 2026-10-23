@@ -337,3 +337,135 @@ def test_mcp_server_environs_with_invalid_item(item: str) -> None:
     with pytest.raises(SpecificationValidationError) as error:
         _ = parse_specification(toml)
     assert "unknown keys" not in str(error.value)
+
+
+def test_mcp_server_missing_secrets() -> None:
+    """Default omitted MCP secrets to an empty collection."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
+
+        [mcp_server]
+        environs = []
+    """
+    specification = parse_specification(toml)
+    assert specification.mcp_server is not None
+    assert specification.mcp_server.secrets == frozenset()
+
+
+def test_mcp_server_empty_secrets() -> None:
+    """Recognize an MCP table containing only an empty secrets list."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
+
+        [mcp_server]
+        secrets = []
+    """
+    specification = parse_specification(toml)
+    assert specification.mcp_server is not None
+    assert specification.mcp_server.secrets == frozenset()
+    assert specification.mcp_server.environs == frozenset()
+
+
+def test_mcp_server_only_secrets() -> None:
+    """Hydrate MCP secrets without requiring tools, resources, or environs."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
+
+        [mcp_server]
+        secrets = ["TOKEN=${host:MCP_TOKEN}"]
+    """
+    specification = parse_specification(toml)
+    assert specification.mcp_server is not None
+    assert specification.mcp_server.secrets == frozenset({"TOKEN=${host:MCP_TOKEN}"})
+    assert specification.mcp_server.environs == frozenset()
+    assert specification.mcp_server.tools == ()
+    assert specification.mcp_server.resources == ()
+
+
+def test_mcp_server_valid_secrets() -> None:
+    """Preserve MCP secrets independently of other scopes and environs."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
+        secrets = ["SHARED=workload"]
+
+        [llm_broker]
+        secrets = ["SHARED=broker"]
+
+        [mcp_server]
+        environs = ["SHARED=public"]
+        secrets = [
+            "SHARED=mcp",
+            "TOKEN=${host:HOST_SECRET}",
+            "EMPTY=",
+            "COMPOSITE=part1=part2",
+        ]
+    """
+    specification = parse_specification(toml)
+    assert specification.mcp_server is not None
+    assert specification.mcp_server.secrets == frozenset(
+        {
+            "SHARED=mcp",
+            "TOKEN=${host:HOST_SECRET}",
+            "EMPTY=",
+            "COMPOSITE=part1=part2",
+        }
+    )
+    assert specification.mcp_server.environs == frozenset({"SHARED=public"})
+    assert specification.secrets == frozenset({"SHARED=workload"})
+    assert specification.llm_broker is not None
+    assert specification.llm_broker.secrets == frozenset({"SHARED=broker"})
+
+
+@pytest.mark.parametrize("name", ["PATH", "HTTP_PROXY", "METISA_RUNTIME_ROLE"])
+def test_mcp_server_secrets_accept_reserved_names(name: str) -> None:
+    """Allow secret names that are reserved for environment declarations."""
+    toml = f"""
+        agent_name = "sample_agent"
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
+
+        [mcp_server]
+        secrets = ["{name}=value"]
+    """
+    specification = parse_specification(toml)
+    assert specification.mcp_server is not None
+    assert specification.mcp_server.secrets == frozenset({f"{name}=value"})
+
+
+@pytest.mark.parametrize(
+    "item",
+    ["123", '""', '"   "', '"NAME"', '"NAME=${vault:secret}"', '"NAME=${host:secret"'],
+)
+def test_mcp_server_secrets_with_invalid_item(item: str) -> None:
+    """Reject an invalid secret among otherwise valid MCP declarations."""
+    toml = f"""
+        agent_name = "sample_agent"
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
+
+        [mcp_server]
+        secrets = ["VALID=value", {item}, "ALSO_VALID=value"]
+    """
+    with pytest.raises(SpecificationValidationError) as error:
+        _ = parse_specification(toml)
+    assert "unknown keys" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "secrets",
+    ['"NAME=value"', '""', "123", "0", "true", "false", '{ NAME = "value" }', "{}"],
+)
+def test_mcp_server_not_iterable_secrets(secrets: str) -> None:
+    """Require MCP secret declarations to be an array."""
+    toml = f"""
+        agent_name = "sample_agent"
+        capabilities = ["network", "mcp_server", "prompt_guard", "entity_guard"]
+
+        [mcp_server]
+        secrets = {secrets}
+    """
+    with pytest.raises(SpecificationValidationError) as error:
+        _ = parse_specification(toml)
+    assert "unknown keys" not in str(error.value)

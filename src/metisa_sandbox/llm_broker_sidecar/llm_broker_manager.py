@@ -7,9 +7,11 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from metisa_common.secrets_helper import SECRETS_DIRECTORY
 from metisa_common.specification_helper import (
     generate_image_tag,
-    get_resolved_environs_for_llm_broker,
+    resolve_environs,
+    resolve_secrets,
 )
 from metisa_common.specification_models import (
     LlmBrokerSpecification,
@@ -18,8 +20,6 @@ from metisa_common.specification_models import (
 
 from .._docker._docker_container import (
     create_docker_container,
-    inspect_docker_container,
-    start_docker_container,
 )
 from .._docker._docker_hardening import (
     configure_http_proxy,
@@ -37,6 +37,9 @@ from .._sandbox_models import (
     ContainerCreationResult,
     SandboxContainer,
     SandboxContext,
+)
+from .._utilities._secrets_helper import (
+    create_secrets_file,
 )
 from ._llm_broker_workspace import (
     LLM_BROKER_MODULE_NAME,
@@ -99,14 +102,6 @@ def create_llm_broker_container(
         _LLM_BROKER_NETWORK_ALIAS,
     ]
 
-    # Mount temporary (in memory) filesystems.
-    arguments.extend(
-        [
-            "--tmpfs",
-            "/tmp:rw,size=16m,nosuid,nodev,noexec",
-        ]
-    )
-
     # Mount the necessary volumes.
     arguments.extend(
         [
@@ -120,6 +115,12 @@ def create_llm_broker_container(
         [
             "--tmpfs",
             "/tmp:rw,size=16m,nosuid,nodev,noexec",
+            "--tmpfs",
+            (
+                f"{SECRETS_DIRECTORY.as_posix()}:"
+                "rw,size=64k,nosuid,nodev,noexec,"
+                "uid=10005,gid=10005,mode=0700"
+            ),
         ]
     )
 
@@ -136,8 +137,14 @@ def create_llm_broker_container(
     if squid_proxy_url is not None and _USE_SQUID_PROXY:
         configure_http_proxy(environs, squid_proxy_url)
 
-    specified_environs = get_resolved_environs_for_llm_broker(specification)
-    environs.extend(specified_environs)
+    # Handle the secrets for the container
+    secrets = resolve_secrets(specification.llm_broker.secrets)
+    secrets_file, secrets_key = create_secrets_file(staged_source_path, secrets)
+
+    # Get environment variables
+    if specification.llm_broker is not None:
+        resolved_environs = resolve_environs(specification.llm_broker.environs)
+        environs.extend(resolved_environs)
 
     # Harden the container
     harden_docker_container(
@@ -181,12 +188,12 @@ def create_llm_broker_container(
                 aliases=(_LLM_BROKER_NETWORK_ALIAS,),
             )
 
-    start_docker_container(container_name)
-    started_successfully = inspect_docker_container(container_name)
-    if not started_successfully:
-        raise RuntimeError("LLM Broker sidecar failed to start.")
-
-    return ContainerCreationResult(container_name, staged_source=staged_source_path)
+    return ContainerCreationResult(
+        container_name,
+        staged_source=staged_source_path,
+        secrets_file=secrets_file,
+        secrets_key=secrets_key,
+    )
 
 
 def _ensure_llm_broker_image_exists(

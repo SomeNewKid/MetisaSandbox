@@ -131,10 +131,13 @@ class SandboxContainer:
         self._name = self._validate_name(name)
         self._instance_name: str | None = None
         self._is_created = False
+        self._is_started = False
         self._network_alias: str | None = network_alias or name
         self._network_ip_address: str | None = network_ip_address
         self._network_url: str | None = network_url
         self._staged_source: Path | None = staged_source
+        self._secrets_file: Path | None = None
+        self._secrets_key: bytes | None = None
         self._log_folder: str | None = log_folder
         self._log_files: list[str] = log_files or []
 
@@ -190,6 +193,16 @@ class SandboxContainer:
         """Get the path to the staged source of the container."""
         return self._staged_source
 
+    @property
+    def secrets_file(self) -> Path | None:
+        """Get the path to the secrets file of the container."""
+        return self._secrets_file
+
+    @property
+    def secrets_key(self) -> bytes | None:
+        """Get the key used to encrypt the secrets of the container."""
+        return self._secrets_key
+
     @staged_source.setter
     def staged_source(self, value: Path | None) -> None:
         """Set the path to the staged source of the container."""
@@ -224,7 +237,18 @@ class SandboxContainer:
         """Mark the container as having been created."""
         self._instance_name = creation_result.container_name
         self._staged_source = creation_result.staged_source
+        self._secrets_file = creation_result.secrets_file
+        self._secrets_key = creation_result.secrets_key
         self._is_created = True
+
+    @property
+    def is_started(self) -> bool:
+        """Return a flag indicating if the container has been started."""
+        return self._is_started
+
+    def set_started(self) -> None:
+        """Mark the container as having been started."""
+        self._is_started = True
 
     def remove(self) -> None:
         """Remove the Docker container."""
@@ -301,6 +325,8 @@ class ContainerCreationResult:
 
     container_name: str
     staged_source: Path | None = None
+    secrets_file: Path | None = None
+    secrets_key: bytes | None = None
 
 
 class SandboxNetwork:

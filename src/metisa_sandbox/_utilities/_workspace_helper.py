@@ -42,6 +42,18 @@ def clean_up_staged_sources(
             shutil.rmtree(staged_source, ignore_errors=False)
 
 
+def clean_up_secrets_files(
+    sandbox_containers: list[SandboxContainer],
+) -> None:
+    """Clean up secrets files for the given sandbox containers."""
+    for sandbox_container in sandbox_containers:
+        if not sandbox_container.is_created:
+            continue
+        secrets_file = sandbox_container.secrets_file
+        if secrets_file is not None and secrets_file.exists():
+            secrets_file.unlink()
+
+
 def copy_directories_into_staged(
     source_directory: Path,
     target_directory: Path,

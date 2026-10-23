@@ -1,4 +1,4 @@
-"""Test LLM Broker capability and environment declarations."""
+"""Test LLM Broker capability, environment, and secret declarations."""
 
 from __future__ import annotations
 
@@ -167,6 +167,142 @@ def test_llm_broker_not_iterable_environs(environs: str) -> None:
 
         [llm_broker]
         environs = {environs}
+    """
+    with pytest.raises(SpecificationValidationError) as error:
+        _ = parse_specification(toml)
+    assert "unknown keys" not in str(error.value)
+
+
+def test_llm_broker_missing_secrets() -> None:
+    """Default omitted broker secrets to an empty collection."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "llm_broker", "prompt_guard", "entity_guard"]
+
+        [llm_broker]
+        environs = []
+    """
+    specification = parse_specification(toml)
+    assert specification.llm_broker is not None
+    assert specification.llm_broker.secrets == frozenset()
+
+
+def test_llm_broker_empty_secrets() -> None:
+    """Recognize a broker table containing only an empty secrets list."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "llm_broker", "prompt_guard", "entity_guard"]
+
+        [llm_broker]
+        secrets = []
+    """
+    specification = parse_specification(toml)
+    assert specification.llm_broker is not None
+    assert specification.llm_broker.secrets == frozenset()
+    assert specification.llm_broker.environs == frozenset()
+    assert specification.mcp_server is None
+
+
+def test_llm_broker_only_secrets() -> None:
+    """Hydrate broker secrets without requiring environs or an MCP server."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "llm_broker", "prompt_guard", "entity_guard"]
+
+        [llm_broker]
+        secrets = ["OPENAI_API_KEY=${host:OPENAI_API_KEY}"]
+    """
+    specification = parse_specification(toml)
+    assert specification.llm_broker is not None
+    assert specification.llm_broker.secrets == frozenset(
+        {"OPENAI_API_KEY=${host:OPENAI_API_KEY}"}
+    )
+    assert specification.llm_broker.environs == frozenset()
+    assert specification.mcp_server is None
+
+
+def test_llm_broker_valid_secrets() -> None:
+    """Preserve broker secrets independently of other scopes and environs."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network", "llm_broker", "mcp_server", "prompt_guard", "entity_guard"
+        ]
+        secrets = ["SHARED=workload"]
+
+        [mcp_server]
+        secrets = ["SHARED=mcp"]
+
+        [llm_broker]
+        environs = ["SHARED=public"]
+        secrets = [
+            "SHARED=broker",
+            "TOKEN=${host:HOST_SECRET}",
+            "EMPTY=",
+            "COMPOSITE=part1=part2",
+        ]
+    """
+    specification = parse_specification(toml)
+    assert specification.llm_broker is not None
+    assert specification.llm_broker.secrets == frozenset(
+        {
+            "SHARED=broker",
+            "TOKEN=${host:HOST_SECRET}",
+            "EMPTY=",
+            "COMPOSITE=part1=part2",
+        }
+    )
+    assert specification.llm_broker.environs == frozenset({"SHARED=public"})
+    assert specification.secrets == frozenset({"SHARED=workload"})
+    assert specification.mcp_server is not None
+    assert specification.mcp_server.secrets == frozenset({"SHARED=mcp"})
+
+
+@pytest.mark.parametrize("name", ["PATH", "HTTP_PROXY", "METISA_RUNTIME_ROLE"])
+def test_llm_broker_secrets_accept_reserved_names(name: str) -> None:
+    """Allow secret names that are reserved for environment declarations."""
+    toml = f"""
+        agent_name = "sample_agent"
+        capabilities = ["network", "llm_broker", "prompt_guard", "entity_guard"]
+
+        [llm_broker]
+        secrets = ["{name}=value"]
+    """
+    specification = parse_specification(toml)
+    assert specification.llm_broker is not None
+    assert specification.llm_broker.secrets == frozenset({f"{name}=value"})
+
+
+@pytest.mark.parametrize(
+    "item",
+    ["123", '""', '"   "', '"NAME"', '"NAME=${vault:secret}"', '"NAME=${host:secret"'],
+)
+def test_llm_broker_secrets_with_invalid_item(item: str) -> None:
+    """Reject an invalid secret among otherwise valid broker declarations."""
+    toml = f"""
+        agent_name = "sample_agent"
+        capabilities = ["network", "llm_broker", "prompt_guard", "entity_guard"]
+
+        [llm_broker]
+        secrets = ["VALID=value", {item}, "ALSO_VALID=value"]
+    """
+    with pytest.raises(SpecificationValidationError) as error:
+        _ = parse_specification(toml)
+    assert "unknown keys" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "secrets",
+    ['"NAME=value"', '""', "123", "0", "true", "false", '{ NAME = "value" }', "{}"],
+)
+def test_llm_broker_not_iterable_secrets(secrets: str) -> None:
+    """Require broker secret declarations to be an array."""
+    toml = f"""
+        agent_name = "sample_agent"
+        capabilities = ["network", "llm_broker", "prompt_guard", "entity_guard"]
+
+        [llm_broker]
+        secrets = {secrets}
     """
     with pytest.raises(SpecificationValidationError) as error:
         _ = parse_specification(toml)

@@ -11,10 +11,12 @@ from typing import Annotated, Any, TypedDict
 import requests
 from pydantic import Field
 
+from metisa_common.secrets_helper import load_secrets
+
 _MARIADB_HOST_ENVIRONMENT_VARIABLE = "MARIADB_HOST"
 _MARIADB_PORT_ENVIRONMENT_VARIABLE = "MARIADB_PORT"
 _MARIADB_DATABASE_ENVIRONMENT_VARIABLE = "MARIADB_DATABASE"
-_MARIADB_CREDENTIALS_ENVIRONMENT_VARIABLE = "SANDBOX_TESTER_MARIADB_CREDENTIALS"
+_MARIADB_CREDENTIALS_SECRET_NAME = "SANDBOX_TESTER_MARIADB_CREDENTIALS"
 _DEFAULT_MARIADB_HOST = "metisa-haproxy"
 _DEFAULT_MARIADB_PORT = 3306
 _DEFAULT_MARIADB_DATABASE = "agent_allowed"
@@ -432,16 +434,18 @@ def _read_mariadb_connection_settings(
 
 
 def _read_mariadb_credentials() -> tuple[str, str]:
-    value = os.environ.get(_MARIADB_CREDENTIALS_ENVIRONMENT_VARIABLE)
+    secrets = load_secrets()
+
+    value = secrets[_MARIADB_CREDENTIALS_SECRET_NAME]
     if value is None:
         raise RuntimeError(
-            f"{_MARIADB_CREDENTIALS_ENVIRONMENT_VARIABLE} is not configured."
+            f"Secret '{_MARIADB_CREDENTIALS_SECRET_NAME}' is not configured."
         )
 
     username, separator, password = value.partition(",")
     if not separator or not username.strip() or not password:
         raise RuntimeError(
-            f"{_MARIADB_CREDENTIALS_ENVIRONMENT_VARIABLE} must use "
+            f"Secret '{_MARIADB_CREDENTIALS_SECRET_NAME}' must use "
             "the format 'username,password'."
         )
 

@@ -7,6 +7,9 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
+from metisa_common.secrets_helper import (
+    wait_for_secrets,
+)
 from metisa_common.specification_helper import (
     get_workload_specification_path,
     load_specification,
@@ -37,6 +40,16 @@ def main(
     specification_path = get_workload_specification_path(workload_module)
     specification = load_specification(specification_path)
     log_file_path = _get_landlock_log_path()
+
+    try:
+        with terminal_status(
+            running="Waiting for secrets provisioning...",
+            success="Completed secrets provisioning.",
+            failure="Could not provision secrets.",
+        ):
+            wait_for_secrets()
+    except (OSError, TimeoutError, ValueError):
+        return 1
 
     try:
         with terminal_status(

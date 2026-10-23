@@ -17,7 +17,7 @@ from .._helper import (
     print_suite_title,
 )
 
-_SKIP_PROMPT_GUARD_TESTS = True
+_SKIP_PROMPT_GUARD_TESTS = False
 
 
 def test_prompt_guard(specification: MetisaSpecification):

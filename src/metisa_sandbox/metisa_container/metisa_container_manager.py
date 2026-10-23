@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from metisa_common.specification_helper import get_resolved_environs_for_metisa
+from metisa_common.secrets_helper import SECRETS_DIRECTORY
+from metisa_common.specification_helper import resolve_environs, resolve_secrets
 from metisa_common.specification_models import MetisaSpecification
 from metisa_sandbox._docker._docker_container import create_docker_container
 
@@ -17,6 +18,9 @@ from .._sandbox_models import (
     ContainerCreationResult,
     SandboxContainer,
     SandboxContext,
+)
+from .._utilities._secrets_helper import (
+    create_secrets_file,
 )
 from ._metisa_container_workspace import (
     LANDLOCK_MODULE_NAME,
@@ -60,7 +64,7 @@ def create_metisa_workload_container(
         raise RuntimeError("Metisa Workload workload module must be a string.")
 
     is_network_required = creation_settings.get("is_network_required", None)
-    if not is_network_required:
+    if is_network_required is None:
         raise RuntimeError("Metisa Workload requires a network-required flag.")
     if not isinstance(is_network_required, bool):
         raise RuntimeError("Metisa Workload network-required flag must be a bool.")
@@ -131,6 +135,12 @@ def create_metisa_workload_container(
             f"{_GUEST_WORK_DIR}:rw,size=1m,nosuid,nodev,noexec",
             "--tmpfs",
             "/tmp:rw,size=16m,nosuid,nodev,noexec",
+            "--tmpfs",
+            (
+                f"{SECRETS_DIRECTORY.as_posix()}:"
+                "rw,size=64k,nosuid,nodev,noexec,"
+                "uid=10001,gid=10001,mode=0700"
+            ),
         ]
     )
 
@@ -150,7 +160,15 @@ def create_metisa_workload_container(
         ]
     )
 
-    specified_environs = get_resolved_environs_for_metisa(specification)
+    # Handle the secrets for the container
+    secrets = resolve_secrets(specification.secrets)
+    secrets_file, secrets_key = create_secrets_file(staged_source_path, secrets)
+
+    if not secrets_file.is_file():
+        raise FileNotFoundError(f"Secrets file not created: {secrets_file}")
+
+    # Handle the environment variables
+    specified_environs = resolve_environs(specification.environs)
     environs.extend(specified_environs)
 
     environs.append(f"METISA_RUN_ID={sandbox_context.run_identifier}")
@@ -191,4 +209,6 @@ def create_metisa_workload_container(
     return ContainerCreationResult(
         sandbox_context.workload_container_name,
         staged_source=staged_source_path,
+        secrets_file=secrets_file,
+        secrets_key=secrets_key,
     )

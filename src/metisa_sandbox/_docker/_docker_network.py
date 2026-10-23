@@ -131,7 +131,7 @@ def get_docker_container_ip_address(
     address = network.get("IPAddress")
     if not isinstance(address, str) or not address:
         raise RuntimeError(
-            f"Container '{container_name}' has not IPv4 address "
+            f"Container '{container_name}' has no IPv4 address "
             f"on network '{network_name}'."
         )
 

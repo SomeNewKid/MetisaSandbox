@@ -27,6 +27,7 @@ from .test_suite.internet import test_internet_access
 from .test_suite.jina_reader import test_jina_reader
 from .test_suite.llm_broker import test_llm_broker
 from .test_suite.prompt_guard import test_prompt_guard
+from .test_suite.secrets import test_secrets
 from .test_suite.tracing import test_tracing
 
 root_directory = Path(__file__).parent
@@ -74,6 +75,7 @@ def _run_tests(specification: MetisaSpecification) -> None:
     test_documents(specification)
     test_docling(specification)
     test_embeddings(specification)
+    test_secrets(specification)
 
     print()
     print("-" * 30, flush=True)

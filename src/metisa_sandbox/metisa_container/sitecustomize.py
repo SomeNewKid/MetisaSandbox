@@ -31,6 +31,7 @@ _VALID_RUNTIME_ROLES = frozenset(
         "runner",
         "probes",
         "workload",
+        "provisioner",
     }
 )
 

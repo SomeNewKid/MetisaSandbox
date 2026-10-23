@@ -17,7 +17,7 @@ from .._helper import (
     print_suite_title,
 )
 
-_SKIP_DOCUMENTS_TESTS = True
+_SKIP_DOCUMENTS_TESTS = False
 
 
 def test_documents(specification: MetisaSpecification):

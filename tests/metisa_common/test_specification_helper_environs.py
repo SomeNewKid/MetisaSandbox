@@ -129,6 +129,28 @@ def test_empty_environs() -> None:
     assert specification.environs == frozenset()
 
 
+@pytest.mark.parametrize(
+    "environs",
+    [
+        ["NAME=value", "NAME=value"],
+        ["NAME=first", "NAME=second"],
+        ["NAME=first", "OTHER=value", "NAME=second"],
+        ["NAME=literal", "NAME=${host:HOST_NAME}"],
+        ["NAME=", "NAME=value"],
+    ],
+    ids=["identical", "conflicting", "non-adjacent", "host-reference", "empty-value"],
+)
+def test_environs_reject_duplicate_keys(environs: list[str]) -> None:
+    """Reject repeated variable names regardless of their assignment values."""
+    declarations = json.dumps(environs)
+    toml = f"""
+        agent_name = "sample_agent"
+        environs = {declarations}
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
 @pytest.mark.parametrize("item", ["123", "true", "[]", "{}"])
 def test_environs_with_an_invalid_type(item: str) -> None:
     """Reject non-string items even when valid strings precede them."""
@@ -139,6 +161,17 @@ def test_environs_with_an_invalid_type(item: str) -> None:
     with pytest.raises(SpecificationValidationError) as error:
         _ = parse_specification(toml)
     assert "unknown keys" not in str(error.value)
+
+
+def test_environs_reject_null_character_in_value() -> None:
+    """Reject a NUL character decoded from a valid TOML string escape."""
+    declaration = json.dumps("NAME=before\x00after")
+    toml = f"""
+        agent_name = "sample_agent"
+        environs = [{declaration}]
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
 
 
 def test_environs_with_an_empty_value() -> None:
@@ -343,7 +376,7 @@ def test_valid_environs() -> None:
             "TOKEN=part1=part2",
             "URL=https://example.com:443/path",
             "LITERAL={host:NAME}",
-            "LITERAL=prefix-${host:NAME}",
+            "PREFIXED_LITERAL=prefix-${host:NAME}",
         ]
     """
     specification = parse_specification(toml)
@@ -356,6 +389,6 @@ def test_valid_environs() -> None:
             "TOKEN=part1=part2",
             "URL=https://example.com:443/path",
             "LITERAL={host:NAME}",
-            "LITERAL=prefix-${host:NAME}",
+            "PREFIXED_LITERAL=prefix-${host:NAME}",
         }
     )

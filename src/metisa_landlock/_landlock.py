@@ -233,6 +233,15 @@ _LANDLOCK_RULES: tuple[_LandlockRule, ...] = (
             }
         ),
     ),
+    _LandlockRule(
+        Path("/run/metisa-secrets"),
+        frozenset(
+            {
+                _LandlockPermission.READ_FILE,
+                _LandlockPermission.READ_DIRECTORY,
+            }
+        ),
+    ),
 )
 
 

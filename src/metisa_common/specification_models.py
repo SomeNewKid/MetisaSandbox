@@ -42,6 +42,7 @@ class MetisaSpecification:
     capabilities: frozenset[Capability]
     dependencies: frozenset[str]
     environs: frozenset[str]
+    secrets: frozenset[str]
     settings: dict[str, str]
     haproxy: HaproxySpecification | None
     squid_proxy: SquidProxySpecification | None
@@ -61,6 +62,7 @@ class MetisaSpecification:
 class HaproxySpecification:
     """Represents the HAProxy section of the Metisa specification."""
 
+    environs: frozenset[str]
     backends: tuple[HaproxyBackend, ...]
 
 
@@ -77,6 +79,7 @@ class HaproxyBackend:
 class SquidProxySpecification:
     """Represents the Squid Proxy section of the Metisa specification."""
 
+    environs: frozenset[str]
     allowed_domains: tuple[str, ...]
     allowed_ip_addresses: tuple[str, ...]
 
@@ -110,9 +113,10 @@ class DocumentsSpecification:
 class McpServerSpecification:
     """Represents the MCP Server section of the Metisa specification."""
 
+    environs: frozenset[str]
+    secrets: frozenset[str]
     tools: tuple[str, ...]
     resources: tuple[str, ...]
-    environs: frozenset[str]
 
 
 @dataclass(frozen=True)
@@ -120,6 +124,7 @@ class LlmBrokerSpecification:
     """Represents the LLM Broker section of the Metisa specification."""
 
     environs: frozenset[str]
+    secrets: frozenset[str]
     local_models: tuple[str, ...]
     online_models: tuple[str, ...]
 

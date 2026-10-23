@@ -20,7 +20,7 @@ from .._helper import (
     print_suite_title,
 )
 
-_SKIP_ENTITY_GUARD_TESTS = True
+_SKIP_ENTITY_GUARD_TESTS = False
 
 
 def test_entity_guard(specification: MetisaSpecification):

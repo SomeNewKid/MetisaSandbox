@@ -11,8 +11,6 @@ from metisa_common.specification_models import LlmModel, MetisaSpecification
 
 from .._docker._docker_container import (
     create_docker_container,
-    inspect_docker_container,
-    start_docker_container,
 )
 from .._docker._docker_hardening import (
     harden_docker_container,
@@ -153,11 +151,6 @@ def _create_llm_server_container(
     )
 
     create_docker_container(arguments)
-
-    start_docker_container(container_name)
-    started_successfully = inspect_docker_container(container_name)
-    if not started_successfully:
-        raise RuntimeError(f"LLM server '{container_alias}' failed to start.")
 
     return container_name
 

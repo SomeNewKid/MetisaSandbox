@@ -79,6 +79,7 @@ COPY --from=builder /opt/metisa-venv /opt/metisa-venv
 
 # Copy the embedding models
 COPY --from=builder /models /models
+RUN chmod -R a+rX /models
 
 # Remove installation distributions supplied by base image.
 RUN python -m pip uninstall \

@@ -17,7 +17,7 @@ from .._helper import (
     print_suite_title,
 )
 
-_SKIP_DATABASE_TESTS = True
+_SKIP_DATABASE_TESTS = False
 
 
 def test_database_access(specification: MetisaSpecification):

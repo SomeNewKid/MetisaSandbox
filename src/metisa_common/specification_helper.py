@@ -167,15 +167,76 @@ def environ_is_valid(
     environ: str,
 ) -> bool:
     """Validate the TOML environ value."""
+    return _environ_or_secret_is_valid(environ, disallow_reserved_names=True)
+
+
+def resolve_environs(
+    environs: frozenset[str],
+) -> list[str]:
+    """Resolve environment declarations."""
+    resolved_environs: list[str] = []
+
+    if not environs:
+        return resolved_environs
+
+    for environ in environs:
+        if not environ_is_valid(environ):
+            raise ValueError(f"Environ is not valid: {environ}")
+        resolved_environ = _resolve_environ(environ)
+        resolved_environs.append(resolved_environ)
+
+    return resolved_environs
+
+
+def resolve_secrets(
+    secrets: frozenset[str],
+) -> dict[str, str]:
+    """Resolve secret declarations."""
+    resolved_secrets: dict[str, str] = {}
+
+    if not secrets:
+        return resolved_secrets
+
+    for secret in secrets:
+        if not _secret_is_valid(secret):
+            raise ValueError(f"Secret is not valid: {secret}")
+        resolved_secret = _resolve_environ(secret)
+        name, value = _get_environ_name_value(resolved_secret)
+        resolved_secrets[name] = value
+
+    return resolved_secrets
+
+
+# Example in a `metisa.toml` file:
+#   secrets = [
+#     "METISA_PROBE_1=hard-coded value",
+#     "METISA_PROBE_2=${host:METISA_PROBE_2}",
+#   ]
+# The latter uses a simple version of the named-resolver pattern
+# https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html
+def _secret_is_valid(
+    secret: str,
+) -> bool:
+    """Validate the TOML secret value."""
+    return _environ_or_secret_is_valid(secret, disallow_reserved_names=False)
+
+
+def _environ_or_secret_is_valid(
+    pair: str, disallow_reserved_names: bool = False
+) -> bool:
+    """Validate the TOML pair value."""
     try:
-        name, value = _get_environ_name_value(environ)
+        name, value = _get_environ_name_value(pair)
     except ValueError:
         return False
 
-    if _environ_name_is_reserved(name):
+    if disallow_reserved_names and _environ_name_is_reserved(name):
         return False
 
     if not re.fullmatch("[A-Za-z_][A-Za-z0-9_]*", name):
+        return False
+
+    if "\x00" in value:  # null character not permitted
         return False
 
     if not value.startswith("${"):
@@ -192,126 +253,6 @@ def environ_is_valid(
         return False
 
     return resolver_value is not None
-
-
-def get_resolved_environs_for_metisa(
-    specification: MetisaSpecification,
-) -> list[str]:
-    """Resolve environment variables specified for the Metisa workload container."""
-    return _get_resolved_environs(specification.environs)
-
-
-def get_resolved_environs_for_mcp_server(
-    specification: MetisaSpecification,
-) -> list[str]:
-    """Resolve environment variables specified for the MCP server container."""
-    if not specification.mcp_server:
-        return []
-    if not specification.mcp_server.environs:
-        return []
-    return _get_resolved_environs(specification.mcp_server.environs)
-
-
-def get_resolved_environs_for_llm_broker(
-    specification: MetisaSpecification,
-) -> list[str]:
-    """Resolve environment variables specified for the LLM Broker container."""
-    if not specification.llm_broker:
-        return []
-    if not specification.llm_broker.environs:
-        return []
-    return _get_resolved_environs(specification.llm_broker.environs)
-
-
-def get_resolved_environs_for_jina_reader(
-    specification: MetisaSpecification,
-) -> list[str]:
-    """Resolve environment variables specified for the Jina Reader container."""
-    if not specification.jina_reader:
-        return []
-    if not specification.jina_reader.environs:
-        return []
-    return _get_resolved_environs(specification.jina_reader.environs)
-
-
-def get_resolved_environs_for_code_execution(
-    specification: MetisaSpecification,
-) -> list[str]:
-    """Resolve environment variables specified for the Code Execution container."""
-    if not specification.code_execution:
-        return []
-    if not specification.code_execution.environs:
-        return []
-    return _get_resolved_environs(specification.code_execution.environs)
-
-
-def get_resolved_environs_for_docling(
-    specification: MetisaSpecification,
-) -> list[str]:
-    """Resolve environment variables specified for the Docling container."""
-    if not specification.docling:
-        return []
-    if not specification.docling.environs:
-        return []
-    return _get_resolved_environs(specification.docling.environs)
-
-
-def get_resolved_environs_for_documents(
-    specification: MetisaSpecification,
-) -> list[str]:
-    """Resolve environment variables specified for the Documents container."""
-    if not specification.documents:
-        return []
-    if not specification.documents.environs:
-        return []
-    return _get_resolved_environs(specification.documents.environs)
-
-
-def get_resolved_environs_for_qdrant(
-    specification: MetisaSpecification,
-) -> list[str]:
-    """Resolve environment variables specified for the Qdrant container."""
-    if not specification.qdrant:
-        return []
-    if not specification.qdrant.environs:
-        return []
-    return _get_resolved_environs(specification.qdrant.environs)
-
-
-def get_resolved_environs_for_embeddings(
-    specification: MetisaSpecification,
-) -> list[str]:
-    """Resolve environment variables specified for the Embeddings container."""
-    if not specification.embeddings:
-        return []
-    if not specification.embeddings.environs:
-        return []
-    return _get_resolved_environs(specification.embeddings.environs)
-
-
-def get_resolved_environs_for_otel_collector(
-    specification: MetisaSpecification,
-) -> list[str]:
-    """Resolve environment variables specified for the OTel Collector container."""
-    if not specification.otel_collector:
-        return []
-    if not specification.otel_collector.environs:
-        return []
-    return _get_resolved_environs(specification.otel_collector.environs)
-
-
-def _get_resolved_environs(
-    environs: frozenset[str],
-) -> list[str]:
-    resolved_list: list[str] = []
-
-    for environ in environs:
-        if not environ_is_valid(environ):
-            raise ValueError(f"Environ is not valid: {environ}")
-        resolved_env = _resolve_environ(environ)
-        resolved_list.append(resolved_env)
-
-    return resolved_list
 
 
 def _resolve_environ(
@@ -398,6 +339,7 @@ def _create_metisa_specification(
             "capabilities",
             "dependencies",
             "environs",
+            "secrets",
             "settings",
         }
     )
@@ -426,6 +368,7 @@ def _create_metisa_specification(
     capabilities = _get_capabilities(toml)
     dependencies = _get_dependencies(toml)
     environs = _get_environs(toml, "TOML specification environs")
+    secrets = _get_secrets(toml, "TOML specification secrets")
     settings = _get_settings(toml)
     haproxy = _get_haproxy_specfication(toml)
     squid_proxy = _get_squid_proxy_specification(toml)
@@ -445,6 +388,7 @@ def _create_metisa_specification(
         capabilities=capabilities,
         dependencies=dependencies,
         environs=environs,
+        secrets=secrets,
         settings=settings,
         haproxy=haproxy,
         squid_proxy=squid_proxy,
@@ -565,6 +509,8 @@ def _get_environs(
 
     environs: set[str] = set()
 
+    existing_names: list[str] = []
+
     for raw_environ in raw_environs:
         if not isinstance(raw_environ, str):
             raise SpecificationValidationError(
@@ -578,9 +524,48 @@ def _get_environs(
             raise SpecificationValidationError(
                 f"TOML specification environ '{raw_environ}' is not valid."
             )
+
+        name, _ = _get_environ_name_value(raw_environ)
+        if name in existing_names:
+            raise SpecificationValidationError(
+                f"TOML specification environ '{name}' had duplicate entries."
+            )
+
         environs.add(raw_environ)
+        existing_names.append(name)
 
     return frozenset(environs)
+
+
+def _get_secrets(
+    toml: dict[str, object],
+    source: str,
+) -> frozenset[str]:
+    raw_secrets = _get_str_tuple(toml.get("secrets"), source)
+
+    secrets: set[str] = set()
+
+    existing_names: list[str] = []
+
+    for raw_secret in raw_secrets:
+        if not isinstance(raw_secret, str):
+            raise SpecificationValidationError(
+                f"TOML specification secret '{raw_secret}' is not supported."
+            )
+        if not _secret_is_valid(raw_secret):
+            raise SpecificationValidationError(
+                f"TOML specification secret '{raw_secret}' is not valid."
+            )
+        name, _ = _get_environ_name_value(raw_secret)
+        if name in existing_names:
+            raise SpecificationValidationError(
+                f"TOML specification secret '{name}' had duplicate entries."
+            )
+
+        secrets.add(raw_secret)
+        existing_names.append(name)
+
+    return frozenset(secrets)
 
 
 def _get_haproxy_specfication(
@@ -597,6 +582,7 @@ def _get_haproxy_specfication(
 
     HAPROXY_KEYS = frozenset(
         {
+            "environs",
             "backends",
         }
     )
@@ -629,7 +615,12 @@ def _get_haproxy_specfication(
 
             backends.append(backend)
 
-    return HaproxySpecification(backends=tuple(backends))
+    environs = _get_environs(haproxy, "HAProxy environs")
+
+    return HaproxySpecification(
+        backends=tuple(backends),
+        environs=environs,
+    )
 
 
 def _get_haproxy_backend(
@@ -685,6 +676,7 @@ def _get_squid_proxy_specification(
 
     SQUID_PROXY_KEYS = frozenset(
         {
+            "environs",
             "allowed_domains",
             "allowed_ip_addresses",
         }
@@ -700,8 +692,12 @@ def _get_squid_proxy_specification(
         squid_proxy.get("allowed_ip_addresses"), "Squid Proxy allowed IP addresses"
     )
 
+    environs = _get_environs(squid_proxy, "Squid Proxy environs")
+
     return SquidProxySpecification(
-        allowed_domains=allowed_domains, allowed_ip_addresses=allowed_ip_addresses
+        allowed_domains=allowed_domains,
+        allowed_ip_addresses=allowed_ip_addresses,
+        environs=environs,
     )
 
 
@@ -756,7 +752,9 @@ def _get_llm_server_specification(
 
             models.append(model)
 
-    return LlmServerSpecification(models=tuple(models))
+    return LlmServerSpecification(
+        models=tuple(models),
+    )
 
 
 def _get_llm_model(
@@ -814,9 +812,10 @@ def _get_mcp_server_specification(
 
     MCP_SERVER_KEYS = frozenset(
         {
+            "environs",
+            "secrets",
             "tools",
             "resources",
-            "environs",
         }
     )
 
@@ -828,7 +827,14 @@ def _get_mcp_server_specification(
 
     environs = _get_environs(mcp_server, "MCP Server environs")
 
-    return McpServerSpecification(tools=tools, resources=resources, environs=environs)
+    secrets = _get_secrets(mcp_server, "MCP Server environs")
+
+    return McpServerSpecification(
+        environs=environs,
+        secrets=secrets,
+        tools=tools,
+        resources=resources,
+    )
 
 
 def _get_llm_broker_specification(
@@ -846,6 +852,7 @@ def _get_llm_broker_specification(
     LLM_BROKER_KEYS = frozenset(
         {
             "environs",
+            "secrets",
             "local_models",
             "online_models",
         }
@@ -855,6 +862,8 @@ def _get_llm_broker_specification(
 
     environs = _get_environs(llm_broker, "LLM Broker environs")
 
+    secrets = _get_secrets(llm_broker, "LLM Broker environs")
+
     local_models = _get_str_tuple(
         llm_broker.get("local_models"), "LLM Broker local models"
     )
@@ -863,7 +872,10 @@ def _get_llm_broker_specification(
     )
 
     return LlmBrokerSpecification(
-        environs=environs, local_models=local_models, online_models=online_models
+        environs=environs,
+        secrets=secrets,
+        local_models=local_models,
+        online_models=online_models,
     )
 
 
@@ -889,7 +901,9 @@ def _get_jina_reader_specification(
 
     environs = _get_environs(jina_reader, "Jina Reader environs")
 
-    return JinaReaderSpecification(environs=environs)
+    return JinaReaderSpecification(
+        environs=environs,
+    )
 
 
 def _get_docling_specification(
@@ -929,7 +943,10 @@ def _get_docling_specification(
             "TOML specification docling embedding_model must be a non-empty string."
         )
 
-    return DoclingSpecification(environs=environs, embedding_model=embedding_model)
+    return DoclingSpecification(
+        environs=environs,
+        embedding_model=embedding_model,
+    )
 
 
 def _get_documents_specification(
@@ -960,7 +977,10 @@ def _get_documents_specification(
             "TOML specification documents local_directory must be a string."
         )
 
-    return DocumentsSpecification(environs=environs, local_directory=local_directory)
+    return DocumentsSpecification(
+        environs=environs,
+        local_directory=local_directory,
+    )
 
 
 def _get_code_execution_specification(
@@ -985,7 +1005,9 @@ def _get_code_execution_specification(
 
     environs = _get_environs(code_execution, "Code Execution environs")
 
-    return CodeExecutionSpecification(environs=environs)
+    return CodeExecutionSpecification(
+        environs=environs,
+    )
 
 
 def _get_otel_collector_specification(
@@ -1010,7 +1032,9 @@ def _get_otel_collector_specification(
 
     environs = _get_environs(otel_collector, "OpenTelemetry Collector environs")
 
-    return OpenTelemetrySpecification(environs=environs)
+    return OpenTelemetrySpecification(
+        environs=environs,
+    )
 
 
 def _get_qdrant_specification(
@@ -1033,7 +1057,9 @@ def _get_qdrant_specification(
 
     environs = _get_environs(qdrant, "Qdrant environs")
 
-    return QdrantSpecification(environs=environs)
+    return QdrantSpecification(
+        environs=environs,
+    )
 
 
 def _get_embeddings_specification(
@@ -1058,7 +1084,9 @@ def _get_embeddings_specification(
 
     environs = _get_environs(embeddings, "Embeddings environs")
 
-    return EmbeddingsSpecification(environs=environs)
+    return EmbeddingsSpecification(
+        environs=environs,
+    )
 
 
 def _validate_known_keys(

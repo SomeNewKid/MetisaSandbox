@@ -11,7 +11,11 @@ from metisa_common.terminal_helper import (
 )
 
 from ._docker._docker_container import (
-    run_docker_container,
+    inspect_docker_container,
+    provision_container_secrets,
+    start_attached_docker_container,
+    start_docker_container,
+    wait_until_container_running,
 )
 from ._docker._docker_network import (
     get_docker_container_ip_address,
@@ -35,6 +39,7 @@ from ._sandbox_workspace import (
     create_sandbox_context,
 )
 from ._utilities._workspace_helper import (
+    clean_up_secrets_files,
     clean_up_staged_sources,
 )
 from .code_execution_sidecar.code_execution_manager import (
@@ -60,6 +65,7 @@ from .entity_guard_sidecar.entity_guard_manager import (
 from .haproxy_sidecar.haproxy_manager import (
     create_haproxy_container,
     create_haproxy_definition,
+    verify_haproxy_configuration,
 )
 from .jina_reader_sidecar.jina_reader_manager import (
     create_jina_reader_container,
@@ -171,6 +177,7 @@ def run_metisa_container_workload_in_sandbox(
                     sandbox_context,
                     squid_proxy_container,
                 )
+                _start_docker_container(squid_proxy_container)
 
         if sandbox_requirements.is_llm_broker_required:
             _create_llm_broker_container(
@@ -179,15 +186,21 @@ def run_metisa_container_workload_in_sandbox(
                 squid_proxy_container,
                 llm_broker_container,
             )
+            _start_docker_container(llm_broker_container)
+            if llm_broker_container.secrets_key is not None:
+                provision_container_secrets(
+                    llm_broker_container.instance_name,
+                    llm_broker_container.secrets_key,
+                )
 
         if sandbox_requirements.is_llm_server_required and specification.llm_server:
-            all_containers.extend(
-                _create_llm_server_containers(
-                    specification,
-                    sandbox_context,
-                    squid_proxy_container,
-                )
+            llm_server_containers = _create_llm_server_containers(
+                specification,
+                sandbox_context,
+                squid_proxy_container,
             )
+            all_containers.extend(llm_server_containers)
+            _start_docker_containers(llm_server_containers)
 
         if sandbox_requirements.is_jina_reader_required:
             _create_jina_reader_container(
@@ -196,6 +209,7 @@ def run_metisa_container_workload_in_sandbox(
                 squid_proxy_container,
                 jina_reader_container,
             )
+            _start_docker_container(jina_reader_container)
 
         if sandbox_requirements.is_code_execution_required:
             _create_code_execution_container(
@@ -204,6 +218,7 @@ def run_metisa_container_workload_in_sandbox(
                 squid_proxy_container,
                 code_execution_container,
             )
+            _start_docker_container(code_execution_container)
 
         if sandbox_requirements.is_mcp_server_required:
             _create_mcp_server_container(
@@ -212,6 +227,16 @@ def run_metisa_container_workload_in_sandbox(
                 squid_proxy_container,
                 mcp_server_container,
             )
+            _start_docker_container(mcp_server_container)
+            mcp_server_container.network_ip_address = get_docker_container_ip_address(
+                mcp_server_container.instance_name,
+                sandbox_context.backend_network_name,
+            )
+            if mcp_server_container.secrets_key is not None:
+                provision_container_secrets(
+                    mcp_server_container.instance_name,
+                    mcp_server_container.secrets_key,
+                )
 
         if sandbox_requirements.is_docling_required:
             _create_docling_container(
@@ -220,6 +245,7 @@ def run_metisa_container_workload_in_sandbox(
                 squid_proxy_container,
                 docling_container,
             )
+            _start_docker_container(docling_container)
 
         if sandbox_requirements.is_documents_required:
             _create_documents_container(
@@ -228,6 +254,7 @@ def run_metisa_container_workload_in_sandbox(
                 squid_proxy_container,
                 documents_container,
             )
+            _start_docker_container(documents_container)
 
         if (
             sandbox_requirements.is_mcp_server_required
@@ -239,6 +266,7 @@ def run_metisa_container_workload_in_sandbox(
                 squid_proxy_container,
                 prompt_guard_container,
             )
+            _start_docker_container(prompt_guard_container)
 
             _create_entity_guard_container(
                 specification,
@@ -246,6 +274,7 @@ def run_metisa_container_workload_in_sandbox(
                 squid_proxy_container,
                 entity_guard_container,
             )
+            _start_docker_container(entity_guard_container)
 
         if sandbox_requirements.is_localnet_access_required:
             _create_haproxy_container(
@@ -256,6 +285,8 @@ def run_metisa_container_workload_in_sandbox(
                 mcp_server_container,
                 haproxy_container,
             )
+            _start_docker_container(haproxy_container)
+            verify_haproxy_configuration(haproxy_container.instance_name)
 
         if sandbox_requirements.is_qdrant_required:
             _create_qdrant_container(
@@ -264,6 +295,7 @@ def run_metisa_container_workload_in_sandbox(
                 squid_proxy_container,
                 qdrant_container,
             )
+            _start_docker_container(qdrant_container)
 
         if sandbox_requirements.is_embeddings_required:
             _create_embeddings_container(
@@ -272,6 +304,7 @@ def run_metisa_container_workload_in_sandbox(
                 squid_proxy_container,
                 embeddings_container,
             )
+            _start_docker_container(embeddings_container)
 
         if sandbox_requirements.is_otel_collector_required:
             _create_otel_collector_container(
@@ -280,6 +313,7 @@ def run_metisa_container_workload_in_sandbox(
                 squid_proxy_container,
                 otel_collector_container,
             )
+            _start_docker_container(otel_collector_container)
 
         _create_metisa_workload_container(
             specification,
@@ -291,7 +325,22 @@ def run_metisa_container_workload_in_sandbox(
             metisa_workload_container,
         )
 
-        return run_docker_container(metisa_workload_container.instance_name)
+        workload_container_name = metisa_workload_container.instance_name
+        process = start_attached_docker_container(workload_container_name)
+
+        wait_until_container_running(workload_container_name)
+
+        metisa_workload_container.set_started()
+
+        if metisa_workload_container.secrets_key is None:
+            raise RuntimeError("Workload secrets key is missing.")
+
+        provision_container_secrets(
+            workload_container_name,
+            metisa_workload_container.secrets_key,
+        )
+
+        return process.wait()
 
     finally:
         if sandbox_context is not None:
@@ -319,7 +368,32 @@ def run_metisa_container_workload_in_sandbox(
                     sandbox_context.host_scratch_path,
                 )
 
+                clean_up_secrets_files(all_containers)
                 clean_up_staged_sources(all_containers)
+
+
+def _start_docker_containers(
+    containers: list[SandboxContainer],
+) -> None:
+    for container in containers:
+        _start_docker_container(container)
+
+
+def _start_docker_container(
+    container: SandboxContainer,
+) -> None:
+    container_title = container.title
+    with terminal_status(
+        running=f"Starting {container_title} container.",
+        success=f"Started {container_title} container.",
+        failure=f"Could not start {container_title} container.",
+    ):
+        start_docker_container(container.instance_name)
+        started_successfully = inspect_docker_container(container.instance_name)
+        if not started_successfully:
+            error = f"Docker container '{container.title}' failed to start."
+            raise RuntimeError(error)
+        container.set_started()
 
 
 def _create_metisa_workload_container(
@@ -465,10 +539,6 @@ def _create_mcp_server_container(
             mcp_creation_context,
         )
         mcp_server_container.set_created(mcp_server_creation)
-        mcp_server_container.network_ip_address = get_docker_container_ip_address(
-            mcp_server_container.instance_name,
-            sandbox_context.backend_network_name,
-        )
 
 
 def _create_code_execution_container(

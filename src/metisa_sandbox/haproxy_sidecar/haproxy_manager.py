@@ -14,8 +14,6 @@ from metisa_common.specification_models import MetisaSpecification
 from .._docker._docker_container import (
     create_docker_container,
     execute_docker_command,
-    inspect_docker_container,
-    start_docker_container,
 )
 from .._docker._docker_hardening import (
     harden_docker_container,
@@ -142,23 +140,7 @@ def create_haproxy_container(
                     network_name=network_name,
                 )
 
-    start_docker_container(container_name)
-    started_successfully = inspect_docker_container(container_name)
-    if not started_successfully:
-        raise RuntimeError("HAProxy sidecar failed to start.")
-
-    _verify_haproxy_configuration(container_name)
-
     return ContainerCreationResult(container_name)
-
-
-def _use_network_alias(
-    sandbox_context: SandboxContext,
-    network_name: str,
-) -> bool:
-    if network_name == sandbox_context.egress_network_name:
-        return False
-    return True
 
 
 # Verify HAProxy configuration inside the container.
@@ -172,7 +154,7 @@ def _use_network_alias(
 #
 # The metisa-haproxy host name must be resolved by the container's DNS,
 # which is not available during image building or container creation.
-def _verify_haproxy_configuration(
+def verify_haproxy_configuration(
     container_name: str,
 ) -> None:
     """Verify the HAProxy configuration inside the container."""
@@ -181,6 +163,15 @@ def _verify_haproxy_configuration(
     )
     if exitcode != 0:
         raise RuntimeError(f"HAProxy configuration verification failed: {message}")
+
+
+def _use_network_alias(
+    sandbox_context: SandboxContext,
+    network_name: str,
+) -> bool:
+    if network_name == sandbox_context.egress_network_name:
+        return False
+    return True
 
 
 def _ensure_haproxy_image_exists(

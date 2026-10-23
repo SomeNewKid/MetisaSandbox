@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from metisa_common.terminal_helper import (
@@ -24,6 +25,12 @@ from ._sandbox_models import (
 
 _LOG_INSPECTION_FILES = False
 _ACKNOWLEDGE_INSPECTION_FILES_HAVE_SENSITIVE_DATA = False
+
+_ANSI_ESCAPE_PATTERN = re.compile(
+    r"\x1b(?:\[[0-?]*[ -/]*[@-~]|"
+    r"\][^\x07\x1b]*(?:\x07|\x1b\\)|"
+    r"[@-_])"
+)
 
 
 def stop_and_remove_containers(
@@ -64,9 +71,8 @@ def _stop_and_remove_container(
     finally:
         _finalize_and_stop_and_remove_container(
             sandbox_context=sandbox_context,
+            sandbox_container=sandbox_container,
             cleanup_errors=cleanup_errors,
-            container_instance_name=sandbox_container.instance_name,
-            container_title=sandbox_container.title,
             log_folder=log_folder,
         )
 
@@ -94,13 +100,13 @@ def _save_container_log_file(
     with target_file.open("w", encoding="utf-8") as file:
         for line in content.splitlines():
             contains_braiie = any(
-                "\u2800" <= character <= "\u28ff"
-                for character in line
+                "\u2800" <= character <= "\u28ff" for character in line
             )
-            if contains_braiie: 
+            if contains_braiie:
                 continue
 
-            file.write(line)
+            cleaned = _ANSI_ESCAPE_PATTERN.sub("", line)
+            file.write(cleaned)
             file.write("\n")
 
 
@@ -155,11 +161,13 @@ def _save_container_state(
 
 def _finalize_and_stop_and_remove_container(
     sandbox_context: SandboxContext,
+    sandbox_container: SandboxContainer,
     cleanup_errors: list[str],
-    container_instance_name: str,
-    container_title: str,
     log_folder: str,
 ) -> None:
+    container_title = sandbox_container.title
+    container_instance_name = sandbox_container.instance_name
+
     _save_container_state(
         sandbox_context,
         container_instance_name,
@@ -179,16 +187,19 @@ def _finalize_and_stop_and_remove_container(
 
     container_stopped = False
 
-    try:
-        with terminal_status(
-            running=f"Stopping {container_title} container...",
-            success=f"Stopped {container_title} container.",
-            failure=f"Could not stop {container_title} container.",
-        ):
-            stop_docker_container(container_instance_name, timeout_seconds=10)
-            container_stopped = True
-    except Exception as error:
-        cleanup_errors.append(f"Could not stop {container_title} container: {error}")
+    if sandbox_container.is_started:
+        try:
+            with terminal_status(
+                running=f"Stopping {container_title} container...",
+                success=f"Stopped {container_title} container.",
+                failure=f"Could not stop {container_title} container.",
+            ):
+                stop_docker_container(container_instance_name, timeout_seconds=10)
+                container_stopped = True
+        except Exception as error:
+            cleanup_errors.append(
+                f"Could not stop {container_title} container: {error}"
+            )
 
     try:
         _save_container_log_files(sandbox_context, container_instance_name, log_folder)

@@ -19,7 +19,7 @@ from .._helper import (
     print_suite_title,
 )
 
-_SKIP_INTERNET_TESTS = True
+_SKIP_INTERNET_TESTS = False
 
 
 def test_internet_access(specification: MetisaSpecification):

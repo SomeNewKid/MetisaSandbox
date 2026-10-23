@@ -15,8 +15,6 @@ from metisa_common.specification_models import (
 
 from .._docker._docker_container import (
     create_docker_container,
-    inspect_docker_container,
-    start_docker_container,
 )
 from .._docker._docker_hardening import (
     harden_docker_container,
@@ -134,11 +132,6 @@ def create_entity_guard_container(
     )
 
     create_docker_container(arguments)
-
-    start_docker_container(container_name)
-    started_successfully = inspect_docker_container(container_name)
-    if not started_successfully:
-        raise RuntimeError("Entity Guard sidecar failed to start.")
 
     return ContainerCreationResult(container_name, staged_source=staged_source_path)
 

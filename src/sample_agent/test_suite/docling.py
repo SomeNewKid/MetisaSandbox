@@ -17,7 +17,7 @@ from .._helper import (
     print_suite_title,
 )
 
-_SKIP_DOCLING_TESTS = True
+_SKIP_DOCLING_TESTS = False
 
 
 def test_docling(specification: MetisaSpecification):

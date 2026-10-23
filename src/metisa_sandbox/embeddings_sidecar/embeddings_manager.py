@@ -9,6 +9,7 @@ from pathlib import Path
 
 from metisa_common.specification_helper import (
     generate_image_tag,
+    resolve_environs,
 )
 from metisa_common.specification_models import (
     MetisaSpecification,
@@ -16,8 +17,6 @@ from metisa_common.specification_models import (
 
 from .._docker._docker_container import (
     create_docker_container,
-    inspect_docker_container,
-    start_docker_container,
 )
 from .._docker._docker_hardening import (
     harden_docker_container,
@@ -123,11 +122,17 @@ def create_embeddings_container(
         ]
     )
 
+    # Get environment variables
+    if specification.embeddings is not None:
+        resolved_environs = resolve_environs(specification.embeddings.environs)
+        environs.extend(resolved_environs)
+
     # Harden the container
     harden_docker_container(
         arguments=arguments,
         environs=environs,
         username="searcher",
+        number_container_processes=128,
         cpu_count=2,
         memory="3g",
         number_of_files=512,
@@ -154,11 +159,6 @@ def create_embeddings_container(
     )
 
     create_docker_container(arguments)
-
-    start_docker_container(container_name)
-    started_successfully = inspect_docker_container(container_name)
-    if not started_successfully:
-        raise RuntimeError("Embeddings sidecar failed to start.")
 
     return ContainerCreationResult(container_name, staged_source=staged_source_path)
 

@@ -7,6 +7,7 @@ from pathlib import Path
 from .._sandbox_models import SandboxContext
 from .._utilities._workspace_helper import copy_directories_into_staged
 
+_COMMON_MODULE_NAME = "metisa_common"
 MCP_SERVER_MODULE_NAME = "metisa_mcp_server"
 
 
@@ -22,6 +23,7 @@ def create_staged_source_directory(
         local_source_path,
         staged_source_path,
         [
+            _COMMON_MODULE_NAME,
             MCP_SERVER_MODULE_NAME,
         ],
     )

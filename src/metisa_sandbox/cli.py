@@ -37,7 +37,7 @@ from ._utilities._terminal_helper import (
     print_info,
     print_warning,
 )
-from .metisa_container.metisa_container_image import (
+from .metisa_container._metisa_container_image import (
     build_metisa_container_image,
 )
 

@@ -6,14 +6,12 @@ from pathlib import Path
 
 from metisa_common.specification_helper import (
     generate_image_tag,
-    get_resolved_environs_for_jina_reader,
+    resolve_environs,
 )
 from metisa_common.specification_models import MetisaSpecification
 
 from .._docker._docker_container import (
     create_docker_container,
-    inspect_docker_container,
-    start_docker_container,
 )
 from .._docker._docker_hardening import (
     configure_http_proxy,
@@ -75,12 +73,6 @@ def create_jina_reader_container(
         [
             "--tmpfs",
             "/tmp:rw,size=64m,nosuid,nodev,noexec",
-        ]
-    )
-
-    # Mount temporary (in memory) filesystems.
-    arguments.extend(
-        [
             "--tmpfs",
             "/home/jina:rw,size=64m,nosuid,nodev,noexec,mode=0700,uid=1001,gid=997",
         ]
@@ -91,8 +83,10 @@ def create_jina_reader_container(
     if _USE_SQUID_PROXY:
         configure_http_proxy(environs, squid_proxy_url)
 
-    specified_environs = get_resolved_environs_for_jina_reader(specification)
-    environs.extend(specified_environs)
+    # Get environment variables
+    if specification.jina_reader is not None:
+        resolved_environs = resolve_environs(specification.jina_reader.environs)
+        environs.extend(resolved_environs)
 
     # Harden the container
     harden_docker_container(
@@ -115,11 +109,6 @@ def create_jina_reader_container(
     )
 
     create_docker_container(arguments)
-
-    start_docker_container(container_name)
-    started_successfully = inspect_docker_container(container_name)
-    if not started_successfully:
-        raise RuntimeError("Jina Reader sidecar failed to start.")
 
     return ContainerCreationResult(container_name)
 
