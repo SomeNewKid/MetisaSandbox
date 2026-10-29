@@ -16,6 +16,7 @@ from .._probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 if TYPE_CHECKING:
     from mcp import Client
+    from mcp.types import CallToolResult
 
 _MCP_SERVER_ALIAS = "metisa-mcp-server"
 _MCP_SERVER_PORT = 8000
@@ -67,19 +68,10 @@ def test_tool_1_returns_expected_greeting(probe_context: ProbeContext) -> ProbeR
     expected_greeting = "Hello, from test_tool_1."
 
     async def _operation(client: Client) -> str | None:
-        from mcp import types
-
         result = await client.call_tool(tool_name, {})
-        if result.is_error:
-            return f"{tool_name} returned a tool execution error."
-        if len(result.content) != 1:
-            return f"{tool_name} did not return exactly one content block."
-        content = result.content[0]
-        if (
-            not isinstance(content, types.TextContent)
-            or content.text != expected_greeting
-        ):
-            return f"{tool_name} did not return the expected text greeting."
+        payload = _read_tool_payload(result, tool_name)
+        if payload.get("message") != expected_greeting:
+            return f"{tool_name} did not return the expected greeting in both fields."
         return None
 
     return _run_mcp_probe(
@@ -94,7 +86,6 @@ def test_tool_2_returns_expected_greetings(probe_context: ProbeContext) -> Probe
     declared = mcp_server is not None and tool_name in mcp_server.tools
 
     async def _operation(client: Client) -> str | None:
-        from mcp import types
         from mcp.shared.exceptions import MCPError
 
         result = await client.list_tools()
@@ -120,20 +111,10 @@ def test_tool_2_returns_expected_greetings(probe_context: ProbeContext) -> Probe
             ("Susan", "Hello, Susan, from test_tool_2."),
         ):
             response = await client.call_tool(tool_name, {"name": name})
-            if response.is_error:
-                return f"{tool_name} returned a tool execution error for name {name!r}."
-            if len(response.content) != 1:
+            payload = _read_tool_payload(response, tool_name)
+            if payload.get("message") != expected_greeting:
                 return (
-                    f"{tool_name} did not return exactly one content block "
-                    f"for name {name!r}."
-                )
-            content = response.content[0]
-            if (
-                not isinstance(content, types.TextContent)
-                or content.text != expected_greeting
-            ):
-                return (
-                    f"{tool_name} did not return the expected text greeting "
+                    f"{tool_name} did not return the expected greeting in both fields "
                     f"for name {name!r}."
                 )
         return None
@@ -151,7 +132,6 @@ def test_tool_3_validates_name(probe_context: ProbeContext) -> ProbeResult:
     declared = mcp_server is not None and tool_name in mcp_server.tools
 
     async def _operation(client: Client) -> str | None:
-        from mcp import types
         from mcp.shared.exceptions import MCPError
 
         result = await client.list_tools()
@@ -181,20 +161,10 @@ def test_tool_3_validates_name(probe_context: ProbeContext) -> ProbeResult:
             if not response.is_error:
                 return f"{tool_name} did not reject an empty name."
         response = await client.call_tool(tool_name, {"name": "Susan"})
-        if response.is_error:
-            return f"{tool_name} returned a tool execution error for name 'Susan'."
-        if len(response.content) != 1:
+        payload = _read_tool_payload(response, tool_name)
+        if payload.get("message") != expected_greeting:
             return (
-                f"{tool_name} did not return exactly one content block "
-                "for name 'Susan'."
-            )
-        content = response.content[0]
-        if (
-            not isinstance(content, types.TextContent)
-            or content.text != expected_greeting
-        ):
-            return (
-                f"{tool_name} did not return the expected text greeting "
+                f"{tool_name} did not return the expected greeting in both fields "
                 "for name 'Susan'."
             )
         return None
@@ -342,18 +312,11 @@ def read_content_from_url_returns_expected_content(
         )
 
     async def _operation(client: Client) -> str | None:
-        from mcp import types
-
         tool_name = "read_content_from_url"
         result = await client.call_tool(tool_name, {"url": "https://example.com"})
-        if result.is_error:
-            return f"{tool_name} returned a tool execution error."
-        text = "\n".join(
-            content.text
-            for content in result.content
-            if isinstance(content, types.TextContent)
-        )
-        if not text.strip():
+        payload = _read_tool_payload(result, tool_name)
+        text = payload.get("content")
+        if not isinstance(text, str) or not text.strip():
             return f"{tool_name} did not return non-empty text."
         if "for use in documentation" not in text:
             return f"{tool_name} did not return the expected example.com phrase."
@@ -451,7 +414,7 @@ def anonymize_text_removes_phone_number(probe_context: ProbeContext) -> ProbeRes
 def execute_starlark_code_returns_expected_result(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """Verify declared Starlark execution returns the average as MCP text."""
+    """Verify Starlark returns the average in text and structured content."""
     probe_name = "execute_starlark_code_returns_expected_result"
     tool_name = "execute_starlark_code"
 
@@ -484,19 +447,13 @@ def execute_starlark_code_returns_expected_result(
     expected_result = "20.0"
 
     async def _operation(client: Client) -> str | None:
-        from mcp import types
-
         result = await client.call_tool(tool_name, {"starlark_code": starlark_code})
-        if result.is_error:
-            return f"{tool_name} returned a tool execution error."
-        if len(result.content) != 1:
-            return f"{tool_name} did not return exactly one content block."
-        content = result.content[0]
-        if not isinstance(content, types.TextContent):
-            return f"{tool_name} did not return a text content block."
-        if content.text != expected_result:
+        payload = _read_tool_payload(result, tool_name)
+        actual_result = payload.get("result")
+        if actual_result != expected_result:
             return (
-                f"{tool_name} returned {content.text!r}; expected {expected_result!r}."
+                f"{tool_name} returned {actual_result!r}; expected {expected_result!r} "
+                "in both fields."
             )
         return None
 
@@ -722,22 +679,8 @@ def _run_classification_probe(
         )
 
     async def _operation(client: Client) -> str | None:
-        from mcp import types
-
         result = await client.call_tool(tool_name, {"text": text})
-        if result.is_error:
-            return f"{tool_name} returned a tool execution error."
-        if len(result.content) != 1:
-            return f"{tool_name} did not return exactly one content block."
-        content = result.content[0]
-        if not isinstance(content, types.TextContent):
-            return f"{tool_name} did not return a text content block."
-        try:
-            payload = json.loads(content.text)
-        except ValueError:
-            return f"{tool_name} did not return valid JSON."
-        if not isinstance(payload, dict):
-            return f"{tool_name} did not return a JSON object."
+        payload = _read_tool_payload(result, tool_name)
         indicators = payload.get("indicators")
         if not isinstance(indicators, list):
             return f"{tool_name} did not return an indicators array."
@@ -782,22 +725,8 @@ def _run_moderation_probe(
         )
 
     async def _operation(client: Client) -> str | None:
-        from mcp import types
-
         result = await client.call_tool(tool_name, {"text": text})
-        if result.is_error:
-            return f"{tool_name} returned a tool execution error."
-        if len(result.content) != 1:
-            return f"{tool_name} did not return exactly one content block."
-        content = result.content[0]
-        if not isinstance(content, types.TextContent):
-            return f"{tool_name} did not return a text content block."
-        try:
-            payload = json.loads(content.text)
-        except ValueError:
-            return f"{tool_name} did not return valid JSON."
-        if not isinstance(payload, dict):
-            return f"{tool_name} did not return a JSON object."
+        payload = _read_tool_payload(result, tool_name)
         labels = payload.get("labels")
         if not isinstance(labels, list):
             return f"{tool_name} did not return a labels array."
@@ -837,22 +766,8 @@ def _run_anonymization_probe(
         )
 
     async def _operation(client: Client) -> str | None:
-        from mcp import types
-
         result = await client.call_tool(tool_name, {"text": text})
-        if result.is_error:
-            return f"{tool_name} returned a tool execution error."
-        if len(result.content) != 1:
-            return f"{tool_name} did not return exactly one content block."
-        content = result.content[0]
-        if not isinstance(content, types.TextContent):
-            return f"{tool_name} did not return a text content block."
-        try:
-            payload = json.loads(content.text)
-        except ValueError:
-            return f"{tool_name} did not return valid JSON."
-        if not isinstance(payload, dict):
-            return f"{tool_name} did not return a JSON object."
+        payload = _read_tool_payload(result, tool_name)
         anonymized = payload.get("anonymized")
         if not isinstance(anonymized, str):
             return f"{tool_name} did not return an anonymized string."
@@ -868,6 +783,42 @@ def _run_anonymization_probe(
         _operation,
         timeout_seconds=_ENTITY_GUARD_TIMEOUT_SECONDS,
     )
+
+
+def _read_tool_payload(
+    result: CallToolResult,
+    tool_name: str,
+) -> dict[str, object]:
+    """Read a tool object after verifying text and structured content agree."""
+    from mcp import types
+
+    if result.is_error:
+        raise ValueError(f"{tool_name} returned a tool execution error.")
+    if len(result.content) != 1:
+        raise ValueError(f"{tool_name} did not return exactly one content block.")
+    content = result.content[0]
+    if not isinstance(content, types.TextContent):
+        raise ValueError(f"{tool_name} did not return a text content block.")
+    try:
+        payload = json.loads(content.text)
+    except ValueError as error:
+        raise ValueError(
+            f"{tool_name} did not return valid JSON in content[0].text."
+        ) from error
+    if not isinstance(payload, dict):
+        raise ValueError(
+            f"{tool_name} did not return a JSON object in content[0].text."
+        )
+    if not isinstance(result.structured_content, dict):
+        raise ValueError(f"{tool_name} did not return an object in structuredContent.")
+    if payload != result.structured_content:
+        raise ValueError(
+            f"{tool_name} returned different objects in content[0].text "
+            "and structuredContent."
+        )
+
+    # Checking expected values in this object now checks both representations.
+    return payload
 
 
 def _run_starlark_error_probe(

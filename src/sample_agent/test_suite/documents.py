@@ -35,10 +35,17 @@ def test_documents(specification: MetisaSpecification):
     filename = "sample.txt"
     with print_elapsed_time():
         try:
-            markdown = get_mcp_server_tool_result(
+            tool_result = get_mcp_server_tool_result(
                 tool_name="retrieve_from_documents",
                 params={"filename": filename},
             )
+            markdown = tool_result.get("content", None)
+            if markdown is None:
+                print_failure("No content returned.")
+                return
+            if not isinstance(markdown, str):
+                print_failure("Returned content not a string.")
+                return
             print("Data from ", filename)
             if markdown:
                 if len(markdown) > 200:

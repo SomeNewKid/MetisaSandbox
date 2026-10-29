@@ -200,15 +200,15 @@ def _get_all_chunks(
     if result is None:
         raise RuntimeError("Docling returned JSON which could not be loaded.")
 
-    chunks = result.get("data", None)
+    chunks = result.get("chunks", None)
 
     if chunks is None:
-        raise RuntimeError("Docling JSON response did not include 'data'.")
+        raise RuntimeError("Docling JSON response did not include 'chunks'.")
     if not isinstance(chunks, list):
-        raise RuntimeError("Docling JSON 'data' was not a list.")
+        raise RuntimeError("Docling JSON 'chunks' was not a list.")
     for chunk in chunks:
         if not isinstance(chunk, str):
-            raise RuntimeError("Docling JSON 'data' list contained non-string items.")
+            raise RuntimeError("Docling JSON 'chunks' list contained non-string items.")
 
     return chunks
 

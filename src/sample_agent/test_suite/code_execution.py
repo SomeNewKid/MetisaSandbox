@@ -46,10 +46,14 @@ def test_code_execution(specification: MetisaSpecification):
                     return total / len(values)
                 """
             )
-            code_execution_result = get_mcp_server_tool_result(
+            tool_call_result = get_mcp_server_tool_result(
                 tool_name="execute_starlark_code",
                 params={"starlark_code": code},
             )
-            print_success("Code execution result:", code_execution_result)
+            code_execution_result = tool_call_result.get("result", None)
+            if code_execution_result is None:
+                print_failure("Code execution returned no result.")
+            else:
+                print_success("Code execution result:", code_execution_result)
         except Exception as error:
             print_failure("Code execution error:", error)

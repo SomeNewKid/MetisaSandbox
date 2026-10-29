@@ -35,11 +35,18 @@ def test_docling(specification: MetisaSpecification):
     filename = "Docling Technical Report.pdf"
     with print_elapsed_time():
         try:
-            markdown = get_mcp_server_tool_result(
+            print("Data from ", filename)
+            tool_result = get_mcp_server_tool_result(
                 tool_name="extract_markdown_from_document",
                 params={"filename": filename},
             )
-            print("Data from ", filename)
+            markdown = tool_result.get("markdown", None)
+            if markdown is None:
+                print_failure("No markdown returned")
+                return
+            if not isinstance(markdown, str):
+                print_failure("Returned markdown was not a string.")
+                return
             if markdown:
                 if len(markdown) > 200:
                     markdown = markdown[0:200].strip() + "..."

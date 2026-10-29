@@ -74,11 +74,18 @@ def _test_mcp_internet_access(
 ) -> None:
     with print_elapsed_time():
         try:
-            url_title = get_mcp_server_tool_result(
+            tool_result = get_mcp_server_tool_result(
                 tool_name="get_title_from_url",
                 params={"url": url},
             )
-            print_success(f"URL title from MCP Server: '{url_title}'")
+            title = tool_result.get("title", None)
+            if title is None:
+                print_failure("URL title from MCP Server not found.")
+                return
+            if not isinstance(title, str):
+                print_failure("URL title from MCP Server not a string.")
+                return
+            print_success(f"URL title from MCP Server: '{title}'")
         except Exception as error:
             print_failure("URL title from MCP Server error:", error)
 

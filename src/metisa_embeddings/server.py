@@ -111,7 +111,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
             )
             return
 
-        result = {"data": data}
+        result = {"chunks": data}
         response_text = json.dumps(result)
 
         body = response_text.encode("utf-8")

@@ -51,7 +51,7 @@ def _format_elapsed_time(elapsed_seconds: float) -> str:
 def get_mcp_server_tool_result(
     tool_name: str,
     params: dict[str, object] | None = None,
-) -> str:
+) -> dict[str, object]:
     """Get the result of calling a tool on the MCP Server."""
     tracer = trace.get_tracer("sample_agent.tools")
 
@@ -66,7 +66,7 @@ def get_mcp_server_tool_result(
 def _get_mcp_server_tool_result(
     tool_name: str,
     params: dict[str, object] | None = None,
-) -> str:
+) -> dict[str, object]:
     """Get the result of calling a tool on the MCP Server."""
     url = "http://metisa-mcp-server:8000/mcp"
     timeout_seconds = 300
@@ -106,15 +106,11 @@ def _get_mcp_server_tool_result(
         )
         raise RuntimeError(details or f"{tool_name} failed.")
 
-    if len(result.content) != 1:
-        raise RuntimeError("Expected exactly one tool content block.")
+    payload = result.structured_content
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Expected a structured JSON object from {tool_name}.")
 
-    content = result.content[0]
-    if not isinstance(content, types.TextContent):
-        actual_type = type(content)
-        raise RuntimeError(f"Expected a text result from {tool_name}. {actual_type}")
-
-    return content.text
+    return payload
 
 
 def print_suite_title(

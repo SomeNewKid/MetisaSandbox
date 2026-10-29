@@ -6,6 +6,7 @@ import importlib
 import json
 import os
 import traceback
+from datetime import date, datetime
 from typing import Annotated, Any, TypedDict
 
 import requests
@@ -36,30 +37,38 @@ class _MariaDBConnectionSettings(TypedDict):
     database: str
 
 
-def test_tool_1() -> str:
+def test_tool_1() -> dict[str, object]:
     """Return a test response."""
-    return "Hello, from test_tool_1."
+    return {
+        "message": "Hello, from test_tool_1.",
+    }
 
 
 def test_tool_2(
     name: Annotated[str, Field(description="The name of the user")],
-) -> str:
+) -> dict[str, object]:
     """Return a test response."""
     if not name:
-        return "Hello, from test_tool_2."
-    return f"Hello, {name}, from test_tool_2."
+        return {
+            "message": "Hello, from test_tool_2.",
+        }
+    return {
+        "message": f"Hello, {name}, from test_tool_2.",
+    }
 
 
 def test_tool_3(
     name: Annotated[str, Field(description="The name of the user")],
-) -> str:
+) -> dict[str, object]:
     """Return a test response."""
     if not name:
         raise ValueError("Name must be provided for test_tool_3.")
-    return f"Hello, {name}, from test_tool_3."
+    return {
+        "message": f"Hello, {name}, from test_tool_3.",
+    }
 
 
-def get_active_items() -> str:
+def get_active_items() -> dict[str, object]:
     """Return the active items from the database."""
     try:
         username, _ = _read_mariadb_credentials()
@@ -80,7 +89,7 @@ def get_active_items() -> str:
 
 def get_title_from_url(
     url: Annotated[str, Field(description="The URL endpoint.")],
-) -> str | None:
+) -> dict[str, object] | None:
     """Return the title of the document at the specified URL."""
     try:
         headers = {
@@ -92,14 +101,17 @@ def get_title_from_url(
         }
         response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
-        return _parse_html_title(response.text)
+        title = _parse_html_title(response.text)
+        return {
+            "title": title,
+        }
     except Exception as error:
         raise RuntimeError(f"Could not get title from URL: {error}") from error
 
 
 def read_content_from_url(
     url: Annotated[str, Field(description="The URL endpoint.")],
-) -> str | None:
+) -> dict[str, object] | None:
     """Return plain text from a URL through the Jina Reader sidecar."""
     reader_endpoint = "http://metisa-jina-reader:8081/"
     headers = {
@@ -122,7 +134,9 @@ def read_content_from_url(
             )
             content = response.text
             response.raise_for_status()
-        return content
+        return {
+            "content": content,
+        }
     except requests.RequestException as error:
         error_message = f"Jina Reader could not read the url: {error}"
         raise RuntimeError(error_message) from error
@@ -134,7 +148,7 @@ def read_content_from_url(
 
 def classify_text(
     text: Annotated[str, Field(description="The text to classify")],
-) -> str | None:
+) -> dict[str, object] | None:
     """Return the classificatin of the provided text."""
     prompt_guard_endpoint = "http://metisa-prompt-guard:8000/classify"
     headers = {
@@ -155,11 +169,11 @@ def classify_text(
                 headers=headers,
                 timeout=(5, 240),
             )
-            content = response.text
+            content = response.json()
             response.raise_for_status()
-        if not content:
-            raise RuntimeError("Prompt Guard did not return any content")
-        return content
+            if not isinstance(content, dict):
+                raise RuntimeError("Prompt Guard did not return JSON content.")
+            return content
     except Exception as error:
         if content:
             raise RuntimeError(f"Prompt Guard returned an error: {content}") from error
@@ -168,7 +182,7 @@ def classify_text(
 
 def moderate_text(
     text: Annotated[str, Field(description="The text to moderate")],
-) -> str | None:
+) -> dict[str, object] | None:
     """Return the classificatin of the provided text."""
     prompt_guard_endpoint = "http://metisa-prompt-guard:8000/moderate"
     headers = {
@@ -189,11 +203,11 @@ def moderate_text(
                 headers=headers,
                 timeout=(5, 240),
             )
-            content = response.text
+            content = response.json()
             response.raise_for_status()
-        if not content:
-            raise RuntimeError("Prompt Guard did not return any content")
-        return content
+            if not isinstance(content, dict):
+                raise RuntimeError("Prompt Guard did not return JSON content.")
+            return content
     except Exception as error:
         if content:
             raise RuntimeError(f"Prompt Guard returned an error: {content}") from error
@@ -202,7 +216,7 @@ def moderate_text(
 
 def anonymize_text(
     text: Annotated[str, Field(description="The text to anonymize")],
-) -> str | None:
+) -> dict[str, object] | None:
     """Return the provided text with entities anonymized."""
     entity_guard_endpoint = "http://metisa-entity-guard:8000/anonymize"
     headers = {
@@ -223,11 +237,11 @@ def anonymize_text(
                 headers=headers,
                 timeout=(5, 240),
             )
-            content = response.text
+            content = response.json()
             response.raise_for_status()
-        if not content:
-            raise RuntimeError("Entity Guard did not return any content")
-        return content
+            if not isinstance(content, dict):
+                raise RuntimeError("Entity Guard did not return JSON content.")
+            return content
     except Exception as error:
         if content:
             raise RuntimeError(f"Entity Guard returned an error: {content}") from error
@@ -236,7 +250,7 @@ def anonymize_text(
 
 def extract_markdown_from_document(
     filename: Annotated[str, Field(description="The filename of the sample.")],
-) -> str | None:
+) -> dict[str, object] | None:
     """Return the data from the specified example filename."""
     docling_endpoint = "http://metisa-docling:8000/extract-markdown-from-document"
     headers = {
@@ -257,11 +271,11 @@ def extract_markdown_from_document(
                 headers=headers,
                 timeout=(5, 240),
             )
-            content = response.text
+            content = response.json()
             response.raise_for_status()
-        if not content:
-            raise RuntimeError("Docling did not return any content")
-        return content
+            if not isinstance(content, dict):
+                raise RuntimeError("Docling did not return JSON content.")
+            return content
     except Exception as error:
         if content:
             raise RuntimeError(f"Docling returned an error: {content}") from error
@@ -270,7 +284,7 @@ def extract_markdown_from_document(
 
 def retrieve_from_documents(
     filename: Annotated[str, Field(description="The filename of the document.")],
-) -> str | None:
+) -> dict[str, object] | None:
     """Return the data from the specified filename."""
     documents_endpoint = "http://metisa-documents:8080/"
     document_endpoint = f"{documents_endpoint}{filename}"
@@ -292,7 +306,9 @@ def retrieve_from_documents(
             response.raise_for_status()
         if not content:
             raise RuntimeError("Documents did not return any content")
-        return content
+        return {
+            "content": content,
+        }
     except Exception as error:
         if content:
             raise RuntimeError(f"Documents returned an error: {content}") from error
@@ -302,7 +318,7 @@ def retrieve_from_documents(
 def get_matching_chunks(
     filename: Annotated[str, Field(description="The filename of the document.")],
     prompt: Annotated[str, Field(description="The user's prompt.")],
-) -> str | None:
+) -> dict[str, object] | None:
     """Return the data from the specified filename."""
     embeddings_endpoint = "http://metisa-embeddings:8000/search"
     headers = {
@@ -326,11 +342,11 @@ def get_matching_chunks(
                 headers=headers,
                 timeout=(5, 240),
             )
-            content = response.text
+            content = response.json()
             response.raise_for_status()
-        if not content:
-            raise RuntimeError("Embeddings did not return any content")
-        return content
+            if not isinstance(content, dict):
+                raise RuntimeError("Embeddings did not return JSON content")
+            return content
     except Exception as error:
         if content:
             raise RuntimeError(f"Embeddings returned an error: {content}") from error
@@ -355,7 +371,7 @@ def execute_starlark_code(
         """
         ),
     ],
-) -> str | None:
+) -> dict[str, object] | None:
     """Return the result of executing the provided Starlark code."""
     starlark_endpoint = "http://metisa-code-execution:8090/execute"
     headers = {
@@ -394,7 +410,9 @@ def execute_starlark_code(
             raise RuntimeError("Starlark did not return expected JSON format.")
         if not isinstance(result, str):
             raise RuntimeError("Starlark did not return a string result.")
-        return result
+        return {
+            "result": result,
+        }
     except Exception as error:
         if content:
             raise RuntimeError(f"Starlark returned an error: {content}") from error
@@ -403,7 +421,7 @@ def execute_starlark_code(
 
 def _get_active_items(
     maria_db_host: str,
-) -> str:
+) -> dict[str, object]:
     connection_settings = _read_mariadb_connection_settings(maria_db_host)
     connection = _connect_to_mariadb(connection_settings)
     try:
@@ -413,8 +431,31 @@ def _get_active_items(
     finally:
         connection.close()
 
-    normalized_rows = [_normalize_database_row(row) for row in rows]
-    return json.dumps(normalized_rows, sort_keys=True, default=str)
+    items = [_normalize_database_row(row) for row in rows]
+
+    _serialize_dates_in_items(items)
+
+    return {
+        "items": items,
+    }
+
+
+def _serialize_dates_in_items(
+    items: list[dict[str, object]],
+) -> None:
+    if not items:
+        return
+
+    for item in items:
+        _serialize_dates_in_item(item)
+
+
+def _serialize_dates_in_item(
+    item: dict[str, object],
+) -> None:
+    for key, value in item.items():
+        if isinstance(value, (date, datetime)):
+            item[key] = value.isoformat()
 
 
 def _read_mariadb_connection_settings(

@@ -34,9 +34,16 @@ def test_database_access(specification: MetisaSpecification):
 
     with print_elapsed_time():
         try:
-            active_items = get_mcp_server_tool_result(
+            tool_call_result = get_mcp_server_tool_result(
                 tool_name="get_active_items",
             )
-            print_success("Database records from MCP server:", active_items)
+            items = tool_call_result.get("items", None)
+            if items is None:
+                print_failure("Database records not returned by MCP server.")
+                return
+            if not isinstance(items, list):
+                print_failure("Database records from MCP server were not a list.")
+                return
+            print_success("Database records from MCP server:", tool_call_result)
         except Exception as error:
             print_failure("Database records from MCP server error:", error)

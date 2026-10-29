@@ -89,9 +89,11 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
         try:
             if self.path == "/extract-markdown-from-document":
-                data = extract_markdown_from_document(filename)
+                markdown = extract_markdown_from_document(filename)
+                result = {"markdown": markdown}
             elif self.path == "/get-chunks-from-document":
-                data = get_chunks_from_document(filename)
+                chunks = get_chunks_from_document(filename)
+                result = {"chunks": chunks}
             else:
                 self.send_error(_CODE_404_NOT_FOUND)
                 return
@@ -99,7 +101,6 @@ class _RequestHandler(BaseHTTPRequestHandler):
             self.send_error(_CODE_500_INTERNAL_SERVER_ERROR, "Conversion failed")
             return
 
-        result = {"data": data}
         response_text = json.dumps(result)
 
         body = response_text.encode("utf-8")

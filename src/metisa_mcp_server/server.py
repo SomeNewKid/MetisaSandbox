@@ -188,11 +188,16 @@ async def _call_tool(
             is_error=True,
         )
 
-    if not isinstance(tool_result, str):
+    if not isinstance(tool_result, dict):
         raise MCPError(-32602, f"Tool returned a non-string result: {tool_name}")
 
-    content = types.TextContent(text=tool_result)
-    return types.CallToolResult(content=[content])
+    serialized_result = json.dumps(tool_result, allow_nan=False)
+    text_content = types.TextContent(text=serialized_result)
+
+    return types.CallToolResult(
+        content=[text_content],
+        structured_content=tool_result,
+    )
 
 
 async def _list_resources(

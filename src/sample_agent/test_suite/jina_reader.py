@@ -35,10 +35,19 @@ def test_jina_reader(specification: MetisaSpecification):
     with print_elapsed_time():
         url = "https://example.com"
         try:
-            url_content = get_mcp_server_tool_result(
+            tooL_result = get_mcp_server_tool_result(
                 tool_name="read_content_from_url",
                 params={"url": url},
             )
-            print_success(f"URL content from MCP Server: {url_content}")
+            content = tooL_result.get("content", None)
+            if content is None:
+                print_failure("URL content not returned from MCP Server error:")
+                return
+            if not isinstance(content, str):
+                print_failure("URL content from MCP Server was not a string.")
+                return
+            if len(content) > 200:
+                content = content[:200].strip() + "..."
+            print_success(f"URL content from MCP Server: {content}")
         except Exception as error:
             print_failure("URL content from MCP Server error:", error)
