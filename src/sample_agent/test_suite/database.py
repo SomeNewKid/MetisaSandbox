@@ -44,6 +44,14 @@ def test_database_access(specification: MetisaSpecification):
             if not isinstance(items, list):
                 print_failure("Database records from MCP server were not a list.")
                 return
-            print_success("Database records from MCP server:", tool_call_result)
+            if not items:
+                print_failure("Database records from MCP server were empty.")
+                return
+            titles = []
+            for item in items:
+                title = '"' + item.get("title", "") + '"'
+                titles.append(title)
+            display = ", ".join(titles)
+            print_success("Database records from MCP server:", display)
         except Exception as error:
             print_failure("Database records from MCP server error:", error)

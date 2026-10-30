@@ -19,8 +19,17 @@ from .._helper import (
 )
 
 _SKIP_ENTITY_GUARD_TESTS = False
+_USE_EXTENSIVE_TEST_SENTENCES = False
 
 _TEST_SENTENCES = [
+    "My phone number is (08) 9332 1234.",
+    "My name is Samantha Smith.",
+    "My email is samantha.smith@example.com.",
+    "My credit card number is 4111-1111-1111-1111.",
+    "My Medicare number is 2428 77813 2.",
+]
+
+_EXTENSIVE_TEST_SENTENCES = [
     "My phone number is 9332 1234.",
     "My phone number is (08) 9332 1234.",
     "My phone number is +61 9332 1234.",
@@ -52,7 +61,10 @@ def test_entity_guard(specification: MetisaSpecification):
         print_disabled("Entity Guard capability not declared.")
         return
 
-    _anonymize_text_sentences(_TEST_SENTENCES)
+    if _USE_EXTENSIVE_TEST_SENTENCES:
+        _anonymize_text_sentences(_EXTENSIVE_TEST_SENTENCES)
+    else:
+        _anonymize_text_sentences(_TEST_SENTENCES)
 
 
 def _anonymize_text_sentences(
@@ -69,9 +81,9 @@ def _anonymize_text_sentences(
                 anonymized = _anonymize_text(sentence)
                 successful = anonymized != sentence
                 if successful:
-                    print_success("Anonymization successful for:", sentence)
+                    print_success("Anonymization successful for:", anonymized)
                 else:
-                    print_failure("Anonymization failed for:", sentence)
+                    print_failure("Anonymization failed for:", anonymized)
             except Exception as error:
                 print_failure("MCP server error for anonymization:", error)
 

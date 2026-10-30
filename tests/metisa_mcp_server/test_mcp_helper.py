@@ -3,14 +3,16 @@ from __future__ import annotations
 from datetime import date as Date
 from typing import Annotated
 
+import pytest
 from pydantic import Field
 
 from metisa_mcp_server._helper import (
+    _create_input_schema,
     create_declared_resource,
     create_declared_tool,
-    create_input_schema,
     create_resource,
     create_tool,
+    with_output_schema,
 )
 
 
@@ -19,6 +21,7 @@ class Flight:
     pass
 
 
+@with_output_schema({})
 def search_flights(
     origin: Annotated[str, Field(description="Departure city")],
     destination: Annotated[str, Field(description="Arrival city")],
@@ -28,9 +31,15 @@ def search_flights(
     ...
 
 
+@with_output_schema({})
 def flight_policy() -> str:
     """Provide the flight policy."""
     return "The flight policy"
+
+
+def tool_with_no_output_schema() -> str:
+    """This tool does not declare its output schema."""
+    ...
 
 
 def test_create_resource_for_flight_policy_resource() -> None:
@@ -53,8 +62,13 @@ def test_create_declared_resource_if_flight_policy_is_not_in_metisa_json() -> No
     assert resource is None
 
 
+def test_tool_with_no_output_schema() -> None:
+    with pytest.raises(ValueError):
+        _ = create_tool(tool_with_no_output_schema)
+
+
 def test_input_schema_for_search_flights_tool() -> None:
-    input_schema = create_input_schema(search_flights)
+    input_schema = _create_input_schema(search_flights)
     expected_schema = {
         "type": "object",
         "properties": {

@@ -5,9 +5,15 @@ from __future__ import annotations
 from functools import cache
 from threading import Lock
 
-from presidio_analyzer import AnalyzerEngine, RecognizerResult
+from presidio_analyzer import (
+    AnalyzerEngine,
+    Pattern,
+    PatternRecognizer,
+    RecognizerResult,
+)
 from presidio_analyzer.predefined_recognizers import PhoneRecognizer
 from presidio_anonymizer import AnonymizerEngine
+from presidio_anonymizer.entities import OperatorConfig
 from presidio_anonymizer.entities import RecognizerResult as AnonymizerRecognizerResult
 
 _ANALYZER_LOCK = Lock()
@@ -32,7 +38,8 @@ def anonymize(
             "AU_ABN",  # Australian Business Number (ABN)
             "AU_ACN",  # Australian Company Number (ACN)
             "AU_TFN",  # Tax file number (TFN)
-            "AU_MEDICARE",  # Medicare numbe
+            "AU_MEDICARE",  # Medicare number
+            "COARSE_NUMBER",
         ]
 
     with _ANALYZER_LOCK:
@@ -55,10 +62,16 @@ def anonymize(
     ]
 
     with _ANONYMIZER_LOCK:
+        operators = {
+            "COARSE_NUMBER": OperatorConfig("replace", {"new_value": "<COARSE_NUMBER>"})
+        }
+
         anonymizer = _get_anonymizer_engine()
 
         anonymized = anonymizer.anonymize(
-            text=text, analyzer_results=anonymizer_results
+            text=text,
+            analyzer_results=anonymizer_results,
+            operators=operators,
         )
 
     return anonymized.text
@@ -70,6 +83,32 @@ def initialize_anonymizer_engine() -> None:
         _ = _get_analyzer()
     with _ANONYMIZER_LOCK:
         _ = _get_anonymizer_engine()
+
+
+# This is a purposely coarse number recognizer,
+# created as an exercise in learning how to extend
+# the Presidio library.
+def _create_coarse_number_recognizer() -> PatternRecognizer:
+    regex = (
+        r"(?<!\w)"  # Do not start immediately after a word character
+        r"\+?"  # Allow an optional leading '+' character
+        "[0-9]"  # Match the first digit
+        "(?:[ -]?[0-9]){7,}"  # At least seven more digits, maybe with space or hyphen
+        r"(?!\w)"  # Do not end immediately before a word character
+    )
+
+    pattern = Pattern(
+        name="coarse_number_recognizer",
+        regex=regex,
+        score=0.7,
+    )
+
+    return PatternRecognizer(
+        name="CoarseNumberRecognizer",
+        supported_entity="COARSE_NUMBER",
+        supported_language="en",
+        patterns=[pattern],
+    )
 
 
 @cache
@@ -86,6 +125,9 @@ def _get_analyzer() -> AnalyzerEngine:
 
     analyzer.registry.remove_recognizer("PhoneRecognizer")
     analyzer.registry.add_recognizer(phone_recognizer)
+
+    coarse_number_recognizer = _create_coarse_number_recognizer()
+    analyzer.registry.add_recognizer(coarse_number_recognizer)
 
     return analyzer
 

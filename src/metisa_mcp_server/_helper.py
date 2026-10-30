@@ -2,13 +2,29 @@
 
 import inspect
 from collections.abc import Callable
-from typing import get_type_hints
+from typing import TypeVar, get_type_hints
 
 from mcp.types import Resource, Tool
 from pydantic import create_model
 
 # This helper would be unnecessary if we used the built-in MCPServer.
 # However, we're using the lower-level Server because this is a learning project.
+
+
+_ToolFunction = TypeVar("_ToolFunction", bound=Callable[..., object])
+
+
+def with_output_schema(
+    schema: dict[str, object],
+) -> Callable[[_ToolFunction], _ToolFunction]:
+    """Attach an output schema to a tool function."""
+
+    def _decorate(func: _ToolFunction) -> _ToolFunction:
+        # Attach metadata that is not declared on the callable's static type.
+        setattr(func, "_metisa_output_schema", schema)  # noqa: B010
+        return func
+
+    return _decorate
 
 
 def create_declared_resource(
@@ -68,15 +84,21 @@ def create_tool(
     """Create an MCP tool definition for the function."""
     tool_name = func.__name__
     tool_description = func.__doc__
+    tool_input_schema = _create_input_schema(func)
+    tool_output_schema = getattr(func, "_metisa_output_schema", None)
+
+    if not isinstance(tool_output_schema, dict):
+        raise ValueError(f"Tool {tool_name} has not output schema.")
 
     return Tool(
         name=tool_name,
         description=tool_description,
-        input_schema=create_input_schema(func),
+        input_schema=tool_input_schema,
+        output_schema=tool_output_schema,
     )
 
 
-def create_input_schema(
+def _create_input_schema(
     func: Callable[..., object],
 ) -> dict[str, object]:
     """Create an input schema for the given function."""
