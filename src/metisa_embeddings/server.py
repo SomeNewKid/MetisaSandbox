@@ -4,7 +4,7 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from ._searcher import get_matching_chunks
+from ._searcher import get_matching_chunks_from_document
 
 _MAX_REQUEST_BYTES = 1024 * 1024  # 1 MiB
 _CODE_200_OK = 200
@@ -101,7 +101,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            chunks = get_matching_chunks(filename, prompt, metisa_json)
+            chunks = get_matching_chunks_from_document(filename, prompt, metisa_json)
             data = [chunk for chunk in chunks]
         except Exception as error:
             self.send_error(

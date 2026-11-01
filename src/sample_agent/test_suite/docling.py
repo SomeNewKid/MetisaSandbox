@@ -37,7 +37,7 @@ def test_docling(specification: MetisaSpecification):
         try:
             print("Data from ", filename)
             tool_result = get_mcp_server_tool_result(
-                tool_name="extract_markdown_from_document",
+                tool_name="convert_document_to_markdown",
                 params={"filename": filename},
             )
             markdown = tool_result.get("markdown", None)

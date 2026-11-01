@@ -28,7 +28,7 @@ class ChunkEmbedding:
     vector: list[float]
 
 
-def get_matching_chunks(
+def get_matching_chunks_from_document(
     filename: str,
     prompt: str,
     metisa_json: dict[str, object],

@@ -60,16 +60,16 @@ secrets = [
     "SANDBOX_TESTER_MARIADB_CREDENTIALS=${host:SANDBOX_TESTER_MARIADB_CREDENTIALS}",
 ]
 tools = [
-    "get_active_items",
+    "get_active_items_from_database",
     "get_title_from_url",
     "read_content_from_url",
     "execute_starlark_code",
-    "classify_text",
-    "moderate_text",
-    "anonymize_text",
-    "extract_markdown_from_document",
-    "retrieve_from_documents",
-    "get_matching_chunks",
+    "get_classification_indicators",
+    "get_moderation_labels",
+    "anonymize_entities_in_text",
+    "convert_document_to_markdown",
+    "retrieve_content_from_document",
+    "get_matching_chunks_from_document",
 ]
 resources = []
 

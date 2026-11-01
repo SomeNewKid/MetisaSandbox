@@ -1,4 +1,4 @@
-"""Provide the database tools for the Metisa MCP Server."""
+"""Provide the tool which gets active items from the database."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ import importlib
 import os
 from datetime import date, datetime
 from typing import Any, TypedDict
+
+from jsonschema import ValidationError, validate
 
 from metisa_common.secrets_helper import load_secrets
 
@@ -24,17 +26,7 @@ FROM items
 WHERE status = 'active'
 ORDER BY id
 """
-
-
-class _MariaDBConnectionSettings(TypedDict):
-    host: str
-    port: int
-    user: str
-    password: str
-    database: str
-
-
-@with_output_schema({
+_TOOL_RESULT_SCHEMA = {
     "type": "object",
     "properties": {
         "items": {
@@ -57,9 +49,34 @@ class _MariaDBConnectionSettings(TypedDict):
     },
     "required": ["items"],
     "additionalProperties": False,
-})
-def get_active_items() -> dict[str, object]:
+}
+
+
+class _MariaDBConnectionSettings(TypedDict):
+    host: str
+    port: int
+    user: str
+    password: str
+    database: str
+
+
+@with_output_schema(_TOOL_RESULT_SCHEMA)
+def get_active_items_from_database() -> dict[str, object]:
     """Return the active items from the database."""
+    _validate_arguments()
+
+    result = _execute_tool()
+
+    _validate_result(result)
+
+    return result
+
+
+def _validate_arguments() -> None:
+    pass
+
+
+def _execute_tool() -> dict[str, object]:
     try:
         username, _ = _read_mariadb_credentials()
         if not username:
@@ -72,12 +89,22 @@ def get_active_items() -> dict[str, object]:
             _MARIADB_HOST_ENVIRONMENT_VARIABLE,
             _DEFAULT_MARIADB_HOST,
         )
-        return _get_active_items(maria_db_host)
+        return _get_active_items_from_database(maria_db_host)
     except Exception as error:
         raise RuntimeError(f"Database connection error: {error}") from error
 
 
-def _get_active_items(
+def _validate_result(
+    result: dict[str, object],
+) -> None:
+    try:
+        validate(result, _TOOL_RESULT_SCHEMA)
+    except ValidationError as error:
+        message = "Database returned content in an unexpected format."
+        raise RuntimeError(message) from error
+
+
+def _get_active_items_from_database(
     maria_db_host: str,
 ) -> dict[str, object]:
     connection_settings = _read_mariadb_connection_settings(maria_db_host)

@@ -4,7 +4,7 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ._converter import (
-    extract_markdown_from_document,
+    convert_document_to_markdown,
     get_chunks_from_document,
 )
 
@@ -89,7 +89,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
         try:
             if self.path == "/extract-markdown-from-document":
-                markdown = extract_markdown_from_document(filename)
+                markdown = convert_document_to_markdown(filename)
                 result = {"markdown": markdown}
             elif self.path == "/get-chunks-from-document":
                 chunks = get_chunks_from_document(filename)

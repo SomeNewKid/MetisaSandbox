@@ -49,9 +49,9 @@ def mcp_server_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
     )
 
 
-def test_tool_1_is_available(probe_context: ProbeContext) -> ProbeResult:
-    """Verify MCP tool discovery includes test_tool_1."""
-    tool_name = "test_tool_1"
+def test_greeting_1_is_available(probe_context: ProbeContext) -> ProbeResult:
+    """Verify MCP tool discovery includes test_greeting_1."""
+    tool_name = "test_greeting_1"
 
     async def _operation(client: Client) -> str | None:
         result = await client.list_tools()
@@ -59,13 +59,15 @@ def test_tool_1_is_available(probe_context: ProbeContext) -> ProbeResult:
             return f"MCP server did not advertise {tool_name}."
         return None
 
-    return _run_mcp_probe(probe_context, "test_tool_1_is_available", _operation)
+    return _run_mcp_probe(probe_context, "test_greeting_1_is_available", _operation)
 
 
-def test_tool_1_returns_expected_greeting(probe_context: ProbeContext) -> ProbeResult:
-    """Verify test_tool_1 succeeds and returns the expected greeting."""
-    tool_name = "test_tool_1"
-    expected_greeting = "Hello, from test_tool_1."
+def test_greeting_1_returns_expected_greeting(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify test_greeting_1 succeeds and returns the expected greeting."""
+    tool_name = "test_greeting_1"
+    expected_greeting = "Hello, from test_greeting_1."
 
     async def _operation(client: Client) -> str | None:
         result = await client.call_tool(tool_name, {})
@@ -75,13 +77,15 @@ def test_tool_1_returns_expected_greeting(probe_context: ProbeContext) -> ProbeR
         return None
 
     return _run_mcp_probe(
-        probe_context, "test_tool_1_returns_expected_greeting", _operation
+        probe_context, "test_greeting_1_returns_expected_greeting", _operation
     )
 
 
-def test_tool_2_returns_expected_greetings(probe_context: ProbeContext) -> ProbeResult:
-    """Verify test_tool_2 is usable only when declared and handles both names."""
-    tool_name = "test_tool_2"
+def test_greeting_2_returns_expected_greetings(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify test_greeting_2 is usable only when declared and handles both names."""
+    tool_name = "test_greeting_2"
     mcp_server = probe_context.specification.mcp_server
     declared = mcp_server is not None and tool_name in mcp_server.tools
 
@@ -107,8 +111,8 @@ def test_tool_2_returns_expected_greetings(probe_context: ProbeContext) -> Probe
         if not listed:
             return f"MCP server did not advertise {tool_name}."
         for name, expected_greeting in (
-            ("", "Hello, from test_tool_2."),
-            ("Susan", "Hello, Susan, from test_tool_2."),
+            ("", "Hello, from test_greeting_2."),
+            ("Susan", "Hello, Susan, from test_greeting_2."),
         ):
             response = await client.call_tool(tool_name, {"name": name})
             payload = _read_tool_payload(response, tool_name)
@@ -120,14 +124,14 @@ def test_tool_2_returns_expected_greetings(probe_context: ProbeContext) -> Probe
         return None
 
     return _run_mcp_probe(
-        probe_context, "test_tool_2_returns_expected_greetings", _operation
+        probe_context, "test_greeting_2_returns_expected_greetings", _operation
     )
 
 
-def test_tool_3_validates_name(probe_context: ProbeContext) -> ProbeResult:
-    """Verify test_tool_3 is usable only when declared and validates names."""
-    tool_name = "test_tool_3"
-    expected_greeting = "Hello, Susan, from test_tool_3."
+def test_greeting_3_validates_name(probe_context: ProbeContext) -> ProbeResult:
+    """Verify test_greeting_3 is usable only when declared and validates names."""
+    tool_name = "test_greeting_3"
+    expected_greeting = "Hello, Susan, from test_greeting_3."
     mcp_server = probe_context.specification.mcp_server
     declared = mcp_server is not None and tool_name in mcp_server.tools
 
@@ -169,13 +173,13 @@ def test_tool_3_validates_name(probe_context: ProbeContext) -> ProbeResult:
             )
         return None
 
-    return _run_mcp_probe(probe_context, "test_tool_3_validates_name", _operation)
+    return _run_mcp_probe(probe_context, "test_greeting_3_validates_name", _operation)
 
 
-def test_tool_2_rejects_non_string_name(probe_context: ProbeContext) -> ProbeResult:
-    """Verify declared test_tool_2 rejects a non-string name."""
-    tool_name = "test_tool_2"
-    probe_name = "test_tool_2_rejects_non_string_name"
+def test_greeting_2_rejects_non_string_name(probe_context: ProbeContext) -> ProbeResult:
+    """Verify declared test_greeting_2 rejects a non-string name."""
+    tool_name = "test_greeting_2"
+    probe_name = "test_greeting_2_rejects_non_string_name"
     mcp_server = probe_context.specification.mcp_server
     if mcp_server is None or tool_name not in mcp_server.tools:
         return ProbeResult.success(
@@ -202,12 +206,12 @@ def test_tool_2_rejects_non_string_name(probe_context: ProbeContext) -> ProbeRes
     return _run_mcp_probe(probe_context, probe_name, _operation)
 
 
-def test_tool_2_rejects_additional_arguments(
+def test_greeting_2_rejects_additional_arguments(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """Verify declared test_tool_2 rejects arguments beyond name."""
-    tool_name = "test_tool_2"
-    probe_name = "test_tool_2_rejects_additional_arguments"
+    """Verify declared test_greeting_2 rejects arguments beyond name."""
+    tool_name = "test_greeting_2"
+    probe_name = "test_greeting_2_rejects_additional_arguments"
     mcp_server = probe_context.specification.mcp_server
     if mcp_server is None or tool_name not in mcp_server.tools:
         return ProbeResult.success(
@@ -236,10 +240,10 @@ def test_tool_2_rejects_additional_arguments(
     return _run_mcp_probe(probe_context, probe_name, _operation)
 
 
-def test_tool_3_rejects_non_string_name(probe_context: ProbeContext) -> ProbeResult:
-    """Verify declared test_tool_3 rejects a non-string name."""
-    tool_name = "test_tool_3"
-    probe_name = "test_tool_3_rejects_non_string_name"
+def test_greeting_3_rejects_non_string_name(probe_context: ProbeContext) -> ProbeResult:
+    """Verify declared test_greeting_3 rejects a non-string name."""
+    tool_name = "test_greeting_3"
+    probe_name = "test_greeting_3_rejects_non_string_name"
     mcp_server = probe_context.specification.mcp_server
     if mcp_server is None or tool_name not in mcp_server.tools:
         return ProbeResult.success(
@@ -266,12 +270,12 @@ def test_tool_3_rejects_non_string_name(probe_context: ProbeContext) -> ProbeRes
     return _run_mcp_probe(probe_context, probe_name, _operation)
 
 
-def test_tool_3_rejects_additional_arguments(
+def test_greeting_3_rejects_additional_arguments(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """Verify declared test_tool_3 rejects arguments beyond name."""
-    tool_name = "test_tool_3"
-    probe_name = "test_tool_3_rejects_additional_arguments"
+    """Verify declared test_greeting_3 rejects arguments beyond name."""
+    tool_name = "test_greeting_3"
+    probe_name = "test_greeting_3_rejects_additional_arguments"
     mcp_server = probe_context.specification.mcp_server
     if mcp_server is None or tool_name not in mcp_server.tools:
         return ProbeResult.success(
@@ -333,7 +337,7 @@ def read_content_from_url_returns_expected_content(
 def classify_safe_text_returns_no_indicators(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """Verify classify_text returns no indicators for clearly safe text."""
+    """Verify classification tool returns no indicators for clearly safe text."""
     return _run_classification_probe(
         probe_context,
         "classify_safe_text_returns_no_indicators",
@@ -345,7 +349,7 @@ def classify_safe_text_returns_no_indicators(
 def classify_unsafe_text_returns_indicators(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """Verify classify_text returns indicators for an instruction override."""
+    """Verify classification tool returns indicators for an instruction override."""
     return _run_classification_probe(
         probe_context,
         "classify_unsafe_text_returns_indicators",
@@ -357,7 +361,7 @@ def classify_unsafe_text_returns_indicators(
 def moderate_safe_text_returns_no_labels(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """Verify moderate_text returns no labels for clearly safe text."""
+    """Verify moderation tool returns no labels for clearly safe text."""
     return _run_moderation_probe(
         probe_context,
         "moderate_safe_text_returns_no_labels",
@@ -369,7 +373,7 @@ def moderate_safe_text_returns_no_labels(
 def moderate_unsafe_text_returns_labels(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """Verify moderate_text returns labels for clearly unsafe text."""
+    """Verify moderation tool returns labels for clearly unsafe text."""
     return _run_moderation_probe(
         probe_context,
         "moderate_unsafe_text_returns_labels",
@@ -378,33 +382,39 @@ def moderate_unsafe_text_returns_labels(
     )
 
 
-def anonymize_text_removes_person_name(probe_context: ProbeContext) -> ProbeResult:
-    """Verify anonymize_text removes a name while preserving surrounding text."""
+def anonymize_entities_in_text_removes_person_name(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify anonymization tool removes a name while preserving surrounding text."""
     return _run_anonymization_probe(
         probe_context,
-        "anonymize_text_removes_person_name",
+        "anonymize_entities_in_text_removes_person_name",
         "My name is Samantha Smith.",
         "My name is",
         "Samantha Smith",
     )
 
 
-def anonymize_text_removes_email_address(probe_context: ProbeContext) -> ProbeResult:
-    """Verify anonymize_text removes an email while preserving surrounding text."""
+def anonymize_entities_in_text_removes_email_address(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify anonymization tool removes an email while preserving surrounding text."""
     return _run_anonymization_probe(
         probe_context,
-        "anonymize_text_removes_email_address",
+        "anonymize_entities_in_text_removes_email_address",
         "My email is samantha.smith@example.com.",
         "My email is",
         "samantha.smith@example.com",
     )
 
 
-def anonymize_text_removes_phone_number(probe_context: ProbeContext) -> ProbeResult:
-    """Verify anonymize_text removes a phone while preserving surrounding text."""
+def anonymize_entities_in_text_removes_phone_number(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify anonymization tool removes a phone while preserving surrounding text."""
     return _run_anonymization_probe(
         probe_context,
-        "anonymize_text_removes_phone_number",
+        "anonymize_entities_in_text_removes_phone_number",
         "My phone number is 0488 123 456.",
         "My phone number is",
         "0488 123 456",
@@ -667,7 +677,7 @@ def _run_classification_probe(
     expect_indicators: bool,
 ) -> ProbeResult:
     probe_name = f"container__mcp__{name}"
-    tool_name = "classify_text"
+    tool_name = "get_classification_indicators"
     if Capability.PROMPT_GUARD not in probe_context.specification.capabilities:
         return ProbeResult.success(
             probe_name, "Prompt Guard is disabled. Skipping probe."
@@ -713,7 +723,7 @@ def _run_moderation_probe(
     expect_labels: bool,
 ) -> ProbeResult:
     probe_name = f"container__mcp__{name}"
-    tool_name = "moderate_text"
+    tool_name = "get_moderation_labels"
     if Capability.PROMPT_GUARD not in probe_context.specification.capabilities:
         return ProbeResult.success(
             probe_name, "Prompt Guard is disabled. Skipping probe."
@@ -754,7 +764,7 @@ def _run_anonymization_probe(
     sensitive_text: str,
 ) -> ProbeResult:
     probe_name = f"container__mcp__{name}"
-    tool_name = "anonymize_text"
+    tool_name = "anonymize_entities_in_text"
     if Capability.ENTITY_GUARD not in probe_context.specification.capabilities:
         return ProbeResult.success(
             probe_name, "Entity Guard is disabled. Skipping probe."
@@ -931,22 +941,22 @@ MCP_PROBES = ProbeGroup(
     name="mcp",
     probes=(
         mcp_server_alias_resolves,
-        test_tool_1_is_available,
-        test_tool_1_returns_expected_greeting,
-        test_tool_2_returns_expected_greetings,
-        test_tool_2_rejects_non_string_name,
-        test_tool_2_rejects_additional_arguments,
-        test_tool_3_validates_name,
-        test_tool_3_rejects_non_string_name,
-        test_tool_3_rejects_additional_arguments,
+        test_greeting_1_is_available,
+        test_greeting_1_returns_expected_greeting,
+        test_greeting_2_returns_expected_greetings,
+        test_greeting_2_rejects_non_string_name,
+        test_greeting_2_rejects_additional_arguments,
+        test_greeting_3_validates_name,
+        test_greeting_3_rejects_non_string_name,
+        test_greeting_3_rejects_additional_arguments,
         read_content_from_url_returns_expected_content,
         classify_safe_text_returns_no_indicators,
         classify_unsafe_text_returns_indicators,
         moderate_safe_text_returns_no_labels,
         moderate_unsafe_text_returns_labels,
-        anonymize_text_removes_person_name,
-        anonymize_text_removes_email_address,
-        anonymize_text_removes_phone_number,
+        anonymize_entities_in_text_removes_person_name,
+        anonymize_entities_in_text_removes_email_address,
+        anonymize_entities_in_text_removes_phone_number,
         execute_starlark_code_returns_expected_result,
         execute_starlark_code_rejects_missing_main,
         execute_starlark_code_enforces_step_budget,

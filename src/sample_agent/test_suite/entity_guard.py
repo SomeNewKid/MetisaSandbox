@@ -62,12 +62,12 @@ def test_entity_guard(specification: MetisaSpecification):
         return
 
     if _USE_EXTENSIVE_TEST_SENTENCES:
-        _anonymize_text_sentences(_EXTENSIVE_TEST_SENTENCES)
+        _anonymize_entities_in_text_sentences(_EXTENSIVE_TEST_SENTENCES)
     else:
-        _anonymize_text_sentences(_TEST_SENTENCES)
+        _anonymize_entities_in_text_sentences(_TEST_SENTENCES)
 
 
-def _anonymize_text_sentences(
+def _anonymize_entities_in_text_sentences(
     sentences: list[str],
 ) -> None:
     if not sentences:
@@ -78,7 +78,7 @@ def _anonymize_text_sentences(
                 if sentence != _TEST_SENTENCES[0]:
                     print()
                 print_message("Clear content:", sentence)
-                anonymized = _anonymize_text(sentence)
+                anonymized = _anonymize_entities_in_text(sentence)
                 successful = anonymized != sentence
                 if successful:
                     print_success("Anonymization successful for:", anonymized)
@@ -88,11 +88,11 @@ def _anonymize_text_sentences(
                 print_failure("MCP server error for anonymization:", error)
 
 
-def _anonymize_text(
+def _anonymize_entities_in_text(
     text: str,
 ) -> str:
     tool_result = get_mcp_server_tool_result(
-        tool_name="anonymize_text",
+        tool_name="anonymize_entities_in_text",
         params={"text": text},
     )
     anonymized = tool_result.get("anonymized", None)

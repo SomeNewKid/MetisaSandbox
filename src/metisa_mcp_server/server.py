@@ -32,34 +32,44 @@ from ._resources import (
     test_resource_3,
 )
 from ._telemetry import initialize_tracing
-from ._tools._code_execution_tools import (
+from ._tools._anonymize_entities_in_text_tool import (
+    anonymize_entities_in_text,
+)
+from ._tools._convert_document_to_markdown_tool import (
+    convert_document_to_markdown,
+)
+from ._tools._execute_starlark_code_tools import (
     execute_starlark_code,
 )
-from ._tools._database_tools import (
-    get_active_items,
+from ._tools._get_active_items_from_database_tool import (
+    get_active_items_from_database,
 )
-from ._tools._docling_tools import (
-    extract_markdown_from_document,
+from ._tools._get_classification_indicators_tool import (
+    get_classification_indicators,
 )
-from ._tools._document_tools import (
-    get_matching_chunks,
-    retrieve_from_documents,
+from ._tools._get_matching_chunks_from_document_tool import (
+    get_matching_chunks_from_document,
 )
-from ._tools._entity_guard_tools import (
-    anonymize_text,
+from ._tools._get_moderation_labels_tool import (
+    get_moderation_labels,
 )
-from ._tools._internet_tools import (
+from ._tools._get_title_from_url_tool import (
     get_title_from_url,
+)
+from ._tools._read_content_from_url_tool import (
     read_content_from_url,
 )
-from ._tools._prompt_guard_tools import (
-    classify_text,
-    moderate_text,
+from ._tools._retrieve_content_from_document_tool import (
+    retrieve_content_from_document,
 )
-from ._tools._test_tools import (
-    test_tool_1,
-    test_tool_2,
-    test_tool_3,
+from ._tools._test_greeting_1_tool import (
+    test_greeting_1,
+)
+from ._tools._test_greeting_2_tool import (
+    test_greeting_2,
+)
+from ._tools._test_greeting_3_tool import (
+    test_greeting_3,
 )
 
 _MCP_SERVER_PORT = 8000
@@ -132,22 +142,22 @@ def _create_resource_registry(
 
 TOOL_REGISTRY = _create_tool_registry(
     [
-        test_tool_1,
+        test_greeting_1,
     ],
     metisa_json,
     [
-        test_tool_2,
-        test_tool_3,
-        get_active_items,
+        test_greeting_2,
+        test_greeting_3,
+        get_active_items_from_database,
         get_title_from_url,
         read_content_from_url,
         execute_starlark_code,
-        classify_text,
-        moderate_text,
-        anonymize_text,
-        extract_markdown_from_document,
-        retrieve_from_documents,
-        get_matching_chunks,
+        get_classification_indicators,
+        get_moderation_labels,
+        anonymize_entities_in_text,
+        convert_document_to_markdown,
+        retrieve_content_from_document,
+        get_matching_chunks_from_document,
     ],
 )
 

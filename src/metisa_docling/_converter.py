@@ -21,7 +21,7 @@ from docling_core.types.io import DocumentStream
 from transformers import AutoTokenizer
 
 
-def extract_markdown_from_document(
+def convert_document_to_markdown(
     filename: str,
 ) -> str:
     """Retrieve data from sample file."""

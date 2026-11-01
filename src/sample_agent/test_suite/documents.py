@@ -33,10 +33,11 @@ def test_documents(specification: MetisaSpecification):
         return
 
     filename = "sample.txt"
+    print("Data from ", filename, flush=True)
     with print_elapsed_time():
         try:
             tool_result = get_mcp_server_tool_result(
-                tool_name="retrieve_from_documents",
+                tool_name="retrieve_content_from_document",
                 params={"filename": filename},
             )
             markdown = tool_result.get("content", None)
@@ -46,7 +47,6 @@ def test_documents(specification: MetisaSpecification):
             if not isinstance(markdown, str):
                 print_failure("Returned content not a string.")
                 return
-            print("Data from ", filename)
             if markdown:
                 if len(markdown) > 200:
                     markdown = markdown[0:200].strip() + "..."
@@ -55,7 +55,30 @@ def test_documents(specification: MetisaSpecification):
                 print_failure("[No data returned]")
         except Exception as error:
             print_failure(
-                "Retrieve Documents sample error:",
+                "Retrieve sample document error:",
                 type(error).__name__,
                 str(error),
             )
+
+    filename = "prompt-injection.txt"
+    print()
+    print("Data from ", filename, flush=True)
+    with print_elapsed_time():
+        try:
+            tool_result = get_mcp_server_tool_result(
+                tool_name="retrieve_content_from_document",
+                params={"filename": filename},
+            )
+            markdown = tool_result.get("content", None)
+            if markdown is None:
+                markdown = "[No content returned]"
+            if not isinstance(markdown, str):
+                markdown = "[Non-string content returned]"
+            if markdown:
+                if len(markdown) > 200:
+                    markdown = markdown[0:200].strip() + "..."
+            else:
+                markdown = "[Empty content returned]"
+            print_failure("Prompt injection document did not raise error.", markdown)
+        except Exception:
+            print_success("Prompt injection document raised an error.")

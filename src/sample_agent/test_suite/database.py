@@ -35,7 +35,7 @@ def test_database_access(specification: MetisaSpecification):
     with print_elapsed_time():
         try:
             tool_call_result = get_mcp_server_tool_result(
-                tool_name="get_active_items",
+                tool_name="get_active_items_from_database",
             )
             items = tool_call_result.get("items", None)
             if items is None:

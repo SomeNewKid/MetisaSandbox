@@ -34,17 +34,19 @@ def test_embeddings(specification: MetisaSpecification):
         return
 
     filename = "Employee Handbook.pdf"
-    _get_get_matching_chunks(filename, "What are our company values?")
+    _get_get_matching_chunks_from_document(filename, "What are our company values?")
     print(flush=True)
-    _get_get_matching_chunks(filename, "What is the email of the Compliance Officer?")
+    _get_get_matching_chunks_from_document(
+        filename, "What is the email of the Compliance Officer?"
+    )
 
 
-def _get_get_matching_chunks(filename: str, prompt: str) -> None:
+def _get_get_matching_chunks_from_document(filename: str, prompt: str) -> None:
     with print_elapsed_time():
         try:
             print_message(prompt)
             tool_result = get_mcp_server_tool_result(
-                tool_name="get_matching_chunks",
+                tool_name="get_matching_chunks_from_document",
                 params={"filename": filename, "prompt": prompt},
             )
 
