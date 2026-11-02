@@ -81,21 +81,21 @@ class _RequestHandler(BaseHTTPRequestHandler):
         raw_body = self.rfile.read(length)
         try:
             decoded_body = raw_body.decode("utf-8")
-            payload = json.loads(decoded_body)
+            request_payload = json.loads(decoded_body)
         except (UnicodeDecodeError, ValueError):
             self.send_error(_CODE_400_BAD_REQUEST, "Expected valid UTF-8 JSON")
             return
 
-        if not isinstance(payload, dict):
+        if not isinstance(request_payload, dict):
             self.send_error(_CODE_400_BAD_REQUEST, "Expected a JSON object")
             return
 
-        filename = payload.get("filename")
+        filename = request_payload.get("filename")
         if not isinstance(filename, str):
             self.send_error(_CODE_400_BAD_REQUEST, "'filename' must be a string")
             return
 
-        prompt = payload.get("prompt")
+        prompt = request_payload.get("prompt")
         if not isinstance(prompt, str):
             self.send_error(_CODE_400_BAD_REQUEST, "'prompt' must be a string")
             return
@@ -112,9 +112,9 @@ class _RequestHandler(BaseHTTPRequestHandler):
             return
 
         result = {"chunks": data}
-        response_text = json.dumps(result)
+        response_payload = json.dumps(result)
 
-        body = response_text.encode("utf-8")
+        body = response_payload.encode("utf-8")
         self.send_response(_CODE_200_OK)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

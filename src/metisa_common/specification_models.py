@@ -28,6 +28,8 @@ class Capability(StrEnum):
     QDRANT = "qdrant"
     EMBEDDINGS = "embeddings"
     OTEL_COLLECTOR = "otel_collector"
+    POSTGRES = "postgres"
+    AGENT_MEMORY = "agent_memory"
 
 
 class SpecificationValidationError(ValueError):
@@ -56,6 +58,8 @@ class MetisaSpecification:
     qdrant: QdrantSpecification | None
     embeddings: EmbeddingsSpecification | None
     otel_collector: OpenTelemetrySpecification | None
+    postgres: PostgreSqlSpecification | None
+    agent_memory: AgentMemorySpecification | None
 
 
 @dataclass(frozen=True)
@@ -168,5 +172,19 @@ class EmbeddingsSpecification:
 @dataclass(frozen=True)
 class OpenTelemetrySpecification:
     """Represents the OpenTelemetry section of the Metisa specification."""
+
+    environs: frozenset[str]
+
+
+@dataclass(frozen=True)
+class PostgreSqlSpecification:
+    """Represents the Postgres section of the Metisa specification."""
+
+    environs: frozenset[str]
+
+
+@dataclass(frozen=True)
+class AgentMemorySpecification:
+    """Represents the Agent Memory section of the Metisa specification."""
 
     environs: frozenset[str]

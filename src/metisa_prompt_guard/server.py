@@ -71,16 +71,16 @@ class _RequestHandler(BaseHTTPRequestHandler):
         raw_body = self.rfile.read(length)
         try:
             decoded_body = raw_body.decode("utf-8")
-            payload = json.loads(decoded_body)
+            request_payload = json.loads(decoded_body)
         except (UnicodeDecodeError, ValueError):
             self.send_error(_CODE_400_BAD_REQUEST, "Expected valid UTF-8 JSON")
             return
 
-        if not isinstance(payload, dict):
+        if not isinstance(request_payload, dict):
             self.send_error(_CODE_400_BAD_REQUEST, "Expected a JSON object")
             return
 
-        text = payload.get("text")
+        text = request_payload.get("text")
         if not isinstance(text, str):
             self.send_error(_CODE_400_BAD_REQUEST, "'text' must be a string")
             return
@@ -95,7 +95,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
                 return
 
             result = {"indicators": [asdict(item) for item in indicators]}
-            response_text = json.dumps(result)
+            response_payload = json.dumps(result)
         elif self.path == "/moderate":
             try:
                 labels = get_labels(text)
@@ -103,12 +103,12 @@ class _RequestHandler(BaseHTTPRequestHandler):
                 self.send_error(_CODE_500_INTERNAL_SERVER_ERROR, "Labeling failed")
                 return
             result = {"labels": [label for label in labels]}
-            response_text = json.dumps(result)
+            response_payload = json.dumps(result)
         else:
             self.send_error(_CODE_404_NOT_FOUND)
             return
 
-        body = response_text.encode("utf-8")
+        body = response_payload.encode("utf-8")
         self.send_response(_CODE_200_OK)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

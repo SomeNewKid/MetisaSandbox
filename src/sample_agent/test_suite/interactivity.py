@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from metisa_common.specification_models import (
+    Capability,
     MetisaSpecification,
 )
 
@@ -15,8 +16,6 @@ from .._helper import (
     print_success,
     print_suite_title,
 )
-
-_IS_INTERACTIVE = False
 
 
 def test_interactivity(specification: MetisaSpecification):
@@ -30,7 +29,7 @@ def test_interactivity(specification: MetisaSpecification):
     output_directory = Path(output_dir)
     output_directory.mkdir(parents=True, exist_ok=True)
 
-    if _IS_INTERACTIVE:
+    if Capability.INTERACTIVE in specification.capabilities:
         user_name = input("What is your name? ")
     else:
         user_name = "Fred"

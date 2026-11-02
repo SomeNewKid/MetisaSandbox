@@ -1,20 +1,23 @@
 agent_name = "sample_agent"
 capabilities = [
     "network",
-    "internet",
-    "localnet",
-    "mcp_server",
-    "prompt_guard",
-    "entity_guard",
-    "jina_reader",
-    "code_execution",
-    "llm_server",
-    "llm_broker",
-    "docling",
-    "documents",
-    "qdrant",
-    "embeddings",
-    "otel_collector",
+    # "internet",
+    # "interactive",
+    # "localnet",
+    # "mcp_server",
+    # "prompt_guard",
+    # "entity_guard",
+    # "jina_reader",
+    # "code_execution",
+    # "llm_server",
+    # "llm_broker",
+    # "docling",
+    # "documents",
+    # "qdrant",
+    # "embeddings",
+    # "otel_collector",
+    "postgres",
+    "agent_memory",
 ]
 dependencies = [
     "cryptography==48.0.1",
@@ -117,4 +120,12 @@ environs = []
 environs = []
 
 [otel_collector]
+environs = []
+
+[postgres]
+environs = [
+    "POSTGRES_PASSWORD=${host:METISA_POSTGRES_PASSWORD}",
+]
+
+[agent_memory]
 environs = []

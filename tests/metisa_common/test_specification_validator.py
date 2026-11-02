@@ -108,6 +108,7 @@ def test_is_valid_ipv4_address_unhappy_path(value: str) -> None:
         pytest.param("2001:db8::1", id="compressed"),
         pytest.param("2001:DB8:0:0:0:0:0:1", id="expanded-mixed-case"),
         pytest.param("::ffff:192.0.2.128", id="ipv4-mapped"),
+        pytest.param("1:2:3:4:5:6:192.0.2.1", id="expanded-with-ipv4-tail"),
     ],
 )
 def test_is_valid_ipv6_address_happy_path(value: str) -> None:
@@ -125,6 +126,8 @@ def test_is_valid_ipv6_address_happy_path(value: str) -> None:
         pytest.param("2001:db8::gggg", id="non-hexadecimal-group"),
         pytest.param("2001:db8::12345", id="group-too-long"),
         pytest.param("2001:db8::1::2", id="multiple-compression-markers"),
+        pytest.param(":::1", id="triple-colon"),
+        pytest.param("1:2:3:4:5:6:7:", id="single-trailing-colon"),
         pytest.param("2001:db8:0:0:0:0:1", id="too-few-groups"),
         pytest.param("2001:db8:0:0:0:0:0:1:2", id="too-many-groups"),
         pytest.param("2001:db8::1/64", id="network-prefix"),

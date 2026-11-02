@@ -42,6 +42,10 @@ from ._utilities._workspace_helper import (
     clean_up_secrets_files,
     clean_up_staged_sources,
 )
+from .agent_memory_sidecar.agent_memory_manager import (
+    create_agent_memory_container,
+    create_agent_memory_definition,
+)
 from .code_execution_sidecar.code_execution_manager import (
     create_code_execution_container,
     create_code_execution_definition,
@@ -90,6 +94,10 @@ from .metisa_container.metisa_container_manager import (
 from .otel_collector_sidecar.otel_collector_manager import (
     create_otel_collector_container,
     create_otel_collector_definition,
+)
+from .postgres_sidecar.postgres_manager import (
+    create_postgres_container,
+    create_postgres_definition,
 )
 from .prompt_guard_sidecar.prompt_guard_manager import (
     create_prompt_guard_container,
@@ -142,6 +150,8 @@ def run_metisa_container_workload_in_sandbox(
     qdrant_container = create_qdrant_definition()
     embeddings_container = create_embeddings_definition()
     otel_collector_container = create_otel_collector_definition()
+    postgres_container = create_postgres_definition()
+    agent_memory_container = create_agent_memory_definition()
 
     all_containers = [
         metisa_workload_container,
@@ -158,6 +168,8 @@ def run_metisa_container_workload_in_sandbox(
         qdrant_container,
         embeddings_container,
         otel_collector_container,
+        postgres_container,
+        agent_memory_container,
     ]
 
     try:
@@ -314,6 +326,24 @@ def run_metisa_container_workload_in_sandbox(
                 otel_collector_container,
             )
             _start_docker_container(otel_collector_container)
+
+        if sandbox_requirements.is_postgres_required:
+            _create_postgres_container(
+                specification,
+                sandbox_context,
+                squid_proxy_container,
+                postgres_container,
+            )
+            _start_docker_container(postgres_container)
+
+        if sandbox_requirements.is_agent_memory_required:
+            _create_agent_memory_container(
+                specification,
+                sandbox_context,
+                squid_proxy_container,
+                agent_memory_container,
+            )
+            _start_docker_container(agent_memory_container)
 
         _create_metisa_workload_container(
             specification,
@@ -803,6 +833,53 @@ def _create_otel_collector_container(
             specification, sandbox_context, otel_collector_creation_context
         )
         otel_collector_container.set_created(otel_collector_creation)
+
+
+def _create_postgres_container(
+    specification: MetisaSpecification,
+    sandbox_context: SandboxContext,
+    squid_proxy_container: SandboxContainer,
+    postgres_container: SandboxContainer,
+) -> None:
+    with terminal_status(
+        running="Creating Postgres container...",
+        success="Created Postgres container.",
+        failure="Could not create Postgres container.",
+    ):
+        postgres_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.backend_network_name,
+            ],
+        )
+        postgres_creation = create_postgres_container(
+            specification, sandbox_context, postgres_creation_context
+        )
+        postgres_container.set_created(postgres_creation)
+
+
+def _create_agent_memory_container(
+    specification: MetisaSpecification,
+    sandbox_context: SandboxContext,
+    squid_proxy_container: SandboxContainer,
+    agent_memory_container: SandboxContainer,
+) -> None:
+    with terminal_status(
+        running="Creating AgentMemory container...",
+        success="Created AgentMemory container.",
+        failure="Could not create AgentMemory container.",
+    ):
+        agent_memory_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=[
+                sandbox_context.workload_network_name,
+                sandbox_context.backend_network_name,
+            ],
+        )
+        agent_memory_creation = create_agent_memory_container(
+            specification, sandbox_context, agent_memory_creation_context
+        )
+        agent_memory_container.set_created(agent_memory_creation)
 
 
 def _create_creation_context(

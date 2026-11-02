@@ -374,7 +374,7 @@ def test_haproxy_backend_missing_fields(backend: str) -> None:
 
 
 @pytest.mark.parametrize("field", ["listen_port", "port"])
-@pytest.mark.parametrize("value", ['"3306"', "3306.5", "false", "[]", "{}"])
+@pytest.mark.parametrize("value", ['"3306"', "3306.5", "true", "false", "[]", "{}"])
 def test_haproxy_backend_invalid_port_types(field: str, value: str) -> None:
     """Reject invalid types for both port fields."""
     fields = {
@@ -396,9 +396,9 @@ def test_haproxy_backend_invalid_port_types(field: str, value: str) -> None:
 
 
 @pytest.mark.parametrize("field", ["listen_port", "port"])
-@pytest.mark.parametrize("value", [0, -3306])
-def test_haproxy_backend_non_positive_ports(field: str, value: int) -> None:
-    """Reject zero and negative values for both port fields."""
+@pytest.mark.parametrize("value", [0, -3306, 65536, 70000])
+def test_haproxy_backend_out_of_range_ports(field: str, value: int) -> None:
+    """Require both port fields to be within the inclusive range 1 to 65535."""
     fields = {
         "listen_port": "3306",
         "host": '"host.docker.internal"',
@@ -417,15 +417,68 @@ def test_haproxy_backend_non_positive_ports(field: str, value: int) -> None:
         _ = parse_specification(toml)
 
 
-@pytest.mark.parametrize("host", ['""', "123", "true", "false", "1.5", "[]", "{}"])
+@pytest.mark.parametrize(
+    "host",
+    [
+        '""',
+        '"   "',
+        '" host.docker.internal"',
+        '"host.docker.internal "',
+        '"host name"',
+        "123",
+        "true",
+        "false",
+        "1.5",
+        "[]",
+        "{}",
+    ],
+)
 def test_haproxy_backend_invalid_host(host: str) -> None:
-    """Reject empty hosts and non-string host values."""
+    """Reject empty hosts, whitespace in hosts, and non-string host values."""
     toml = f"""
         agent_name = "sample_agent"
         capabilities = ["network", "localnet"]
 
         [haproxy]
         backends = [{{ listen_port = 3306, host = {host}, port = 3306 }}]
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
+@pytest.mark.parametrize("field", ["listen_port", "port"])
+@pytest.mark.parametrize("value", [1, 65535])
+def test_haproxy_backend_valid_port_boundaries(field: str, value: int) -> None:
+    """Accept both endpoints of the valid range for each port field."""
+    listen_port = value if field == "listen_port" else 3306
+    port = value if field == "port" else 3306
+    toml = f"""
+        agent_name = "sample_agent"
+        capabilities = ["network", "localnet"]
+
+        [haproxy]
+        backends = [
+            {{ listen_port = {listen_port}, host = "localhost", port = {port} }},
+        ]
+    """
+    specification = parse_specification(toml)
+    assert specification.haproxy is not None
+    assert specification.haproxy.backends == (
+        HaproxyBackend(listen_port=listen_port, host="localhost", port=port),
+    )
+
+
+@pytest.mark.parametrize("key", ["unknown", "listen_ports"])
+def test_haproxy_backend_unknown_key(key: str) -> None:
+    """Reject unknown keys within an otherwise valid backend declaration."""
+    toml = f"""
+        agent_name = "sample_agent"
+        capabilities = ["network", "localnet"]
+
+        [haproxy]
+        backends = [
+            {{ listen_port = 3306, host = "localhost", port = 3306, {key} = 3307 }},
+        ]
     """
     with pytest.raises(SpecificationValidationError):
         _ = parse_specification(toml)

@@ -1,0 +1,46 @@
+# Postgres 18 with pgvector 0.8.7.
+FROM pgvector/pgvector:0.8.7-pg18-bookworm
+
+USER root
+
+# Match the UID/GID selected by harden_docker_container("elephant").
+# Keep the account name "postgres" for the inherited entrypoint.
+RUN groupmod --gid 10012 postgres \
+    && usermod --uid 10012 --gid 10012 postgres \
+    && mkdir -p /var/lib/postgres/18/docker /var/run/postgres \
+    && chown -R 10012:10012 /var/lib/postgres /var/run/postgres \
+    && chmod 0700 /var/lib/postgres/18/docker \
+    && chmod 3775 /var/run/postgres
+
+ENV PGDATA=/var/lib/postgres/18/docker \
+    POSTGRES_DB=agent_memory \
+    POSTGRES_USER=postgres \
+    POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+
+# Enable pgvector in POSTGRES_DB when initializing an empty database.
+RUN printf '%s\n' \
+        'CREATE EXTENSION IF NOT EXISTS vector;' \
+        > /docker-entrypoint-initdb.d/10-enable-pgvector.sql \
+    && chmod 0444 /docker-entrypoint-initdb.d/10-enable-pgvector.sql
+
+USER postgres
+
+# TCP checks avoid declaring readiness while the initialization-only
+# server is running, because that server accepts Unix sockets only.
+HEALTHCHECK \
+    --start-period=60s \
+    --start-interval=2s \
+    --interval=10s \
+    --timeout=3s \
+    --retries=5 \
+    CMD pg_isready \
+        --host=127.0.0.1 \
+        --port=5432 \
+        --username="$POSTGRES_USER" \
+        --dbname="$POSTGRES_DB" \
+        || exit 1
+
+# Inherit docker-entrypoint.sh; configure modest defaults.
+CMD ["postgres", \
+     "-c", "shared_buffers=32MB", \
+     "-c", "max_connections=20"]

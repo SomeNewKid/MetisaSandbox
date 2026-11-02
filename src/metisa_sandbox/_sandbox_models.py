@@ -86,6 +86,16 @@ class SandboxRequirements:
         return Capability.OTEL_COLLECTOR in self._specification.capabilities
 
     @property
+    def is_postgres_required(self) -> bool:
+        """Returns a flag indicating if the Postgres sidecar is required."""
+        return Capability.POSTGRES in self._specification.capabilities
+
+    @property
+    def is_agent_memory_required(self) -> bool:
+        """Returns a flag indicating if the Agent Memory sidecar is required."""
+        return Capability.AGENT_MEMORY in self._specification.capabilities
+
+    @property
     def is_internet_access_required(self) -> bool:
         """Returns a flag indicating if internet access is required."""
         return Capability.INTERNET in self._specification.capabilities
@@ -103,7 +113,11 @@ class SandboxRequirements:
     @property
     def is_backend_network_required(self) -> bool:
         """Returns a flag indicating if an internal backend network is required."""
-        return self.is_mcp_server_required or self.is_llm_broker_required
+        return (
+            self.is_mcp_server_required 
+            or self.is_llm_broker_required
+            or self.is_agent_memory_required
+        )
 
     @property
     def is_egress_network_required(self) -> bool:

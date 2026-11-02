@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from .specification_models import (
+    AgentMemorySpecification,
     Capability,
     CodeExecutionSpecification,
     DoclingSpecification,
@@ -16,6 +17,7 @@ from .specification_models import (
     McpServerSpecification,
     MetisaSpecification,
     OpenTelemetrySpecification,
+    PostgreSqlSpecification,
     QdrantSpecification,
     SpecificationValidationError,
     SquidProxySpecification,
@@ -83,6 +85,16 @@ def validate_specification(
         specification.otel_collector,
     )
 
+    _validate_postgres_specification(
+        specification.capabilities,
+        specification.postgres,
+    )
+
+    _validate_agent_memory_specification(
+        specification.capabilities,
+        specification.agent_memory,
+    )
+
 
 def is_valid_domain_name(
     value: str,
@@ -139,6 +151,10 @@ def is_valid_ipv6_address(
     stripped_value = value.strip()
     if len(stripped_value) != len(value):
         return False
+    if value == "::":
+        return True
+    if value[-1] == ":":
+        return False
     parts = value.split(":")
     last_part = parts[-1]
     last_part_is_ipv4_address = is_valid_ipv4_address(last_part)
@@ -151,15 +167,22 @@ def is_valid_ipv6_address(
     else:
         if number_of_parts > 8:
             return False
+    if ":::" in value:
+        return False
     number_compression_markers = value.count("::")
     if number_compression_markers > 1:  # compression markers
         return False
-    if (number_compression_markers == 0) and (number_of_parts != 8):
+    required_parts = 6 if last_part_is_ipv4_address else 8
+    if (number_compression_markers == 0) and (number_of_parts != required_parts):
         return False
 
     for part in parts:
         if not _is_valid_ipv6_part(part):
             return False
+    last_part = parts[-1]
+    if not _is_valid_ipv6_part(last_part) and not last_part_is_ipv4_address:
+        return False
+    
     return True
 
 
@@ -238,6 +261,12 @@ def _validate_capabilities(
         if Capability.DOCLING not in capabilities:
             raise SpecificationValidationError(
                 '"embeddings" capability requires "docling" capability.'
+            )
+
+    if Capability.AGENT_MEMORY in capabilities:
+        if Capability.POSTGRES not in capabilities:
+            raise SpecificationValidationError(
+                '"agent_memory" capability requires "postgres" capability.'
             )
 
 
@@ -361,6 +390,24 @@ def _validate_otel_collector_specification(
     otel_collector_specification: OpenTelemetrySpecification | None,
 ):
     if otel_collector_specification is None:
+        return
+    return
+
+
+def _validate_postgres_specification(
+    capabilities: frozenset[Capability],
+    postgres_specification: PostgreSqlSpecification | None,
+):
+    if postgres_specification is None:
+        return
+    return
+
+
+def _validate_agent_memory_specification(
+    capabilities: frozenset[Capability],
+    agent_memory_specification: AgentMemorySpecification | None,
+):
+    if agent_memory_specification is None:
         return
     return
 

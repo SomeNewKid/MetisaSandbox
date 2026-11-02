@@ -264,5 +264,7 @@ def _get_uid_gid(
             return (None, None)  # (1000, 1000) Qdrant provides non-root user
         case "searcher":
             return (10011, 10011)
+        case "elephant":
+            return (10012, 10012)
         case _:
             raise ValueError(f"Unknown username: {username}")

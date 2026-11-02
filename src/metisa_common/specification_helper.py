@@ -14,6 +14,7 @@ from ._specification_validator import (
     validate_specification,
 )
 from .specification_models import (
+    AgentMemorySpecification,
     Capability,
     CodeExecutionSpecification,
     DoclingSpecification,
@@ -28,6 +29,7 @@ from .specification_models import (
     McpServerSpecification,
     MetisaSpecification,
     OpenTelemetrySpecification,
+    PostgreSqlSpecification,
     QdrantSpecification,
     SpecificationValidationError,
     SquidProxySpecification,
@@ -154,6 +156,29 @@ def alias_is_valid(
         return False
 
     return True
+
+
+def hostname_is_valid(
+    hostname: str,
+) -> bool:
+    """Validate if a string is a valid hostname."""
+    if not hostname:
+        return False
+    if len(hostname) > 253:
+        return False
+    
+    # Strip trailing dot for absolute FQDNs
+    if hostname.endswith('.'):
+        hostname = hostname[:-1]
+
+    # Allowed: alphanumeric characters and hyphens. 
+    # Must be 1-63 chars per label and cannot start/end with a hyphen.
+    # The last label (TLD) can optionally be restricted to alpha-only if desired.
+    label_regex = re.compile(r'^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)$')
+    
+    # Split by the dot separator and validate each individual label
+    labels = hostname.split('.')
+    return all(label_regex.match(label) for label in labels)
 
 
 # Example in a `metisa.toml` file:
@@ -358,6 +383,8 @@ def _create_metisa_specification(
             "qdrant",
             "embeddings",
             "otel_collector",
+            "postgres",
+            "agent_memory",
         }
     )
 
@@ -382,6 +409,8 @@ def _create_metisa_specification(
     qdrant = _get_qdrant_specification(toml)
     embeddings = _get_embeddings_specification(toml)
     otel_collector = _get_otel_collector_specification(toml)
+    postgres = _get_postgres_specification(toml)
+    agent_memory = _get_agent_memory_specification(toml)
 
     specification = MetisaSpecification(
         agent_name=agent_name,
@@ -402,6 +431,8 @@ def _create_metisa_specification(
         qdrant=qdrant,
         embeddings=embeddings,
         otel_collector=otel_collector,
+        postgres=postgres,
+        agent_memory=agent_memory,
     )
 
     validate_specification(specification)
@@ -626,15 +657,27 @@ def _get_haproxy_specfication(
 def _get_haproxy_backend(
     definition: dict[str, object],
 ) -> HaproxyBackend:
+    BACKEND_KEYS = frozenset(
+        {
+            "listen_port",
+            "host",
+            "port",
+        }
+    )
+    _validate_known_keys(definition, "HAProxy backend", BACKEND_KEYS)
+    
     listen_port = definition.get("listen_port")
     if not listen_port:
         error = "HAProxy backend must specify a listen_port."
         raise SpecificationValidationError(error)
+    if isinstance(listen_port, bool):
+        error = "HAProxy backend must specify an integer listen_port."
+        raise SpecificationValidationError(error)
     if not isinstance(listen_port, int):
         error = "HAProxy backend must specify an integer listen_port."
         raise SpecificationValidationError(error)
-    if listen_port < 1:
-        error = "HAProxy backend must specify a positive integer listen_port."
+    if listen_port < 1 or listen_port > 65535:
+        error = "HAProxy backend must specify a listen_port between 1 and 65535."
         raise SpecificationValidationError(error)
 
     host = definition.get("host")
@@ -647,16 +690,22 @@ def _get_haproxy_backend(
     if not host:
         error = "HAProxy backend must specify a valid host."
         raise SpecificationValidationError(error)
+    if not hostname_is_valid(host):
+        error = "HAProxy backend must specify a valid host."
+        raise SpecificationValidationError(error)
 
     port = definition.get("port")
     if not port:
         error = "HAProxy backend must specify a port."
         raise SpecificationValidationError(error)
+    if isinstance(port, bool):
+        error = "HAProxy backend must specify an integer port."
+        raise SpecificationValidationError(error)
     if not isinstance(port, int):
         error = "HAProxy backend must specify an integer port."
         raise SpecificationValidationError(error)
-    if port < 1:
-        error = "HAProxy backend must specify a positive integer port."
+    if port < 1 or port > 65535:
+        error = "HAProxy backend must specify a port between 1 and 65535."
         raise SpecificationValidationError(error)
 
     return HaproxyBackend(listen_port=listen_port, host=host, port=port)
@@ -1033,6 +1082,60 @@ def _get_otel_collector_specification(
     environs = _get_environs(otel_collector, "OpenTelemetry Collector environs")
 
     return OpenTelemetrySpecification(
+        environs=environs,
+    )
+
+
+def _get_postgres_specification(
+    toml: dict[str, object],
+) -> PostgreSqlSpecification | None:
+    postgres = toml.get("postgres")
+    if not postgres:
+        return None
+
+    if not isinstance(postgres, dict):
+        raise SpecificationValidationError(
+            "TOML specification postgres must be a table."
+        )
+
+    POSTGRESQL_KEYS = frozenset(
+        {
+            "environs",
+        }
+    )
+
+    _validate_known_keys(postgres, "postgres", POSTGRESQL_KEYS)
+
+    environs = _get_environs(postgres, "PostgreSql environs")
+
+    return PostgreSqlSpecification(
+        environs=environs,
+    )
+
+
+def _get_agent_memory_specification(
+    toml: dict[str, object],
+) -> AgentMemorySpecification | None:
+    agent_memory = toml.get("agent_memory")
+    if not agent_memory:
+        return None
+
+    if not isinstance(agent_memory, dict):
+        raise SpecificationValidationError(
+            "TOML specification agent_memory must be a table."
+        )
+
+    AGENT_MEMORY_KEYS = frozenset(
+        {
+            "environs",
+        }
+    )
+
+    _validate_known_keys(agent_memory, "agent_memory", AGENT_MEMORY_KEYS)
+
+    environs = _get_environs(agent_memory, "Agent Memory environs")
+
+    return AgentMemorySpecification(
         environs=environs,
     )
 
