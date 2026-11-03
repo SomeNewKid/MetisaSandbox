@@ -188,3 +188,4 @@ class AgentMemorySpecification:
     """Represents the Agent Memory section of the Metisa specification."""
 
     environs: frozenset[str]
+    secrets: frozenset[str]

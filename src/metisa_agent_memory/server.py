@@ -1,7 +1,14 @@
 """Server for the Prompt Guard HTTP endpoints."""
 
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+from ._authentication import get_user_sid
 
 _MAX_REQUEST_BYTES = 1024 * 1024  # 1 MiB
 _CODE_200_OK = 200
@@ -27,6 +34,21 @@ class _RequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:
+        run_identifier = os.environ["METISA_RUN_ID"]
+        if not run_identifier:
+            raise ValueError("Run identifier not available.")
+
+        public_key_path = Path("/sandbox-source/metisa-public-key.pem")
+        public_key_pem = public_key_path.read_bytes()
+        public_key = serialization.load_pem_public_key(public_key_pem)
+
+        if not isinstance(public_key, rsa.RSAPublicKey):
+            raise ValueError("Run verification key must be an RSA public key.")
+
+        user_sid = get_user_sid(self, public_key, run_identifier)
+        if not user_sid:
+            raise RuntimeError("Memory access requires user SID.")
+
         if self.path != "/hello":
             self.send_error(_CODE_404_NOT_FOUND)
             return

@@ -182,7 +182,7 @@ def is_valid_ipv6_address(
     last_part = parts[-1]
     if not _is_valid_ipv6_part(last_part) and not last_part_is_ipv4_address:
         return False
-    
+
     return True
 
 

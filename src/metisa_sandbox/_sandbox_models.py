@@ -114,7 +114,7 @@ class SandboxRequirements:
     def is_backend_network_required(self) -> bool:
         """Returns a flag indicating if an internal backend network is required."""
         return (
-            self.is_mcp_server_required 
+            self.is_mcp_server_required
             or self.is_llm_broker_required
             or self.is_agent_memory_required
         )

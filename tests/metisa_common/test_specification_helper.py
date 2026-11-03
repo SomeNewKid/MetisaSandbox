@@ -6,8 +6,8 @@ import pytest
 
 from metisa_common.specification_helper import (
     alias_is_valid,
-    hostname_is_valid,
     get_image_tag,
+    hostname_is_valid,
     parse_specification,
 )
 from metisa_common.specification_models import SpecificationValidationError
@@ -380,12 +380,13 @@ def test_alias_is_valid_with_valid_values(alias: str) -> None:
 def test_alias_is_valid_with_invalid_values(alias: str) -> None:
     assert not alias_is_valid(alias)
 
+
 @pytest.mark.parametrize(
     "hostname",
     [
-        "-example.com",    # INVALID: Starts with a hyphen
-        "example-.com",    # INVALID: Ends with a hyphen
-        "a" * 64 + ".com", # INVALID: Label too long
+        "-example.com",  # INVALID: Starts with a hyphen
+        "example-.com",  # INVALID: Ends with a hyphen
+        "a" * 64 + ".com",  # INVALID: Label too long
         "has space.com",
         " leading-space.com",
         "trailing-space.com ",
@@ -394,13 +395,14 @@ def test_alias_is_valid_with_invalid_values(alias: str) -> None:
 def test_hostname_is_valid_with_invalid_values(hostname: str) -> None:
     assert not hostname_is_valid(hostname)
 
+
 @pytest.mark.parametrize(
     "hostname",
     [
         "example.com",
         "sub.example.com",
         "localhost",
-        "example.", # Valid absolute FQDN
+        "example.",  # Valid absolute FQDN
     ],
 )
 def test_hostname_is_valid_with_valid_values(hostname: str) -> None:

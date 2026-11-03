@@ -11,6 +11,7 @@ from metisa_common.secrets_helper import SECRETS_DIRECTORY
 from metisa_common.specification_helper import (
     generate_image_tag,
     resolve_environs,
+    resolve_secrets,
 )
 from metisa_common.specification_models import (
     LlmBrokerSpecification,
@@ -35,6 +36,9 @@ from .._sandbox_models import (
     ContainerCreationResult,
     SandboxContainer,
     SandboxContext,
+)
+from .._utilities._secrets_helper import (
+    create_secrets_file,
 )
 from ._agent_memory_workspace import (
     AGENT_MEMORY_MODULE_NAME,
@@ -62,6 +66,7 @@ def create_agent_memory_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
     container_creation_context: ContainerCreationContext,
+    public_key_pem: bytes,
 ) -> ContainerCreationResult:
     """Create the Agent Memory container and connect it to the Docker network."""
     if specification.agent_memory is None:
@@ -75,6 +80,9 @@ def create_agent_memory_container(
     network_name = container_creation_context.network_names[0]
 
     staged_source_path = create_staged_source_directory(sandbox_context)
+
+    public_key_path = staged_source_path / "metisa-public-key.pem"
+    public_key_path.write_bytes(public_key_pem)
 
     environs: list[str] = []
 
@@ -100,6 +108,12 @@ def create_agent_memory_container(
         [
             "--tmpfs",
             "/tmp:rw,size=16m,nosuid,nodev,noexec",
+            "--tmpfs",
+            (
+                f"{SECRETS_DIRECTORY.as_posix()}:"
+                "rw,size=64k,nosuid,nodev,noexec,"
+                "uid=10012,gid=10012,mode=0700"
+            ),
         ]
     )
 
@@ -111,10 +125,16 @@ def create_agent_memory_container(
         ]
     )
 
+    # Handle the secrets for the container
+    secrets = resolve_secrets(specification.agent_memory.secrets)
+    secrets_file, secrets_key = create_secrets_file(staged_source_path, secrets)
+
     # Get environment variables
     if specification.agent_memory is not None:
         resolved_environs = resolve_environs(specification.agent_memory.environs)
         environs.extend(resolved_environs)
+
+    environs.append(f"METISA_RUN_ID={sandbox_context.run_identifier}")
 
     # Harden the container
     harden_docker_container(
@@ -156,6 +176,8 @@ def create_agent_memory_container(
     return ContainerCreationResult(
         container_name,
         staged_source=staged_source_path,
+        secrets_file=secrets_file,
+        secrets_key=secrets_key,
     )
 
 

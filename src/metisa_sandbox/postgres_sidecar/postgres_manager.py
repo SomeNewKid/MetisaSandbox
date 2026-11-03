@@ -74,7 +74,7 @@ def create_postgres_container(
             "--tmpfs",
             "/tmp:rw,size=64m,nosuid,nodev,noexec",
             "--tmpfs",
-            "/var/run/postgres:rw,size=1m,nosuid,nodev,noexec,uid=10012,gid=10012,mode=3775",
+            "/var/run/postgresql:rw,size=1m,nosuid,nodev,noexec,uid=10012,gid=10012,mode=3775",
         ]
     )
 

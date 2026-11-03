@@ -14,6 +14,10 @@ from opentelemetry import trace
 from opentelemetry.propagate import inject
 from opentelemetry.trace import SpanKind
 
+from metisa_common.secrets_helper import (
+    load_secrets,
+)
+
 _RESET = "\033[0m"
 _GREEN = "\033[32m"
 _RED = "\033[31m"
@@ -70,12 +74,18 @@ def _get_mcp_server_tool_result(
     """Get the result of calling a tool on the MCP Server."""
     url = "http://metisa-mcp-server:8000/mcp"
     timeout_seconds = 300
+    secrets = load_secrets()
+    mcp_server_token = secrets["METISA_MCP_SERVER_TOKEN"]
+    if not mcp_server_token:
+        raise RuntimeError("METISA_MCP_SERVER_TOKEN secret is not set.")
 
     async def _call() -> types.CallToolResult:
         async with asyncio.timeout(timeout_seconds):
             # private-network traffic cannot use workload's internet proxy
             trust_env = False
-            headers: dict[str, str] = {}
+            headers: dict[str, str] = {
+                "Authorization": f"Bearer {mcp_server_token}",
+            }
 
             # read the current tool span and add trace-context headers
             inject(headers)

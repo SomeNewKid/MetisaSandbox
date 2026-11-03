@@ -69,6 +69,7 @@ def create_mcp_server_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
     container_creation_context: ContainerCreationContext,
+    public_key_pem: bytes,
 ) -> ContainerCreationResult:
     """Create the MCP Server container and connect it to the Docker network."""
     if specification.mcp_server is None:
@@ -82,6 +83,9 @@ def create_mcp_server_container(
     network_name = container_creation_context.network_names[0]
 
     staged_source_path = create_staged_source_directory(sandbox_context)
+
+    public_key_path = staged_source_path / "metisa-public-key.pem"
+    public_key_path.write_bytes(public_key_pem)
 
     metisa_json_file = staged_source_path / "metisa.json"
     metisa_json = _create_metisa_json(specification.mcp_server)

@@ -1,7 +1,7 @@
 agent_name = "sample_agent"
 capabilities = [
     "network",
-    # "internet",
+    "internet",
     # "interactive",
     # "localnet",
     # "mcp_server",
@@ -26,6 +26,7 @@ dependencies = [
     "opentelemetry-api==1.45.1",
     "opentelemetry-sdk==1.45.1",
     "opentelemetry-exporter-otlp-proto-http==1.45.1",
+    "pyjwt==2.15.1",
 ]
 environs = [
     "METISA_PROBE_1=hard-coded value",

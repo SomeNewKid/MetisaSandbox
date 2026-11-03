@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -20,6 +21,9 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 
+from ._authentication import (
+    RunTokenMiddleware,
+)
 from ._helper import (
     create_declared_resource,
     create_declared_tool,
@@ -174,9 +178,16 @@ RESOURCE_REGISTRY = _create_resource_registry(
 
 
 async def _list_tools(
-    _ctx: ServerRequestContext,
+    ctx: ServerRequestContext,
     _params: types.PaginatedRequestParams | None,
 ) -> types.ListToolsResult:
+    request = ctx.request
+    if not isinstance(request, Request):
+        raise RuntimeError("HTTP request context is required.")
+    user_sid = request.state.user_sid
+    if not user_sid:
+        raise RuntimeError("Tool list requires user SID.")
+
     definitions: list[types.Tool] = []
     for tool in TOOL_REGISTRY:
         definitions.append(tool.definition)
@@ -184,9 +195,16 @@ async def _list_tools(
 
 
 async def _call_tool(
-    _ctx: ServerRequestContext,
+    ctx: ServerRequestContext,
     params: types.CallToolRequestParams,
 ) -> types.CallToolResult:
+    request = ctx.request
+    if not isinstance(request, Request):
+        raise RuntimeError("HTTP request context is required.")
+    user_sid = request.state.user_sid
+    if not user_sid:
+        raise RuntimeError("Tool call requires user SID.")
+
     tool_name = params.name
     requested_tool = None
     for tool in TOOL_REGISTRY:
@@ -242,9 +260,16 @@ async def _call_tool(
 
 
 async def _list_resources(
-    _ctx: ServerRequestContext,
+    ctx: ServerRequestContext,
     _params: types.PaginatedRequestParams | None,
 ) -> types.ListResourcesResult:
+    request = ctx.request
+    if not isinstance(request, Request):
+        raise RuntimeError("HTTP request context is required.")
+    user_sid = request.state.user_sid
+    if not user_sid:
+        raise RuntimeError("Resource list requires user SID.")
+
     definitions: list[types.Resource] = []
     for resource in RESOURCE_REGISTRY:
         definitions.append(resource.definition)
@@ -252,9 +277,16 @@ async def _list_resources(
 
 
 async def _read_resource(
-    _ctx: ServerRequestContext,
+    ctx: ServerRequestContext,
     params: types.ReadResourceRequestParams,
 ) -> types.ReadResourceResult:
+    request = ctx.request
+    if not isinstance(request, Request):
+        raise RuntimeError("HTTP request context is required.")
+    user_sid = request.state.user_sid
+    if not user_sid:
+        raise RuntimeError("Resource read requires user SID.")
+
     requested_uri = params.uri
 
     requested_resource = None
@@ -333,7 +365,7 @@ server = Server(
 
 server.middleware.insert(0, _http_trace_context)
 
-app = server.streamable_http_app(
+_mcp_http_app = server.streamable_http_app(
     streamable_http_path="/mcp",
     json_response=True,
     stateless_http=True,
@@ -349,4 +381,10 @@ app = server.streamable_http_app(
     custom_starlette_routes=[
         Route("/health", endpoint=_health, methods=["GET"]),
     ],
+)
+
+app = RunTokenMiddleware(
+    _mcp_http_app,
+    public_key_path=Path("/sandbox-source/metisa-public-key.pem"),
+    run_identifier=os.environ["METISA_RUN_ID"],
 )

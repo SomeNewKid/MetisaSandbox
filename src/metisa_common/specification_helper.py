@@ -166,18 +166,18 @@ def hostname_is_valid(
         return False
     if len(hostname) > 253:
         return False
-    
+
     # Strip trailing dot for absolute FQDNs
-    if hostname.endswith('.'):
+    if hostname.endswith("."):
         hostname = hostname[:-1]
 
-    # Allowed: alphanumeric characters and hyphens. 
+    # Allowed: alphanumeric characters and hyphens.
     # Must be 1-63 chars per label and cannot start/end with a hyphen.
     # The last label (TLD) can optionally be restricted to alpha-only if desired.
-    label_regex = re.compile(r'^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)$')
-    
+    label_regex = re.compile(r"^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)$")
+
     # Split by the dot separator and validate each individual label
-    labels = hostname.split('.')
+    labels = hostname.split(".")
     return all(label_regex.match(label) for label in labels)
 
 
@@ -665,7 +665,7 @@ def _get_haproxy_backend(
         }
     )
     _validate_known_keys(definition, "HAProxy backend", BACKEND_KEYS)
-    
+
     listen_port = definition.get("listen_port")
     if not listen_port:
         error = "HAProxy backend must specify a listen_port."
@@ -876,7 +876,7 @@ def _get_mcp_server_specification(
 
     environs = _get_environs(mcp_server, "MCP Server environs")
 
-    secrets = _get_secrets(mcp_server, "MCP Server environs")
+    secrets = _get_secrets(mcp_server, "MCP Server secrets")
 
     return McpServerSpecification(
         environs=environs,
@@ -1128,6 +1128,7 @@ def _get_agent_memory_specification(
     AGENT_MEMORY_KEYS = frozenset(
         {
             "environs",
+            "secrets",
         }
     )
 
@@ -1135,8 +1136,11 @@ def _get_agent_memory_specification(
 
     environs = _get_environs(agent_memory, "Agent Memory environs")
 
+    secrets = _get_secrets(agent_memory, "Agent Memory secrets")
+
     return AgentMemorySpecification(
         environs=environs,
+        secrets=secrets,
     )
 
 

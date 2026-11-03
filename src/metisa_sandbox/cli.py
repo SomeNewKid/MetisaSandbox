@@ -30,6 +30,9 @@ from ._docker._docker_image import (
 from ._sandbox_manager import (
     run_metisa_container_workload_in_sandbox,
 )
+from ._utilities._identity_helper import (
+    get_launching_user_sid,
+)
 from ._utilities._terminal_helper import (
     get_first_argument,
     get_user_approval,
@@ -63,6 +66,8 @@ def main(
     image_reference = create_image_reference(image_name, image_tag)
 
     try:
+        launching_user_sid = get_launching_user_sid()
+
         docker_image_exitcode = _ensure_metisa_container_image(
             specification, image_reference
         )
@@ -70,7 +75,7 @@ def main(
             return docker_image_exitcode
 
         docker_workload_exitcode = _run_metisa_container_workload(
-            specification, image_reference, workload_module
+            specification, image_reference, workload_module, launching_user_sid
         )
         if docker_workload_exitcode != 0:
             return docker_workload_exitcode
@@ -119,9 +124,10 @@ def _run_metisa_container_workload(
     specification: MetisaSpecification,
     image_reference: str,
     workload_module: str,
+    launching_user_sid: str,
 ) -> int:
     return_code = run_metisa_container_workload_in_sandbox(
-        specification, image_reference, workload_module
+        specification, image_reference, workload_module, launching_user_sid
     )
     if return_code == 0:
         print_info(SUCCESS_INDICATOR + " Completed agent workload.")

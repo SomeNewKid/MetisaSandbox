@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from opentelemetry import trace
@@ -41,6 +42,14 @@ def main(
     argv: list[str] | None = None,
 ) -> int:
     """Run the sample agent workload."""
+    run_id = os.getenv("METISA_RUN_ID")
+    if not run_id:
+        raise RuntimeError("METISA_RUN_ID environment variable is not set.")
+
+    user_sid = os.getenv("METISA_USER_SID")
+    if not user_sid:
+        raise RuntimeError("METISA_USER_SID environment variable is not set.")
+
     provider = None
 
     if Capability.OTEL_COLLECTOR in specification.capabilities:
@@ -52,7 +61,16 @@ def main(
     try:
         tracer = trace.get_tracer("sample_agent")
 
-        with tracer.start_as_current_span("sample_agent.run", context=Context()):
+        attributes = {
+            "run_id": run_id,
+            "user_sid": user_sid,
+        }
+
+        with tracer.start_as_current_span(
+            "sample_agent.run",
+            attributes=attributes,
+            context=Context(),
+        ):
             _run_tests(specification)
 
         return 0

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import ipaddress
 import json
 import socket
@@ -46,6 +47,24 @@ def mcp_server_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
         )
     return ProbeResult.success(
         probe_name, "MCP alias resolves to non-loopback addresses."
+    )
+
+
+def mcp_requests_require_authorization(probe_context: ProbeContext) -> ProbeResult:
+    """Verify MCP operations reject a missing Authorization header."""
+    return _run_authentication_probe(
+        probe_context, "mcp_requests_require_authorization", invalid_credentials=False
+    )
+
+
+def mcp_requests_reject_invalid_authorization(
+    probe_context: ProbeContext,
+) -> ProbeResult:
+    """Verify MCP operations reject malformed and incorrectly signed credentials."""
+    return _run_authentication_probe(
+        probe_context,
+        "mcp_requests_reject_invalid_authorization",
+        invalid_credentials=True,
     )
 
 
@@ -884,6 +903,94 @@ def _run_starlark_error_probe(
     return _run_mcp_probe(probe_context, name, _operation)
 
 
+def _run_authentication_probe(
+    probe_context: ProbeContext,
+    name: str,
+    *,
+    invalid_credentials: bool,
+) -> ProbeResult:
+    probe_name = f"container__mcp__{name}"
+    if Capability.MCP_SERVER not in probe_context.specification.capabilities:
+        return ProbeResult.success(
+            probe_name, "MCP client is disabled. Skipping probe."
+        )
+
+    try:
+        failure = asyncio.run(_check_authentication_rejection(invalid_credentials))
+    except Exception as error:
+        # Do not include exception text, which could contain request credentials.
+        return ProbeResult.failure(
+            probe_name, f"MCP authentication check failed: {type(error).__name__}."
+        )
+    if failure is not None:
+        return ProbeResult.failure(probe_name, failure)
+    return ProbeResult.success(probe_name, "MCP operations rejected the credentials.")
+
+
+async def _check_authentication_rejection(invalid_credentials: bool) -> str | None:
+    import httpx2
+
+    from metisa_common.secrets_helper import load_secrets
+
+    async with asyncio.timeout(_TIMEOUT_SECONDS):
+        credentials: list[tuple[str, str | None]] = [("missing header", None)]
+        if invalid_credentials:
+            secrets = load_secrets()
+            token = secrets["METISA_MCP_SERVER_TOKEN"]
+            signed_part, signature_part = token.rsplit(".", 1)
+            padding = "=" * (-len(signature_part) % 4)
+            signature = bytearray(base64.urlsafe_b64decode(signature_part + padding))
+            signature[0] ^= 1
+            invalid_signature = base64.urlsafe_b64encode(signature).rstrip(b"=")
+            invalid_token = f"{signed_part}.{invalid_signature.decode('ascii')}"
+            credentials = [
+                ("wrong scheme", "Basic invalid"),
+                ("empty bearer", "Bearer"),
+                ("malformed token", "Bearer not-a-jwt"),
+                ("invalid signature", f"Bearer {invalid_token}"),
+            ]
+
+        operations: list[tuple[str, dict[str, object]]] = [
+            ("tools/list", {}),
+            ("resources/list", {}),
+            ("tools/call", {"name": "test_greeting_1", "arguments": {}}),
+            ("resources/read", {"uri": "metisa://test_resource_1"}),
+        ]
+        # Use raw HTTP so SDK initialization cannot mask an unprotected operation.
+        async with httpx2.AsyncClient(
+            trust_env=False,
+            timeout=_TIMEOUT_SECONDS,
+            follow_redirects=False,
+        ) as client:
+            for credential_name, authorization in credentials:
+                headers = {"Accept": "application/json, text/event-stream"}
+                if authorization is not None:
+                    headers["Authorization"] = authorization
+                for method, params in operations:
+                    response = await client.post(
+                        _MCP_SERVER_URL,
+                        headers=headers,
+                        json={
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": method,
+                            "params": params,
+                        },
+                    )
+                    if response.status_code != 401:
+                        return (
+                            f"{method} with {credential_name} returned HTTP "
+                            f"{response.status_code}; expected 401."
+                        )
+                    challenge = response.headers.get("WWW-Authenticate", "")
+                    if challenge.split(" ", 1)[0].lower() != "bearer":
+                        return (
+                            f"{method} with {credential_name} did not return "
+                            "a Bearer authentication challenge."
+                        )
+    return None
+
+
 def _run_mcp_probe(
     probe_context: ProbeContext,
     name: str,
@@ -915,9 +1022,16 @@ async def _execute_operation(
     from mcp import Client
     from mcp.client.streamable_http import streamable_http_client
 
+    from metisa_common.secrets_helper import load_secrets
+
     async with asyncio.timeout(timeout_seconds):
+        secrets = load_secrets()
+        token = secrets["METISA_MCP_SERVER_TOKEN"]
+        headers = {"Authorization": f"Bearer {token}"}
+
         # Private-network calls must bypass the workload's internet proxy settings.
         async with httpx2.AsyncClient(
+            headers=headers,
             trust_env=False,  # Private-network requests must bypass the internet proxy.
             timeout=timeout_seconds,
         ) as http_client:
@@ -941,6 +1055,8 @@ MCP_PROBES = ProbeGroup(
     name="mcp",
     probes=(
         mcp_server_alias_resolves,
+        mcp_requests_require_authorization,
+        mcp_requests_reject_invalid_authorization,
         test_greeting_1_is_available,
         test_greeting_1_returns_expected_greeting,
         test_greeting_2_returns_expected_greetings,

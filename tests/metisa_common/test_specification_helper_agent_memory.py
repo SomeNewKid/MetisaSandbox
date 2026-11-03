@@ -137,3 +137,133 @@ def test_agent_memory_invalid_if_no_postgres_capability() -> None:
     """
     with pytest.raises(SpecificationValidationError):
         _ = parse_specification(toml)
+
+
+def test_agent_memory_missing_secrets() -> None:
+    """Default omitted MCP secrets to an empty collection."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "agent_memory", "postgres"]
+
+        [agent_memory]
+        environs = []
+    """
+    specification = parse_specification(toml)
+    assert specification.agent_memory is not None
+    assert specification.agent_memory.secrets == frozenset()
+
+
+def test_agent_memory_empty_secrets() -> None:
+    """Recognize an MCP table containing only an empty secrets list."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "agent_memory", "postgres"]
+
+        [agent_memory]
+        secrets = []
+    """
+    specification = parse_specification(toml)
+    assert specification.agent_memory is not None
+    assert specification.agent_memory.secrets == frozenset()
+    assert specification.agent_memory.environs == frozenset()
+
+
+def test_agent_memory_only_secrets() -> None:
+    """Hydrate MCP secrets without requiring tools, resources, or environs."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "agent_memory", "postgres"]
+
+        [agent_memory]
+        secrets = ["TOKEN=${host:MCP_TOKEN}"]
+    """
+    specification = parse_specification(toml)
+    assert specification.agent_memory is not None
+    assert specification.agent_memory.secrets == frozenset({"TOKEN=${host:MCP_TOKEN}"})
+    assert specification.agent_memory.environs == frozenset()
+
+
+def test_agent_memory_valid_secrets() -> None:
+    """Preserve MCP secrets independently of other scopes and environs."""
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["network", "agent_memory", "postgres"]
+        secrets = ["SHARED=workload"]
+
+        [llm_broker]
+        secrets = ["SHARED=broker"]
+
+        [agent_memory]
+        environs = ["SHARED=public"]
+        secrets = [
+            "SHARED=mcp",
+            "TOKEN=${host:HOST_SECRET}",
+            "EMPTY=",
+            "COMPOSITE=part1=part2",
+        ]
+    """
+    specification = parse_specification(toml)
+    assert specification.agent_memory is not None
+    assert specification.agent_memory.secrets == frozenset(
+        {
+            "SHARED=mcp",
+            "TOKEN=${host:HOST_SECRET}",
+            "EMPTY=",
+            "COMPOSITE=part1=part2",
+        }
+    )
+    assert specification.agent_memory.environs == frozenset({"SHARED=public"})
+    assert specification.secrets == frozenset({"SHARED=workload"})
+    assert specification.llm_broker is not None
+    assert specification.llm_broker.secrets == frozenset({"SHARED=broker"})
+
+
+@pytest.mark.parametrize("name", ["PATH", "HTTP_PROXY", "METISA_RUNTIME_ROLE"])
+def test_agent_memory_secrets_accept_reserved_names(name: str) -> None:
+    """Allow secret names that are reserved for environment declarations."""
+    toml = f"""
+        agent_name = "sample_agent"
+        capabilities = ["network", "agent_memory", "postgres"]
+
+        [agent_memory]
+        secrets = ["{name}=value"]
+    """
+    specification = parse_specification(toml)
+    assert specification.agent_memory is not None
+    assert specification.agent_memory.secrets == frozenset({f"{name}=value"})
+
+
+@pytest.mark.parametrize(
+    "item",
+    ["123", '""', '"   "', '"NAME"', '"NAME=${vault:secret}"', '"NAME=${host:secret"'],
+)
+def test_agent_memory_secrets_with_invalid_item(item: str) -> None:
+    """Reject an invalid secret among otherwise valid MCP declarations."""
+    toml = f"""
+        agent_name = "sample_agent"
+        capabilities = ["network", "agent_memory", "postgres"]
+
+        [agent_memory]
+        secrets = ["VALID=value", {item}, "ALSO_VALID=value"]
+    """
+    with pytest.raises(SpecificationValidationError) as error:
+        _ = parse_specification(toml)
+    assert "unknown keys" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "secrets",
+    ['"NAME=value"', '""', "123", "0", "true", "false", '{ NAME = "value" }', "{}"],
+)
+def test_agent_memory_not_iterable_secrets(secrets: str) -> None:
+    """Require MCP secret declarations to be an array."""
+    toml = f"""
+        agent_name = "sample_agent"
+        capabilities = ["network", "agent_memory", "postgres"]
+
+        [agent_memory]
+        secrets = {secrets}
+    """
+    with pytest.raises(SpecificationValidationError) as error:
+        _ = parse_specification(toml)
+    assert "unknown keys" not in str(error.value)

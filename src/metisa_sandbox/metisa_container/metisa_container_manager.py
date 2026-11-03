@@ -47,6 +47,9 @@ def create_metisa_workload_container(
     specification: MetisaSpecification,
     sandbox_context: SandboxContext,
     container_creation_context: ContainerCreationContext,
+    *,
+    user_sid: str,
+    workload_tokens: dict[str, str],
 ) -> ContainerCreationResult:
     """Create the Metisa Workload container and connect it to the Docker network."""
     creation_settings = container_creation_context.settings
@@ -162,6 +165,18 @@ def create_metisa_workload_container(
 
     # Handle the secrets for the container
     secrets = resolve_secrets(specification.secrets)
+
+    reserved_names = {
+        "METISA_MCP_SERVER_TOKEN",
+        "METISA_AGENT_MEMORY_TOKEN",
+    }
+    conflicting_names = reserved_names.intersection(secrets)
+    if conflicting_names:
+        names = ", ".join(sorted(conflicting_names))
+        raise ValueError(f"Workload secrets use reserved names: {names}")
+
+    secrets.update(workload_tokens)
+
     secrets_file, secrets_key = create_secrets_file(staged_source_path, secrets)
 
     if not secrets_file.is_file():
@@ -172,6 +187,7 @@ def create_metisa_workload_container(
     environs.extend(specified_environs)
 
     environs.append(f"METISA_RUN_ID={sandbox_context.run_identifier}")
+    environs.append(f"METISA_USER_SID={user_sid}")
 
     # Harden the container
     harden_docker_container(

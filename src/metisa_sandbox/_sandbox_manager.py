@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import timedelta
 
 from metisa_common.specification_models import MetisaSpecification
 from metisa_common.terminal_helper import (
@@ -37,6 +38,10 @@ from ._sandbox_network import (
 from ._sandbox_workspace import (
     clean_up_run_directory,
     create_sandbox_context,
+)
+from ._utilities._identity_helper import (
+    create_run_signing_key_pair,
+    issue_run_token,
 )
 from ._utilities._workspace_helper import (
     clean_up_secrets_files,
@@ -117,9 +122,13 @@ def run_metisa_container_workload_in_sandbox(
     specification: MetisaSpecification,
     image_reference: str,
     workload_module: str,
+    user_sid: str,
 ) -> int:
     """Run the specified workload in a Docker sandbox."""
     sandbox_requirements = SandboxRequirements(specification)
+
+    if not user_sid:
+        raise RuntimeError("User SID is required.")
 
     sandbox_context: SandboxContext = create_sandbox_context()
     sc = sandbox_context
@@ -173,6 +182,10 @@ def run_metisa_container_workload_in_sandbox(
     ]
 
     try:
+        workload_tokens, public_key_pem = _create_workload_tokens(
+            sandbox_requirements, user_sid, sc.run_identifier
+        )
+
         if sandbox_requirements.is_workload_network_required:
             create_sandbox_network(workload_network)
 
@@ -238,6 +251,7 @@ def run_metisa_container_workload_in_sandbox(
                 sandbox_context,
                 squid_proxy_container,
                 mcp_server_container,
+                public_key_pem,
             )
             _start_docker_container(mcp_server_container)
             mcp_server_container.network_ip_address = get_docker_container_ip_address(
@@ -342,8 +356,14 @@ def run_metisa_container_workload_in_sandbox(
                 sandbox_context,
                 squid_proxy_container,
                 agent_memory_container,
+                public_key_pem,
             )
             _start_docker_container(agent_memory_container)
+            if agent_memory_container.secrets_key is not None:
+                provision_container_secrets(
+                    agent_memory_container.instance_name,
+                    agent_memory_container.secrets_key,
+                )
 
         _create_metisa_workload_container(
             specification,
@@ -353,6 +373,8 @@ def run_metisa_container_workload_in_sandbox(
             sandbox_context,
             squid_proxy_container,
             metisa_workload_container,
+            user_sid,
+            workload_tokens,
         )
 
         workload_container_name = metisa_workload_container.instance_name
@@ -402,6 +424,40 @@ def run_metisa_container_workload_in_sandbox(
                 clean_up_staged_sources(all_containers)
 
 
+def _create_workload_tokens(
+    sandbox_requirements: SandboxRequirements,
+    user_sid: str,
+    run_identifier: str,
+) -> tuple[dict[str, str], bytes]:
+    workload_tokens: dict[str, str] = {}
+
+    private_key, public_key_pem = create_run_signing_key_pair()
+
+    token_lifetime = timedelta(hours=1)
+
+    if sandbox_requirements.is_mcp_server_required:
+        mcp_server_token = issue_run_token(
+            private_key=private_key,
+            user_sid=user_sid,
+            run_identifier=run_identifier,
+            audience="metisa-mcp-server",
+            lifetime=token_lifetime,
+        )
+        workload_tokens["METISA_MCP_SERVER_TOKEN"] = mcp_server_token
+
+    if sandbox_requirements.is_agent_memory_required:
+        agent_memory_token = issue_run_token(
+            private_key=private_key,
+            user_sid=user_sid,
+            run_identifier=run_identifier,
+            audience="metisa-agent-memory",
+            lifetime=token_lifetime,
+        )
+        workload_tokens["METISA_AGENT_MEMORY_TOKEN"] = agent_memory_token
+
+    return workload_tokens, public_key_pem
+
+
 def _start_docker_containers(
     containers: list[SandboxContainer],
 ) -> None:
@@ -434,6 +490,8 @@ def _create_metisa_workload_container(
     sandbox_context: SandboxContext,
     squid_proxy_container: SandboxContainer,
     metisa_workload_container: SandboxContainer,
+    user_sid: str,
+    workload_tokens: dict[str, str],
 ) -> None:
     with terminal_status(
         running="Creating Metisa Workload container.",
@@ -459,6 +517,8 @@ def _create_metisa_workload_container(
             specification,
             sandbox_context,
             metisa_workload_creation_context,
+            user_sid=user_sid,
+            workload_tokens=workload_tokens,
         )
         metisa_workload_container.set_created(metisa_workload_creation)
 
@@ -550,6 +610,7 @@ def _create_mcp_server_container(
     sandbox_context: SandboxContext,
     squid_proxy_container: SandboxContainer,
     mcp_server_container: SandboxContainer,
+    public_key_pem: bytes,
 ) -> None:
     with terminal_status(
         running="Creating MCP Server container...",
@@ -567,6 +628,7 @@ def _create_mcp_server_container(
             specification,
             sandbox_context,
             mcp_creation_context,
+            public_key_pem,
         )
         mcp_server_container.set_created(mcp_server_creation)
 
@@ -863,6 +925,7 @@ def _create_agent_memory_container(
     sandbox_context: SandboxContext,
     squid_proxy_container: SandboxContainer,
     agent_memory_container: SandboxContainer,
+    public_key_pem: bytes,
 ) -> None:
     with terminal_status(
         running="Creating AgentMemory container...",
@@ -877,7 +940,10 @@ def _create_agent_memory_container(
             ],
         )
         agent_memory_creation = create_agent_memory_container(
-            specification, sandbox_context, agent_memory_creation_context
+            specification,
+            sandbox_context,
+            agent_memory_creation_context,
+            public_key_pem,
         )
         agent_memory_container.set_created(agent_memory_creation)
 

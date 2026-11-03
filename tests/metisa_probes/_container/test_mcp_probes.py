@@ -3,16 +3,140 @@ from __future__ import annotations
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
+from functools import partial
 from typing import cast
 from unittest.mock import AsyncMock, Mock
 
+import httpx2
+import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
 from mcp import Client, types
 
+from metisa_common import secrets_helper
 from metisa_common.specification_helper import parse_specification
 from metisa_common.specification_models import Capability, McpServerSpecification
 from metisa_probes._container import _mcp_probes
 from metisa_probes._probe_models import ProbeContext, ProbeFunction
+
+
+@pytest.fixture(scope="module")
+def authentication_token() -> tuple[str, rsa.RSAPublicKey]:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    issued_at = datetime.now(UTC)
+    token = jwt.encode(
+        {
+            "iss": "metisa-sandbox",
+            "sub": "test-user",
+            "aud": "metisa-mcp-server",
+            "run": "test-run",
+            "iat": issued_at,
+            "exp": issued_at + timedelta(minutes=5),
+        },
+        private_key,
+        algorithm="RS256",
+    )
+    return token, private_key.public_key()
+
+
+@pytest.mark.parametrize(
+    "probe",
+    [
+        _mcp_probes.mcp_requests_require_authorization,
+        _mcp_probes.mcp_requests_reject_invalid_authorization,
+    ],
+)
+@pytest.mark.parametrize(
+    "failure_method", ["tools/list", "resources/list", "tools/call", "resources/read"]
+)
+@pytest.mark.parametrize(
+    "failure_mode", [None, "accepted", "forbidden", "no_challenge"]
+)
+def test_authentication_probes_require_http_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+    mcp_case: tuple[ProbeContext, AsyncMock],
+    authentication_token: tuple[str, rsa.RSAPublicKey],
+    probe: ProbeFunction,
+    failure_method: str,
+    failure_mode: str | None,
+) -> None:
+    context, _ = mcp_case
+    token, public_key = authentication_token
+    load_secrets = Mock(return_value={"METISA_MCP_SERVER_TOKEN": token})
+    monkeypatch.setattr(secrets_helper, "load_secrets", load_secrets)
+    requests: list[httpx2.Request] = []
+
+    def handle_request(request: httpx2.Request) -> httpx2.Response:
+        requests.append(request)
+        assert request.url == _mcp_probes._MCP_SERVER_URL
+        payload = json.loads(request.content)
+        method = payload["method"]
+        assert payload["jsonrpc"] == "2.0"
+        if method == "tools/call":
+            assert payload["params"] == {"name": "test_greeting_1", "arguments": {}}
+        if method == "resources/read":
+            assert payload["params"] == {"uri": "metisa://test_resource_1"}
+
+        authorization = request.headers.get("Authorization")
+        assert authorization != f"Bearer {token}"
+        if authorization is not None and authorization.count(".") == 2:
+            # A structurally valid JWT must fail cryptographic verification.
+            with pytest.raises(jwt.InvalidSignatureError):
+                jwt.decode(authorization[7:], public_key, algorithms=["RS256"])
+
+        status = 401
+        headers = {"WWW-Authenticate": "Bearer"}
+        if method == failure_method:
+            if failure_mode == "accepted":
+                status = 200
+            elif failure_mode == "forbidden":
+                status = 403
+            elif failure_mode == "no_challenge":
+                headers = {}
+        return httpx2.Response(status, headers=headers)
+
+    transport = httpx2.MockTransport(handle_request)
+    client_factory = partial(httpx2.AsyncClient, transport=transport)
+    monkeypatch.setattr(httpx2, "AsyncClient", client_factory)
+
+    result = probe(context)
+
+    assert result.passed is (failure_mode is None), result.message
+    assert token not in result.message
+    if failure_mode is None:
+        assert {json.loads(request.content)["method"] for request in requests} == {
+            "tools/list",
+            "resources/list",
+            "tools/call",
+            "resources/read",
+        }
+        if probe is _mcp_probes.mcp_requests_require_authorization:
+            assert len(requests) == 4
+            assert all("Authorization" not in request.headers for request in requests)
+            load_secrets.assert_not_called()
+        else:
+            assert len(requests) == 16
+            assert len({request.headers["Authorization"] for request in requests}) == 4
+
+
+def test_authentication_probe_connection_failure_is_not_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+    mcp_case: tuple[ProbeContext, AsyncMock],
+) -> None:
+    context, _ = mcp_case
+
+    def handle_request(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("connection failed", request=request)
+
+    transport = httpx2.MockTransport(handle_request)
+    client_factory = partial(httpx2.AsyncClient, transport=transport)
+    monkeypatch.setattr(httpx2, "AsyncClient", client_factory)
+
+    result = _mcp_probes.mcp_requests_require_authorization(context)
+
+    assert not result.passed
+    assert "ConnectError" in result.message
 
 
 @pytest.fixture
