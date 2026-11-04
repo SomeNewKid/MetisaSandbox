@@ -33,7 +33,7 @@ def test_documents(specification: MetisaSpecification):
         return
 
     filename = "sample.txt"
-    print("Data from ", filename, flush=True)
+    print("Data from", filename, flush=True)
     with print_elapsed_time():
         try:
             tool_result = get_mcp_server_tool_result(
@@ -62,7 +62,7 @@ def test_documents(specification: MetisaSpecification):
 
     filename = "prompt-injection.txt"
     print()
-    print("Data from ", filename, flush=True)
+    print("Data from", filename, flush=True)
     with print_elapsed_time():
         try:
             tool_result = get_mcp_server_tool_result(

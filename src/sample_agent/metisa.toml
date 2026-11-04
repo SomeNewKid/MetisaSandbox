@@ -3,19 +3,19 @@ capabilities = [
     "network",
     "internet",
     # "interactive",
-    # "localnet",
-    # "mcp_server",
-    # "prompt_guard",
-    # "entity_guard",
-    # "jina_reader",
-    # "code_execution",
-    # "llm_server",
-    # "llm_broker",
-    # "docling",
-    # "documents",
-    # "qdrant",
-    # "embeddings",
-    # "otel_collector",
+    "localnet",
+    "mcp_server",
+    "prompt_guard",
+    "entity_guard",
+    "jina_reader",
+    "code_execution",
+    "llm_server",
+    "llm_broker",
+    "docling",
+    "documents",
+    "qdrant",
+    "embeddings",
+    "otel_collector",
     "postgres",
     "agent_memory",
 ]
@@ -130,3 +130,6 @@ environs = [
 
 [agent_memory]
 environs = []
+secrets = [
+    "POSTGRES_PASSWORD=${host:METISA_POSTGRES_PASSWORD}",
+]

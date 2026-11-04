@@ -17,6 +17,7 @@ from metisa_common.specification_models import (
 )
 
 from ._telemetry import initialize_tracing
+from .test_suite.agent_memory import test_agent_memory
 from .test_suite.code_execution import test_code_execution
 from .test_suite.database import test_database_access
 from .test_suite.docling import test_docling
@@ -94,6 +95,7 @@ def _run_tests(specification: MetisaSpecification) -> None:
     test_docling(specification)
     test_embeddings(specification)
     test_secrets(specification)
+    test_agent_memory(specification)
 
     print()
     print("-" * 30, flush=True)

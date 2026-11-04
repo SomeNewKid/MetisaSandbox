@@ -7,12 +7,12 @@ USER root
 # Keep the account name "postgres" for the inherited entrypoint.
 RUN groupmod --gid 10012 postgres \
     && usermod --uid 10012 --gid 10012 postgres \
-    && mkdir -p /var/lib/postgres/18/docker /var/run/postgres \
-    && chown -R 10012:10012 /var/lib/postgres /var/run/postgres \
-    && chmod 0700 /var/lib/postgres/18/docker \
-    && chmod 3775 /var/run/postgres
+    && mkdir -p /var/lib/postgresql/18/docker /var/run/postgresql \
+    && chown -R 10012:10012 /var/lib/postgresql /var/run/postgresql \
+    && chmod 0700 /var/lib/postgresql/18/docker \
+    && chmod 3775 /var/run/postgresql
 
-ENV PGDATA=/var/lib/postgres/18/docker \
+ENV PGDATA=/var/lib/postgresql/18/docker \
     POSTGRES_DB=agent_memory \
     POSTGRES_USER=postgres \
     POSTGRES_HOST_AUTH_METHOD=scram-sha-256

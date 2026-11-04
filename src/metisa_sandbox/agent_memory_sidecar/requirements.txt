@@ -1,3 +1,4 @@
 cryptography==48.0.1
 pyjwt==2.15.1
+psycopg[binary]==3.3.7
 requests==2.34.2

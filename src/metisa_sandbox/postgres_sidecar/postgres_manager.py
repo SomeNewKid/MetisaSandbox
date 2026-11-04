@@ -12,6 +12,7 @@ from metisa_common.specification_models import MetisaSpecification
 
 from .._docker._docker_container import (
     create_docker_container,
+    execute_docker_command,
 )
 from .._docker._docker_hardening import (
     harden_docker_container,
@@ -30,6 +31,9 @@ from .._sandbox_models import (
 _IMAGE_FORMAT_VERSION = 1
 _POSTGRESQL_ALIAS = "metisa-postgres"
 _POSTGRESQL_IMAGE_NAME = "metisa-postgres"
+_POSTGRES_CONTAINER_NAME = "metisa-postgres-agent-memory"
+_GUEST_STORAGE_DIRECTORY = "/var/lib/postgresql"
+_GUEST_SCHEMA_FILE = "/etc/metisa/schema.sql"
 
 
 def create_postgres_definition() -> SandboxContainer:
@@ -51,11 +55,18 @@ def create_postgres_container(
     if not specification.postgres:
         raise RuntimeError("Metisa specification did not include a document section.")
     image_name = _ensure_postgres_image_exists(specification)
-    container_name = _create_postgres_container_name(sandbox_context.run_identifier)
+
+    # We're using a fixed container name to prevent
+    # concurrent agents from starting separate database
+    # servers against the same storage directory.
+    container_name = _POSTGRES_CONTAINER_NAME
+    # container_name = _create_postgres_container_name(sandbox_context.run_identifier)
 
     if not container_creation_context.network_names:
         raise RuntimeError("No network specified for the Postgres container.")
     network_name = container_creation_context.network_names[0]
+
+    schema_file = Path(__file__).with_name("schema.sql").resolve()
 
     environs: list[str] = []
 
@@ -82,7 +93,9 @@ def create_postgres_container(
     arguments.extend(
         [
             "--mount",
-            "type=volume,source=metisa-agent-memory,target=/var/lib/postgres",
+            ("type=volume,source=metisa-agent-memory,target=/var/lib/postgresql"),
+            "--mount",
+            (f"type=bind,source={schema_file},target={_GUEST_SCHEMA_FILE},readonly"),
         ]
     )
 
@@ -109,6 +122,33 @@ def create_postgres_container(
     create_docker_container(arguments)
 
     return ContainerCreationResult(container_name)
+
+
+def initialize_postgres_schema(
+    container_name: str,
+) -> None:
+    """Create missing memory tables in the running PostgreSQL database."""
+    arguments = [
+        container_name,
+        "/bin/sh",
+        "-c",
+        (
+            "exec psql "
+            "--host=/var/run/postgresql "
+            '--username="$POSTGRES_USER" '
+            '--dbname="$POSTGRES_DB" '
+            "--no-psqlrc "
+            "--no-password "
+            "--set=ON_ERROR_STOP=1 "
+            "--single-transaction "
+            f"--file={_GUEST_SCHEMA_FILE}"
+        ),
+    ]
+
+    return_code, output = execute_docker_command(arguments)
+
+    if return_code != 0:
+        raise RuntimeError(f"Could not initialize PostgreSQL schema:\n{output}")
 
 
 def _ensure_postgres_image_exists(

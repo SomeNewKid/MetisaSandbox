@@ -33,7 +33,7 @@ def get_user_sid(
         key=public_key,
         algorithms=["RS256"],
         issuer="metisa-sandbox",
-        audience="metisa-mcp-server",
+        audience="metisa-agent-memory",
         options={
             "require": ["iss", "sub", "aud", "run", "iat", "exp"],
             "strict_aud": True,

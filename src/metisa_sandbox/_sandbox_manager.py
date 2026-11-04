@@ -103,6 +103,7 @@ from .otel_collector_sidecar.otel_collector_manager import (
 from .postgres_sidecar.postgres_manager import (
     create_postgres_container,
     create_postgres_definition,
+    initialize_postgres_schema,
 )
 from .prompt_guard_sidecar.prompt_guard_manager import (
     create_prompt_guard_container,
@@ -349,6 +350,7 @@ def run_metisa_container_workload_in_sandbox(
                 postgres_container,
             )
             _start_docker_container(postgres_container)
+            initialize_postgres_schema(postgres_container.instance_name)
 
         if sandbox_requirements.is_agent_memory_required:
             _create_agent_memory_container(

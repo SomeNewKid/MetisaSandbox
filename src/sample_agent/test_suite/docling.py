@@ -35,7 +35,7 @@ def test_docling(specification: MetisaSpecification):
     filename = "Docling Technical Report.pdf"
     with print_elapsed_time():
         try:
-            print("Data from ", filename)
+            print("Data from", filename)
             tool_result = get_mcp_server_tool_result(
                 tool_name="convert_document_to_markdown",
                 params={"filename": filename},
