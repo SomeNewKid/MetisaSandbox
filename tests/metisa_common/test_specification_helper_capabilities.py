@@ -123,6 +123,7 @@ def test_jina_reader_capability() -> None:
         agent_name="sample_agent"
         capabilities = [
             "network", 
+            "internet", 
             "mcp_server", 
             "prompt_guard", 
             "entity_guard", 
@@ -131,7 +132,7 @@ def test_jina_reader_capability() -> None:
     """
     specification = parse_specification(toml)
     assert Capability.NETWORK in specification.capabilities
-    assert Capability.INTERNET not in specification.capabilities
+    assert Capability.INTERNET in specification.capabilities
     assert Capability.LOCALNET not in specification.capabilities
     assert Capability.MCP_SERVER in specification.capabilities
     assert Capability.JINA_READER in specification.capabilities

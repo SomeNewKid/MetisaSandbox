@@ -90,9 +90,11 @@ def test_image_tag_with_capabilities_and_no_dependencies() -> None:
     toml = """
         agent_name = "sample_agent"
         capabilities = [
-            "interactive",
+            "internet",
             "network",
         ]
+        [squid_proxy]
+        allowed_domains = []
     """
     image_tag = _get_image_tag_from_toml(toml)
     _assert_valid_image_tag(image_tag)
@@ -114,13 +116,15 @@ def test_image_tag_with_capabilities_and_dependencies() -> None:
     toml = """
         agent_name = "sample_agent"
         capabilities = [
-            "interactive",
+            "internet",
             "network",
         ]
         dependencies = [
             "requests==2.34.2",
             "urllib3>=2.5.0",
         ]
+        [squid_proxy]
+        allowed_domains = []
     """
     image_tag = _get_image_tag_from_toml(toml)
     _assert_valid_image_tag(image_tag)
@@ -130,16 +134,20 @@ def test_capability_order_does_not_change_image_tag() -> None:
     first_toml = """
         agent_name = "sample_agent"
         capabilities = [
-            "interactive",
+            "internet",
             "network",
         ]
+        [squid_proxy]
+        allowed_domains = []
     """
     second_toml = """
         agent_name = "sample_agent"
         capabilities = [
             "network",
-            "interactive",
+            "internet",
         ]
+        [squid_proxy]
+        allowed_domains = []
     """
     first_image_tag = _get_image_tag_from_toml(first_toml)
     second_image_tag = _get_image_tag_from_toml(second_toml)
@@ -170,24 +178,28 @@ def test_collection_order_does_not_change_image_tag() -> None:
     first_toml = """
         agent_name = "sample_agent"
         capabilities = [
-            "interactive",
+            "internet",
             "network",
         ]
         dependencies = [
             "requests==2.34.2",
             "urllib3>=2.5.0",
         ]
+        [squid_proxy]
+        allowed_domains = []
     """
     second_toml = """
         agent_name = "sample_agent"
         capabilities = [
             "network",
-            "interactive",
+            "internet",
         ]
         dependencies = [
             "urllib3>=2.5.0",
             "requests==2.34.2",
         ]
+        [squid_proxy]
+        allowed_domains = []
     """
     first_image_tag = _get_image_tag_from_toml(first_toml)
     second_image_tag = _get_image_tag_from_toml(second_toml)
@@ -198,7 +210,6 @@ def test_unrelated_tables_do_not_change_image_tag() -> None:
     squid_proxy_toml = """
         agent_name = "sample_agent"
         capabilities = [
-            "interactive",
             "network",
             "internet",
             "localnet",
@@ -217,7 +228,6 @@ def test_unrelated_tables_do_not_change_image_tag() -> None:
         agent_name = "sample_agent"
         capabilities = [
             "network",
-            "interactive",
             "internet",
             "localnet",
         ]
@@ -258,8 +268,11 @@ def test_different_capabilities_produce_different_image_tags() -> None:
     first_toml = """
         agent_name = "sample_agent"
         capabilities = [
-            "interactive",
+            "network",
+            "internet",
         ]
+        [squid_proxy]
+        allowed_domains = []
     """
     second_toml = """
         agent_name = "sample_agent"
@@ -300,11 +313,14 @@ def test_different_capabilities_and_dependencies_produce_different_tags() -> Non
     first_toml = """
         agent_name = "sample_agent"
         capabilities = [
-            "interactive",
+            "network",
+            "internet",
         ]
         dependencies = [
             "requests==2.34.2",
         ]
+        [squid_proxy]
+        allowed_domains = []
     """
     second_toml = """
         agent_name = "sample_agent"

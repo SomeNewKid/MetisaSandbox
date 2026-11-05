@@ -1280,6 +1280,7 @@ def _environ_name_is_reserved(
     reserved_by_metisa = (
         "METISA_RUNTIME_ROLE",
         "SANDBOX_OUTPUT_DIR",
+        "METISA_INTERACTIVE",
     )
     if name in reserved_by_metisa:
         return True

@@ -10,6 +10,7 @@ from .specification_models import (
     CodeExecutionSpecification,
     DoclingSpecification,
     DocumentsSpecification,
+    EmbeddingsSpecification,
     HaproxySpecification,
     JinaReaderSpecification,
     LlmBrokerSpecification,
@@ -28,8 +29,6 @@ def validate_specification(
     specification: MetisaSpecification,
 ) -> None:
     """Validate a Metisa TOML specification."""
-    _validate_capabilities(specification.capabilities)
-
     _validate_squid_proxy_specification(
         specification.capabilities,
         specification.squid_proxy,
@@ -39,6 +38,8 @@ def validate_specification(
         specification.capabilities,
         specification.haproxy,
     )
+
+    _validate_interactive_specification(specification.capabilities)
 
     _validate_mcp_server_specification(
         specification.capabilities,
@@ -73,6 +74,11 @@ def validate_specification(
     _validate_documents_specification(
         specification.capabilities,
         specification.documents,
+    )
+
+    _validate_embeddings_specification(
+        specification.capabilities,
+        specification.embeddings,
     )
 
     _validate_qdrant_specification(
@@ -186,8 +192,9 @@ def is_valid_ipv6_address(
     return True
 
 
-def _validate_capabilities(
+def _validate_squid_proxy_specification(
     capabilities: frozenset[Capability],
+    squid_proxy_specification: SquidProxySpecification | None,
 ):
     if Capability.INTERNET in capabilities:
         if Capability.NETWORK not in capabilities:
@@ -195,85 +202,6 @@ def _validate_capabilities(
                 '"internet" capability requires "network" capability.'
             )
 
-    if Capability.LOCALNET in capabilities:
-        if Capability.NETWORK not in capabilities:
-            raise SpecificationValidationError(
-                '"localnet" capability requires "network" capability.'
-            )
-
-    if Capability.MCP_SERVER in capabilities:
-        if Capability.NETWORK not in capabilities:
-            raise SpecificationValidationError(
-                '"mcp_server" capability requires "network" capability.'
-            )
-        if Capability.PROMPT_GUARD not in capabilities:
-            raise SpecificationValidationError(
-                '"mcp_server" capability requires "prompt_guard" capability.'
-            )
-        if Capability.ENTITY_GUARD not in capabilities:
-            raise SpecificationValidationError(
-                '"mcp_server" capability requires "entity_guard" capability.'
-            )
-
-    if Capability.JINA_READER in capabilities:
-        if Capability.MCP_SERVER not in capabilities:
-            raise SpecificationValidationError(
-                '"jina_reader" capability requires "mcp_server" capability.'
-            )
-
-    if Capability.CODE_EXECUTION in capabilities:
-        if Capability.MCP_SERVER not in capabilities:
-            raise SpecificationValidationError(
-                '"code_execution" capability requires "mcp_server" capability.'
-            )
-
-    if Capability.LLM_SERVER in capabilities:
-        if Capability.NETWORK not in capabilities:
-            raise SpecificationValidationError(
-                '"llm_server" capability requires "network" capability.'
-            )
-
-    if Capability.LLM_BROKER in capabilities:
-        if Capability.NETWORK not in capabilities:
-            raise SpecificationValidationError(
-                '"llm_broker" capability requires "network" capability.'
-            )
-        if Capability.PROMPT_GUARD not in capabilities:
-            raise SpecificationValidationError(
-                '"llm_broker" capability requires "prompt_guard" capability.'
-            )
-        if Capability.ENTITY_GUARD not in capabilities:
-            raise SpecificationValidationError(
-                '"llm_broker" capability requires "entity_guard" capability.'
-            )
-
-    if Capability.DOCLING in capabilities:
-        if Capability.MCP_SERVER not in capabilities:
-            raise SpecificationValidationError(
-                '"docling" capability requires "mcp_server" capability.'
-            )
-        if Capability.DOCUMENTS not in capabilities:
-            raise SpecificationValidationError(
-                '"docling" capability requires "documents" capability.'
-            )
-
-    if Capability.EMBEDDINGS in capabilities:
-        if Capability.DOCLING not in capabilities:
-            raise SpecificationValidationError(
-                '"embeddings" capability requires "docling" capability.'
-            )
-
-    if Capability.AGENT_MEMORY in capabilities:
-        if Capability.POSTGRES not in capabilities:
-            raise SpecificationValidationError(
-                '"agent_memory" capability requires "postgres" capability.'
-            )
-
-
-def _validate_squid_proxy_specification(
-    capabilities: frozenset[Capability],
-    squid_proxy_specification: SquidProxySpecification | None,
-):
     if squid_proxy_specification is None:
         return
 
@@ -294,6 +222,12 @@ def _validate_haproxy_specification(
     capabilities: frozenset[Capability],
     haproxy_specification: HaproxySpecification | None,
 ):
+    if Capability.LOCALNET in capabilities:
+        if Capability.NETWORK not in capabilities:
+            raise SpecificationValidationError(
+                '"localnet" capability requires "network" capability.'
+            )
+
     if haproxy_specification is None:
         return
 
@@ -314,10 +248,34 @@ def _validate_haproxy_specification(
         raise SpecificationValidationError(error)
 
 
+def _validate_interactive_specification(
+    capabilities: frozenset[Capability],
+):
+    if Capability.INTERACTIVE in capabilities:
+        if Capability.MCP_SERVER not in capabilities:
+            raise SpecificationValidationError(
+                '"interactive" capability requires "mcp_server" capability.'
+            )
+
+
 def _validate_mcp_server_specification(
     capabilities: frozenset[Capability],
     mcp_server_specification: McpServerSpecification | None,
 ):
+    if Capability.MCP_SERVER in capabilities:
+        if Capability.NETWORK not in capabilities:
+            raise SpecificationValidationError(
+                '"mcp_server" capability requires "network" capability.'
+            )
+        if Capability.PROMPT_GUARD not in capabilities:
+            raise SpecificationValidationError(
+                '"mcp_server" capability requires "prompt_guard" capability.'
+            )
+        if Capability.ENTITY_GUARD not in capabilities:
+            raise SpecificationValidationError(
+                '"mcp_server" capability requires "entity_guard" capability.'
+            )
+
     if mcp_server_specification is None:
         return
     return
@@ -327,6 +285,20 @@ def _validate_llm_broker_specification(
     capabilities: frozenset[Capability],
     llm_broker_specification: LlmBrokerSpecification | None,
 ):
+    if Capability.LLM_BROKER in capabilities:
+        if Capability.NETWORK not in capabilities:
+            raise SpecificationValidationError(
+                '"llm_broker" capability requires "network" capability.'
+            )
+        if Capability.PROMPT_GUARD not in capabilities:
+            raise SpecificationValidationError(
+                '"llm_broker" capability requires "prompt_guard" capability.'
+            )
+        if Capability.ENTITY_GUARD not in capabilities:
+            raise SpecificationValidationError(
+                '"llm_broker" capability requires "entity_guard" capability.'
+            )
+
     if llm_broker_specification is None:
         return
     return
@@ -336,6 +308,12 @@ def _validate_llm_server_specification(
     capabilities: frozenset[Capability],
     llm_server_specification: LlmServerSpecification | None,
 ):
+    if Capability.LLM_SERVER in capabilities:
+        if Capability.NETWORK not in capabilities:
+            raise SpecificationValidationError(
+                '"llm_server" capability requires "network" capability.'
+            )
+
     if llm_server_specification is None:
         return
 
@@ -344,6 +322,16 @@ def _validate_jina_reader_specification(
     capabilities: frozenset[Capability],
     jina_reader_specification: JinaReaderSpecification | None,
 ):
+    if Capability.JINA_READER in capabilities:
+        if Capability.INTERNET not in capabilities:
+            raise SpecificationValidationError(
+                '"jina_reader" capability requires "internet" capability.'
+            )
+        if Capability.MCP_SERVER not in capabilities:
+            raise SpecificationValidationError(
+                '"jina_reader" capability requires "mcp_server" capability.'
+            )
+
     if jina_reader_specification is None:
         return
     return
@@ -353,6 +341,12 @@ def _validate_code_execution_specification(
     capabilities: frozenset[Capability],
     code_execution_specification: CodeExecutionSpecification | None,
 ):
+    if Capability.CODE_EXECUTION in capabilities:
+        if Capability.MCP_SERVER not in capabilities:
+            raise SpecificationValidationError(
+                '"code_execution" capability requires "mcp_server" capability.'
+            )
+
     if code_execution_specification is None:
         return
     return
@@ -362,6 +356,16 @@ def _validate_docling_specification(
     capabilities: frozenset[Capability],
     docling_specification: DoclingSpecification | None,
 ):
+    if Capability.DOCLING in capabilities:
+        if Capability.MCP_SERVER not in capabilities:
+            raise SpecificationValidationError(
+                '"docling" capability requires "mcp_server" capability.'
+            )
+        if Capability.DOCUMENTS not in capabilities:
+            raise SpecificationValidationError(
+                '"docling" capability requires "documents" capability.'
+            )
+
     if docling_specification is None:
         return
     return
@@ -372,6 +376,21 @@ def _validate_documents_specification(
     documents_specification: DocumentsSpecification | None,
 ):
     if documents_specification is None:
+        return
+    return
+
+
+def _validate_embeddings_specification(
+    capabilities: frozenset[Capability],
+    embeddings_specification: EmbeddingsSpecification | None,
+):
+    if Capability.EMBEDDINGS in capabilities:
+        if Capability.DOCLING not in capabilities:
+            raise SpecificationValidationError(
+                '"embeddings" capability requires "docling" capability.'
+            )
+
+    if embeddings_specification is None:
         return
     return
 
@@ -407,6 +426,12 @@ def _validate_agent_memory_specification(
     capabilities: frozenset[Capability],
     agent_memory_specification: AgentMemorySpecification | None,
 ):
+    if Capability.AGENT_MEMORY in capabilities:
+        if Capability.POSTGRES not in capabilities:
+            raise SpecificationValidationError(
+                '"agent_memory" capability requires "postgres" capability.'
+            )
+
     if agent_memory_specification is None:
         return
     return

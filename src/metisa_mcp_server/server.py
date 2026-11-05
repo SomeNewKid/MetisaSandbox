@@ -66,6 +66,9 @@ from ._tools._read_content_from_url_tool import (
 from ._tools._retrieve_content_from_document_tool import (
     retrieve_content_from_document,
 )
+from ._tools._screen_user_input_tool import (
+    screen_user_input,
+)
 from ._tools._test_greeting_1_tool import (
     test_greeting_1,
 )
@@ -146,22 +149,23 @@ def _create_resource_registry(
 
 TOOL_REGISTRY = _create_tool_registry(
     [
+        screen_user_input,
         test_greeting_1,
     ],
     metisa_json,
     [
-        test_greeting_2,
-        test_greeting_3,
-        get_active_items_from_database,
-        get_title_from_url,
-        read_content_from_url,
-        execute_starlark_code,
-        get_classification_indicators,
-        get_moderation_labels,
         anonymize_entities_in_text,
         convert_document_to_markdown,
-        retrieve_content_from_document,
+        execute_starlark_code,
+        get_active_items_from_database,
+        get_classification_indicators,
         get_matching_chunks_from_document,
+        get_moderation_labels,
+        get_title_from_url,
+        read_content_from_url,
+        retrieve_content_from_document,
+        test_greeting_2,
+        test_greeting_3,
     ],
 )
 

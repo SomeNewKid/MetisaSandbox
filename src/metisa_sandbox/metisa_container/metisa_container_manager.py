@@ -6,7 +6,7 @@ from pathlib import Path
 
 from metisa_common.secrets_helper import SECRETS_DIRECTORY
 from metisa_common.specification_helper import resolve_environs, resolve_secrets
-from metisa_common.specification_models import MetisaSpecification
+from metisa_common.specification_models import Capability, MetisaSpecification
 from metisa_sandbox._docker._docker_container import create_docker_container
 
 from .._docker._docker_hardening import (
@@ -71,6 +71,8 @@ def create_metisa_workload_container(
         raise RuntimeError("Metisa Workload requires a network-required flag.")
     if not isinstance(is_network_required, bool):
         raise RuntimeError("Metisa Workload network-required flag must be a bool.")
+
+    is_interactive = Capability.INTERACTIVE in specification.capabilities
 
     use_squid_proxy = creation_settings.get("use_squid_proxy", None)
     if use_squid_proxy is not None and not isinstance(use_squid_proxy, bool):
@@ -189,12 +191,15 @@ def create_metisa_workload_container(
     environs.append(f"METISA_RUN_ID={sandbox_context.run_identifier}")
     environs.append(f"METISA_USER_SID={user_sid}")
 
+    is_interactive_flag = "1" if is_interactive else "0"
+    environs.append(f"METISA_INTERACTIVE={is_interactive_flag}")
+
     # Harden the container
     harden_docker_container(
         arguments=arguments,
         environs=environs,
         username="sandbox",
-        interactive=True,
+        interactive=is_interactive,
         seccomp_path=seccomp_path,
         number_user_processes=64,
     )

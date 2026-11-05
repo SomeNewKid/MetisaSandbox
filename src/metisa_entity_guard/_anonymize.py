@@ -51,6 +51,12 @@ def anonymize(
             language="en",
         )
 
+        analyzer_results = [
+            result
+            for result in analyzer_results
+            if _should_anonymize_result(text, result)
+        ]
+
     anonymizer_results = [
         AnonymizerRecognizerResult(
             entity_type=result.entity_type,
@@ -109,6 +115,21 @@ def _create_coarse_number_recognizer() -> PatternRecognizer:
         supported_language="en",
         patterns=[pattern],
     )
+
+
+# Add a bit of control over the anonymization of person names.
+# So, "My name is Samantha" would be not be anonymized,
+# but "My name is Samantha Smith" would be anonymized.
+def _should_anonymize_result(
+    text: str,
+    result: RecognizerResult,
+) -> bool:
+    if result.entity_type != "PERSON":
+        return True
+
+    detected_name = text[result.start : result.end]
+    name_parts = detected_name.split()
+    return len(name_parts) > 1
 
 
 @cache

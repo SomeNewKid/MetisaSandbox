@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from metisa_common.mcp_helper import (
+    get_mcp_server_tool_result,
+)
 from metisa_common.specification_models import (
     Capability,
     MetisaSpecification,
 )
 
 from .._helper import (
-    get_mcp_server_tool_result,
     print_caution,
     print_disabled,
     print_elapsed_time,
@@ -29,13 +31,16 @@ _TEST_SENTENCES = [
     "My Medicare number is 2428 77813 2.",
 ]
 
+_NEUTRAL_SENTENCES = [
+    "My name is Samantha.",
+]
+
 _EXTENSIVE_TEST_SENTENCES = [
     "My phone number is 9332 1234.",
     "My phone number is (08) 9332 1234.",
     "My phone number is +61 9332 1234.",
     "My phone number is 0488123456.",
     "My phone number is 0488 123 456.",
-    "My name is Samantha.",
     "My name is Samantha Smith.",
     "My email is samantha.smith@example.com.",
     "My credit card number is 4111-1111-1111-1111.",
@@ -46,6 +51,13 @@ _EXTENSIVE_TEST_SENTENCES = [
     "My tax file number is 333333333.",
     "My Medicare number is 2428 77813 2.",
     "My Medicare number is 2428778132.",
+]
+
+_EXTENSIVE_NEUTRAL_SENTENCES = [
+    "The sky is blue.",
+    "My name is my own.",
+    "My name is Samantha.",
+    "My email is private.",
 ]
 
 
@@ -62,13 +74,16 @@ def test_entity_guard(specification: MetisaSpecification):
         return
 
     if _USE_EXTENSIVE_TEST_SENTENCES:
-        _anonymize_entities_in_text_sentences(_EXTENSIVE_TEST_SENTENCES)
+        _anonymize_entities_in_text_sentences(_EXTENSIVE_TEST_SENTENCES, True)
+        _anonymize_entities_in_text_sentences(_EXTENSIVE_NEUTRAL_SENTENCES, False)
     else:
-        _anonymize_entities_in_text_sentences(_TEST_SENTENCES)
+        _anonymize_entities_in_text_sentences(_TEST_SENTENCES, True)
+        _anonymize_entities_in_text_sentences(_NEUTRAL_SENTENCES, False)
 
 
 def _anonymize_entities_in_text_sentences(
     sentences: list[str],
+    expect_anonymization: bool = True,
 ) -> None:
     if not sentences:
         return
@@ -79,7 +94,11 @@ def _anonymize_entities_in_text_sentences(
                     print()
                 print_message("Clear content:", sentence)
                 anonymized = _anonymize_entities_in_text(sentence)
-                successful = anonymized != sentence
+                successful = (
+                    anonymized != sentence
+                    if expect_anonymization
+                    else anonymized == sentence
+                )
                 if successful:
                     print_success("Anonymization successful for:", anonymized)
                 else:

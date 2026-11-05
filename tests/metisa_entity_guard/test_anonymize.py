@@ -92,8 +92,14 @@ def test_anonymize_includes_coarse_numbers_by_default(
             "References: 12345678 and 87654321.",
             "References: <COARSE_NUMBER> and <COARSE_NUMBER>.",
         ),
-        ("Reference: 1234567.", "Reference: 1234567."),
-        ("Nothing sensitive here.", "Nothing sensitive here."),
+        (
+            "Reference: 1234567.",
+            "Reference: 1234567.",
+        ),
+        (
+            "Nothing sensitive here.",
+            "Nothing sensitive here.",
+        ),
         ("", ""),
         ("   ", "   "),
     ],

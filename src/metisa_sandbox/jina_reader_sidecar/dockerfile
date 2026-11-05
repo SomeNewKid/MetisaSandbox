@@ -21,6 +21,18 @@ RUN node -e "\
         .replace(timeoutNeedle, 'timeout: 60_000,'); \
     fs.writeFileSync(path, updated);"
 
+# Allow 120 seconds for Jina's service dependencies to initialize.
+RUN node -e "\
+    const fs = require('node:fs'); \
+    const path = '/app/node_modules/civkit/lib/async-service.js'; \
+    const source = fs.readFileSync(path, 'utf8'); \
+    const needle = 'dependencyReady(timeoutMilliseconds = 30000)'; \
+    if (source.split(needle).length !== 2) { \
+        throw new Error('Expected exactly one dependency-readiness default'); \
+    } \
+    const replacement = 'dependencyReady(timeoutMilliseconds = 120000)'; \
+    fs.writeFileSync(path, source.replace(needle, replacement));"
+
 # Document ports 8080 and 8081 as the ports on which Jina Reader exposes its endpoints.
 # This does not publish the ports to the host.
 EXPOSE 8080 8081

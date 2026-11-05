@@ -334,7 +334,7 @@ def _create_haproxy_cfg(
                 "",
                 f"backend destination_{backend.listen_port}",
                 "    mode tcp",
-                f"    server database {backend.host}:{backend.port} check",
+                f"    server downstream {backend.host}:{backend.port} check",
             ]
         )
 

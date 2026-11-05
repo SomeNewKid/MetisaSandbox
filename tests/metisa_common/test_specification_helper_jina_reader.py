@@ -13,6 +13,7 @@ def test_missing_jina_reader_table() -> None:
         agent_name = "sample_agent"
         capabilities = [
             "network", 
+            "internet", 
             "mcp_server", 
             "prompt_guard",
             "entity_guard", 
@@ -28,6 +29,7 @@ def test_jina_reader_missing_environs() -> None:
         agent_name = "sample_agent"
         capabilities = [
             "network", 
+            "internet", 
             "mcp_server", 
             "prompt_guard", 
             "entity_guard", 
@@ -52,10 +54,26 @@ def test_jina_reader_invalid_if_no_network_capability() -> None:
         _ = parse_specification(toml)
 
 
+def test_jina_reader_invalid_if_no_internet_capability() -> None:
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = [
+            "network", "mcp_server", "prompt_guard", "entity_guard", "jina_reader"
+        ]
+
+        [jina_reader]
+        environs = []
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
 def test_jina_reader_invalid_if_no_mcp_server_capability() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "prompt_guard", "entity_guard", "jina_reader"]
+        capabilities = [
+            "network", "internet", "prompt_guard", "entity_guard", "jina_reader"
+        ]
 
         [jina_reader]
         environs = []
@@ -67,7 +85,7 @@ def test_jina_reader_invalid_if_no_mcp_server_capability() -> None:
 def test_jina_reader_valid_if_no_jina_reader_capability() -> None:
     toml = """
         agent_name = "sample_agent"
-        capabilities = ["network", "prompt_guard", "entity_guard"]
+        capabilities = ["network", "internet", "prompt_guard", "entity_guard"]
 
         [jina_reader]
         environs = []
@@ -82,6 +100,7 @@ def test_jina_reader_with_unknown_key(key: str) -> None:
         agent_name = "sample_agent"
         capabilities = [
             "network", 
+            "internet",
             "mcp_server", 
             "prompt_guard", 
             "entity_guard", 
@@ -100,6 +119,7 @@ def test_jina_reader_empty_environs() -> None:
         agent_name = "sample_agent"
         capabilities = [
             "network", 
+            "internet",
             "mcp_server", 
             "prompt_guard", 
             "entity_guard", 
@@ -119,6 +139,7 @@ def test_jina_reader_valid_environs() -> None:
         agent_name = "sample_agent"
         capabilities = [
             "network", 
+            "internet",
             "mcp_server", 
             "prompt_guard", 
             "entity_guard", 
@@ -168,6 +189,7 @@ def test_jina_reader_environs_with_invalid_item(item: str) -> None:
         agent_name = "sample_agent"
         capabilities = [
             "network", 
+            "internet",
             "mcp_server", 
             "prompt_guard", 
             "entity_guard", 

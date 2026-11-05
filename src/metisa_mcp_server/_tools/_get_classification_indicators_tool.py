@@ -18,7 +18,7 @@ from .._helper import with_output_schema
 def get_classification_indicators(
     text: Annotated[str, Field(description="The text to classify")],
 ) -> dict[str, object]:
-    """Return the classificatin of the provided text."""
+    """Return the classification of the provided text."""
     _validate_arguments(text)
 
     result = _execute_tool(text)

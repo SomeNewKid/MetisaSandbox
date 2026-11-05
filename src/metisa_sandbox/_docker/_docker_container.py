@@ -34,6 +34,8 @@ def create_docker_container(
 
 def start_attached_docker_container(
     container_name: str,
+    *,
+    interactive: bool,
 ) -> subprocess.Popen[str]:
     """Start and attach to a Docker container."""
     docker_command_location = get_docker_command_location()
@@ -42,9 +44,12 @@ def start_attached_docker_container(
         docker_command_location,
         "start",
         "--attach",
-        "--interactive",
-        container_name,
     ]
+
+    if interactive:
+        command.append("--interactive")
+
+    command.append(container_name)
 
     return subprocess.Popen(
         command,

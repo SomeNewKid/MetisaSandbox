@@ -7,6 +7,7 @@ to allow system administrators or tools to perform global,
 environment-wide customizations before any other user script runs.
 """
 
+import builtins
 import importlib
 import importlib.abc
 import importlib.machinery
@@ -36,6 +37,7 @@ _VALID_RUNTIME_ROLES = frozenset(
 )
 
 _RUNTIME_ROLE = os.environ.pop("METISA_RUNTIME_ROLE", "")
+_INTERACTIVE_INPUT_ALLOWED = os.environ.get("METISA_INTERACTIVE") == "1"
 
 _ORIGINAL_SOCKET = socket.socket
 _ORIGINAL_SPEC_FROM_FILE_LOCATION = importlib.util.spec_from_file_location
@@ -108,6 +110,32 @@ _PROBE_SPAWN_PERMITTED = ContextVar(
     "metisa_probe_spawn_permitted",
     default=False,
 )
+
+_original_input = builtins.input
+
+
+def guarded_input(
+    prompt: str = "",
+) -> str:
+    """Guard calls to the built-in input function."""
+    if not _INTERACTIVE_INPUT_ALLOWED:
+        raise RuntimeError(
+            "User input is disabled because the workload "
+            'did not declare the "interactive" capability.'
+        )
+
+    caller = sys._getframe(1)
+    helper_module = sys.modules.get("metisa_common.terminal_helper")
+    reader = getattr(helper_module, "read_user_input", None)
+    allowed_code = getattr(reader, "__code__", None)
+
+    if allowed_code is None or caller.f_code is not allowed_code:
+        raise RuntimeError(
+            "Direct input() is disabled. "
+            "Use metisa_common.terminal_helper.read_user_input()."
+        )
+
+    return _original_input(prompt)
 
 
 @contextmanager
@@ -633,3 +661,5 @@ _deny_writable_spec_from_file_location()
 _deny_writable_script_execution()
 _apply_hardware_device_guards()
 _apply_process_spawn_guards()
+
+builtins.input = guarded_input

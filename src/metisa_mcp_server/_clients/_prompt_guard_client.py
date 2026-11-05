@@ -27,6 +27,18 @@ PROMPT_GUARD_CLASSIFICATION_SCHEMA = {
     "additionalProperties": False,
 }
 
+PROMPT_GUARD_MODERATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "labels": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+    },
+    "required": ["labels"],
+    "additionalProperties": False,
+}
+
 
 def classify_text(
     text: str,
@@ -49,8 +61,36 @@ def classify_text(
         validate(instance=content, schema=PROMPT_GUARD_CLASSIFICATION_SCHEMA)
     except (requests.RequestException, ValueError, ValidationError) as error:
         raise RuntimeError(
-            "Prompt Guard classification could not be completed"
+            "Prompt Guard classification could not be completed."
         ) from error
+
+    if not isinstance(content, dict):
+        raise RuntimeError("Prompt Guard returned an invalid response.")
+
+    return content
+
+
+def moderate_text(
+    text: str,
+) -> dict[str, object]:
+    """Request and validate moderation indicators from Prompt Guard."""
+    endpoint = f"{_PROMPT_GUARD_ENDPOINT}/moderate"
+
+    try:
+        with requests.Session() as session:
+            session.trust_env = False
+            response = session.post(
+                endpoint,
+                json={"text": text},
+                headers={"Accept": "application/json"},
+                timeout=(5, 240),
+            )
+            response.raise_for_status()
+            content = response.json()
+
+        validate(instance=content, schema=PROMPT_GUARD_MODERATION_SCHEMA)
+    except (requests.RequestException, ValueError, ValidationError) as error:
+        raise RuntimeError("Prompt Guard moderation could not be completed.") from error
 
     if not isinstance(content, dict):
         raise RuntimeError("Prompt Guard returned an invalid response.")

@@ -72,6 +72,8 @@ def create_documents_container(
 
     for filename in os.listdir(local_docs_dir):
         source_file = local_docs_path / filename
+        if source_file.is_symlink():
+            continue
         if source_file.is_file():
             shutil.copy2(source_file, staged_docs_path)
 

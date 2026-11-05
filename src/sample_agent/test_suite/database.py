@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from metisa_common.mcp_helper import (
+    get_mcp_server_tool_result,
+)
 from metisa_common.specification_models import (
     Capability,
     MetisaSpecification,
 )
 
 from .._helper import (
-    get_mcp_server_tool_result,
     print_caution,
     print_disabled,
     print_elapsed_time,

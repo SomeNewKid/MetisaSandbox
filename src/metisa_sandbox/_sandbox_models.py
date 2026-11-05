@@ -124,6 +124,11 @@ class SandboxRequirements:
         """Returns a flag indicating if an engress network is required."""
         return self.is_internet_access_required or self.is_localnet_access_required
 
+    @property
+    def is_interactive(self) -> bool:
+        """Returns a flag indicating if interactive mode is required."""
+        return Capability.INTERACTIVE in self._specification.capabilities
+
 
 class SandboxContainer:
     """Represent a Docker container."""

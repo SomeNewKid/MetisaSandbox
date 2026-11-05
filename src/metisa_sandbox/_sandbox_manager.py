@@ -380,7 +380,9 @@ def run_metisa_container_workload_in_sandbox(
         )
 
         workload_container_name = metisa_workload_container.instance_name
-        process = start_attached_docker_container(workload_container_name)
+        process = start_attached_docker_container(
+            workload_container_name, interactive=sandbox_requirements.is_interactive
+        )
 
         wait_until_container_running(workload_container_name)
 

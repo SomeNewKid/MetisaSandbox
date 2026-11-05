@@ -114,6 +114,48 @@ def terminal_status(
         output.flush()
 
 
+def read_user_input(
+    prompt: str,
+) -> str:
+    """Read user input and screen it for malicious or unsafe content."""
+    user_input = input(prompt)
+    return screen_user_input(user_input)
+
+
+def screen_user_input(
+    user_input: str,
+) -> str:
+    """Read user input and screen it for malicious or unsafe content."""
+    # Scope this MCP import to this function and not to this module.
+    # This keeps the `read_user_input` function lighter,
+    # because the `read_user_input` function is used by
+    # Metisa workload's `sitecustomize.py` file and its
+    # `guarded_input` function to disallow calls to `input()`.
+    from .mcp_helper import get_mcp_server_tool_result
+
+    screened_input = get_mcp_server_tool_result(
+        "screen_user_input", params={"text": user_input}
+    )
+
+    screened_accept = screened_input.get("accept", None)
+    if screened_accept is None:
+        raise RuntimeError("Failed to screen user input.")
+    if not isinstance(screened_accept, bool):
+        raise RuntimeError("Screened user input flag is not a boolean.")
+    if not screened_accept:
+        raise RuntimeError("Screened user input was disallowed.")
+
+    screened_text = screened_input.get("text", None)
+    if screened_text is None:
+        raise RuntimeError("Failed to screen user input.")
+    if not isinstance(screened_text, str):
+        raise RuntimeError("Screened user input is not a string.")
+    if not screened_text.strip():
+        raise RuntimeError("Screened user input was disallowed.")
+
+    return screened_text
+
+
 def _get_spinner_frames(stream: TextIO) -> tuple[str, ...]:
     encoding = stream.encoding or "utf-8"
 
