@@ -23,6 +23,8 @@ than the Docker SDK, Docker Compose, or an orchestration framework.
   through HAProxy.
 - Optional MCP tools, local and online language models, document processing,
   semantic retrieval, text guards, and Starlark execution.
+- Interactive input screening and PostgreSQL-backed agent memory that persists
+  across runs, with authenticated MCP and agent memory access.
 - Container hardening, a custom workload seccomp profile, Landlock filesystem
   restrictions, and Python runtime guards.
 - Security probes that must pass before the workload starts.
@@ -31,7 +33,7 @@ than the Docker SDK, Docker Compose, or an orchestration framework.
 ## Requirements
 
 - **Windows and PowerShell.** The host implementation uses Windows-specific
-  terminal and Docker Desktop integration.
+  terminal, user identity, and Docker Desktop integration.
 - **Python 3.11 or later.** The project metadata requires Python 3.11+; Python
   container images currently use Python 3.12.
 - **Docker Desktop running Linux containers**, with the `docker` command on
@@ -60,7 +62,6 @@ tools are not needed. Installation includes the project's machine learning and
 document-processing dependencies and may take some time.
 
 An existing setup script provides the same development installation:
-
 
 ```powershell
 .\scripts\setup-dev.ps1
@@ -182,10 +183,11 @@ references for credentials rather than committing credential values in TOML.
 | `network` | Connects the workload to an internal Docker network; otherwise it uses `--network none`. |
 | `internet` | Creates Squid-controlled egress using `[squid_proxy]` domain and IP allowlists. Requires `network`. |
 | `localnet` | Creates HAProxy routes to the destinations in `[haproxy].backends`. Requires `network`. |
+| `interactive` | Enables attached standard input. Requires `mcp_server`; the provided input helper screens text through MCP. |
 | `mcp_server` | Provides the tools and resources selected in `[mcp_server]`. Requires `network`, `prompt_guard`, and `entity_guard`. |
 | `prompt_guard` | Provides prompt injection checks and text moderation. Started alongside MCP or the LLM broker. |
 | `entity_guard` | Provides entity detection and anonymization. Started alongside MCP or the LLM broker. |
-| `jina_reader` | Provides web content extraction through Jina Reader. Requires `mcp_server`. |
+| `jina_reader` | Provides web content extraction through Jina Reader. Requires `internet` and `mcp_server`. |
 | `code_execution` | Provides Starlark execution in a separate Go service. Requires `mcp_server`. |
 | `llm_server` | Runs a llama.cpp container for each model in `[llm_server].models`. Requires `network`; use with the broker for workload access. |
 | `llm_broker` | Routes requests to configured local model aliases and online OpenAI models. Requires `network`, `prompt_guard`, and `entity_guard`. |
@@ -194,6 +196,8 @@ references for credentials rather than committing credential values in TOML.
 | `qdrant` | Provides a vector database for retrieval. |
 | `embeddings` | Indexes document chunks and searches for matching content using Qdrant. Requires `docling`; include `qdrant` for storage. |
 | `otel_collector` | Collects OpenTelemetry traces from configured components. |
+| `postgres` | Provides PostgreSQL with pgvector and initializes the agent memory schema. Database storage persists across runs. |
+| `agent_memory` | Provides authenticated HTTP operations for episodes and memories, scoped to the launching Windows user. Requires `postgres`; content screening also needs Prompt Guard. |
 
 Include the configuration tables and prerequisite capabilities needed by each
 service. Start from a working combination in the sample specification; the
@@ -213,20 +217,39 @@ allowed_ip_addresses = []
 
 MCP tools include database queries, URL retrieval, text classification and
 moderation, anonymization, Starlark execution, document conversion, and semantic
-search. Tools must be explicitly selected in `[mcp_server].tools`.
+search. Optional tools must be explicitly selected in `[mcp_server].tools`;
+the input screening tool is registered automatically.
+
+Interactive workloads can use `metisa_common.terminal_helper.read_user_input`
+to read and screen input through MCP. The screening tool checks for prompt
+injection and moderation labels and anonymizes detected entities. Input requires
+the `interactive` capability and must go through this helper; direct `input()`
+calls are disabled.
 
 The LLM broker exposes a restricted, non-streaming subset of the models, chat
 completions, and responses APIs. It validates model aliases, request fields,
 payload sizes, and response shapes. Streaming, stored responses, and arbitrary
-API fields are not supported. Content inspection and transformation in the
-broker remain placeholders; enabling the guard services does not automatically
-filter every model request or response.
+API fields are not supported. It sanitizes supported request and response text
+and checks it for prompt injection indicators through Prompt Guard. It rejects
+flagged content and returns an error when classification is unavailable.
+
+The agent memory service stores episodes and memories in PostgreSQL, including
+supplied memory embeddings. It sanitizes and screens record content and derives
+the storage namespace from the authenticated Windows user SID. Its current API
+supports creating, retrieving, and deleting episodes, plus creating, retrieving,
+updating, and deleting memories. This storage is separate from the Qdrant-based
+document retrieval service.
+
+For agent memory, include `network`, `postgres`, and `agent_memory`, and enable
+MCP or the LLM broker with their required guard capabilities so that Prompt
+Guard is started. The validator does not enforce this complete combination.
 
 ## Running the sample agent
 
 [`sample_agent`](src/sample_agent) exercises the sandbox services, including
 network access, database queries, text guards, model requests, documents,
-retrieval, secrets, and tracing. It writes `answer.txt` to the run output directory.
+retrieval, interactive input, agent memory, secrets, and tracing. It writes
+`answer.txt` to the run output directory.
 It is an integration demonstration rather than a complete autonomous agent.
 
 Before running its checked-in configuration:
@@ -247,9 +270,11 @@ Before running its checked-in configuration:
    Each directory must contain the model and tokenizer files needed to load it
    locally. Obtain any required model access before preparing the files.
 4. Set the host variables referenced by the sample:
-   `METISA_PROBE_2`, `OPENAI_API_KEY`, and
-   `SANDBOX_TESTER_MARIADB_CREDENTIALS`. The MariaDB credential format is
-   `username,password`.
+   `METISA_PROBE_2`, `OPENAI_API_KEY`,
+   `SANDBOX_TESTER_MARIADB_CREDENTIALS`, and `METISA_POSTGRES_PASSWORD`.
+   The MariaDB credential format is `username,password`. The PostgreSQL password
+   is used for database initialization and the agent memory connection; when
+   reusing an existing database volume, use its existing database password.
 5. Provide the MariaDB service configured through HAProxy, or remove the
    corresponding integration capability and configuration. The sample routes
    port 3306 to `host.docker.internal`.
@@ -272,7 +297,7 @@ The networking arrangement is:
 ```text
 Workload container
     |
-    +-- internal workload network -- MCP server / LLM broker
+    +-- internal workload network -- MCP / LLM broker / agent memory / telemetry
     |                                      |
     |                              internal backend network
     |                                      |
@@ -282,8 +307,10 @@ Workload container
 ```
 
 Only the networks and services needed for the configured workload are created.
-MCP and the LLM broker bridge the workload and backend networks. Squid handles
-permitted internet access; HAProxy handles configured local network routes.
+MCP, the LLM broker, agent memory, and the telemetry collector attach to both
+the workload and backend networks. Agent memory accesses PostgreSQL on the
+backend network. Squid handles permitted internet access; HAProxy handles
+configured local network routes.
 With the LLM broker enabled, the workload is not configured for direct Squid
 access. Services communicate through Docker network aliases rather than
 published host ports.
@@ -318,6 +345,17 @@ The implementation combines several controls:
   Linux capabilities, resource limits, seccomp, Landlock, and Python behavior.
 - Encrypted staged secrets, with decryption keys delivered separately through
   stdin to a provisioning process and stored in a restricted tmpfs directory.
+- MCP and agent memory authentication using separate, one-hour bearer tokens
+  signed with a fresh RSA key for each run. Tokens identify the launching
+  Windows user, sandbox run, and intended service; services verify the signature,
+  audience, run, and expiry.
+- Content sanitization and prompt injection screening for MCP results, supported
+  LLM broker text, and agent memory records.
+
+The host provisions `METISA_MCP_SERVER_TOKEN` and `METISA_AGENT_MEMORY_TOKEN`
+as workload secrets when their respective services are enabled. The shared MCP
+client supplies its token automatically; direct agent memory HTTP requests must
+send the corresponding token in an `Authorization: Bearer <token>` header.
 
 This is a learning project under development. These controls and their probes
 are not a formal security audit or a guarantee of containment for hostile code.
@@ -342,6 +380,11 @@ files, and scratch storage, while keeping output and collected logs. Cleanup
 also runs when setup or execution raises an error. Docker images remain cached
 for reuse.
 
+PostgreSQL data is retained in the Docker volume `metisa-agent-memory`,
+independently of per-run output and logs. Normal cleanup removes the PostgreSQL
+container but preserves this volume. PostgreSQL uses the fixed container name
+`metisa-postgres-agent-memory`, so runs using it cannot execute concurrently.
+
 A forced termination or unavailable Docker daemon can leave resources behind.
 Inspect the CLI's cleanup errors and use `docker ps -a` and `docker network ls`
 to identify the affected run before removing its resources.
@@ -363,21 +406,23 @@ To run only unit tests:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-Unit tests cover specification parsing and validation, MCP helpers, and prompt
-checks. Container security probes run separately inside each sandbox; the
-sample agent provides additional service integration exercises.
+Unit tests cover specification parsing and validation, MCP helpers and
+validation, agent memory models, text guards, and security probe logic.
+Container security probes run separately inside each sandbox; the sample agent
+provides additional service integration exercises.
 
 ### Repository layout
 
 | Path | Contents |
 | --- | --- |
 | `src/metisa_sandbox/` | Host CLI, Docker helpers, lifecycle management, Dockerfiles, and sidecar provisioning. |
-| `src/metisa_common/` | Shared specification, terminal, and secrets utilities. |
+| `src/metisa_common/` | Shared specification, terminal, secrets, screening, and client utilities. |
 | `src/metisa_landlock/` | Linux filesystem restrictions and workload bootstrap. |
 | `src/metisa_runner/` | Probe execution and handoff to the workload. |
 | `src/metisa_probes/` | Container, kernel, and Python security checks. |
 | `src/metisa_mcp_server/` | Configured MCP tools and resources. |
 | `src/metisa_llm_broker/` | Restricted local and online model request routing. |
+| `src/metisa_agent_memory/` | Authenticated, user-scoped episode and memory storage, sanitization, and screening. |
 | `src/metisa_prompt_guard/`, `src/metisa_entity_guard/` | Text classification, moderation, and anonymization services. |
 | `src/metisa_docling/`, `src/metisa_embeddings/` | Document conversion, indexing, and retrieval services. |
 | `src/sample_agent/` | Sample workload, TOML configuration, and service exercises. |
@@ -401,6 +446,9 @@ configuration explicit so the implementation remains useful for learning.
 | Image build fails | Inspect Docker build output, dependency availability, model download access, and disk space. |
 | Bootstrap or probes fail | Inspect `.runs/<run>/.logs`, kernel support, and the specific failed restriction or service check. |
 | A service is slow or exits unexpectedly | Inspect its logs and Docker resource allocation; models have different memory and startup requirements. |
+| PostgreSQL container name conflict | Check whether another run is using `metisa-postgres-agent-memory`; runs using PostgreSQL must execute sequentially. |
+| Agent memory cannot connect to PostgreSQL | Check `METISA_POSTGRES_PASSWORD` against the password used to initialize the retained volume, plus the database and agent memory logs. |
+| MCP or agent memory returns an authentication error | Check that the correct service token is supplied and has not expired; tokens are issued for one run and last one hour. |
 
 ## License
 
