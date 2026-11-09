@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from metisa_common.mcp_helper import (
+from metisa_common.clients.mcp_client import (
     get_mcp_server_tool_result,
 )
 from metisa_common.specification_models import (

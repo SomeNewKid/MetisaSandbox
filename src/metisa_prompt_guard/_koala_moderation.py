@@ -108,7 +108,7 @@ def _get_category(
         case "V2":
             return "violence/graphic"
         case _:
-            return f"unknown/{label}"
+            return "unknown"
 
 
 @cache

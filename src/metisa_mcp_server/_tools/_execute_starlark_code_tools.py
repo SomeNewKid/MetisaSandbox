@@ -9,6 +9,7 @@ import requests
 from jsonschema import ValidationError, validate
 from pydantic import Field
 
+from .._errors import KnownSafeError
 from .._helper import with_output_schema
 
 _TOOL_RESULT_SCHEMA = {
@@ -62,12 +63,8 @@ def _execute_tool(
     starlark_code: str,
 ) -> dict[str, object]:
     starlark_endpoint = "http://metisa-code-execution:8090/execute"
-    headers = {
-        "Accept": "application/json",
-    }
+    headers = {"Accept": "application/json"}
     payload = {"code": starlark_code}
-
-    content: str | None = None
 
     trust_env = False  # Private-network requests must bypass the internet proxy.
 
@@ -80,31 +77,43 @@ def _execute_tool(
                 headers=headers,
                 timeout=(5, 120),
             )
-            content = response.text
-            response.raise_for_status()
-        if not content:
-            raise RuntimeError("Starlark did not return any content.")
-        try:
-            dictionary = json.loads(content)
-        except json.JSONDecodeError as error:
-            raise RuntimeError(f"Starlark returned an error: {content}") from error
-        if not isinstance(dictionary, dict):
-            raise RuntimeError("Starlark did not return expected JSON dictionary.")
-        error_result = dictionary.get("error", None)
-        if error_result is not None:
-            raise RuntimeError(f"Starlark returned an error: {error_result}")
-        result = dictionary.get("result", None)
-        if result is None:
-            raise RuntimeError("Starlark did not return expected JSON format.")
-        if not isinstance(result, str):
-            raise RuntimeError("Starlark did not return a string result.")
-        return {
-            "result": result,
-        }
-    except Exception as error:
-        if content:
-            raise RuntimeError(f"Starlark returned an error: {content}") from error
-        raise RuntimeError(f"Starlark returned an error: {error}") from error
+    except requests.RequestException as error:
+        raise RuntimeError("Starlark request failed.") from error
+
+    try:
+        dictionary = json.loads(response.text)
+    except json.JSONDecodeError as error:
+        raise RuntimeError("Starlark returned invalid JSON.") from error
+
+    if not isinstance(dictionary, dict):
+        raise RuntimeError("Starlark did not return a JSON dictionary.")
+
+    error_result = dictionary.get("error")
+    if error_result is not None:
+        if not isinstance(error_result, str):
+            raise RuntimeError("Starlark returned an invalid error.")
+
+        remote_error = RuntimeError(error_result)
+
+        if error_result in (
+            "script must define main()",
+            "Starlark computation cancelled: too many steps",
+        ):
+            raise KnownSafeError(error_result) from remote_error
+
+        # Preserve the remote message as the cause while returning a fixed outer message
+        raise RuntimeError("Starlink execution failed.") from remote_error
+
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as error:
+        raise RuntimeError("Starlark returned an HTTP error.") from error
+
+    result = dictionary.get("result")
+    if not isinstance(result, str):
+        raise RuntimeError("Starlark did not return a string result.")
+
+    return {"result": result}
 
 
 def _validate_result(
@@ -113,5 +122,5 @@ def _validate_result(
     try:
         validate(result, _TOOL_RESULT_SCHEMA)
     except ValidationError as error:
-        message = "Starlark returned content in an unexpected format."
-        raise RuntimeError(message) from error
+        error_message = "Starlark returned content in an unexpected format."
+        raise RuntimeError(error_message) from error

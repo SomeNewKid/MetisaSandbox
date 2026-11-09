@@ -10,11 +10,10 @@ import pytest
 
 from metisa_agent_memory._models import (
     Episode,
-    JsonObject,
-    JsonValue,
     Memory,
     validate_json_object,
 )
+from metisa_common.utilities.type_models import JsonObject, JsonValue
 
 _ROW_ID = UUID("f32002c6-1723-4d21-8d74-c69e14c5d884")
 _CREATED_AT = datetime(2026, 11, 4, 10, tzinfo=UTC)

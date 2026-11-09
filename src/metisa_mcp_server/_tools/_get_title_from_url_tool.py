@@ -44,6 +44,7 @@ def _validate_arguments(
 def _execute_tool(
     url: str,
 ) -> dict[str, object]:
+    title: str | None = None
     try:
         headers = {
             "User-Agent": (
@@ -59,7 +60,7 @@ def _execute_tool(
             "title": title,
         }
     except Exception as error:
-        raise RuntimeError(f"Could not get title from URL: {error}") from error
+        raise RuntimeError("Could not get title from URL.") from error
 
 
 def _parse_html_title(response_text: str | None) -> str:

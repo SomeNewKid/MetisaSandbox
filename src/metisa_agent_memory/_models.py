@@ -5,14 +5,13 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TypeAlias
 from uuid import UUID
 
-JsonValue: TypeAlias = (
-    str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+from metisa_common.utilities.type_models import (
+    JsonObject,
+    sanitize_content,
+    validate_json_object,
 )
-
-JsonObject: TypeAlias = dict[str, JsonValue]
 
 
 @dataclass
@@ -37,7 +36,7 @@ class Episode:
         _validate_identifier(self.agent_id, name="agent_id")
         _validate_identifier(self.run_id, name="run_id")
         _validate_identifier(self.trace_id, name="trace_id")
-        _validate_string(self.kind, name="kind")
+        _validate_kind(self.kind)
         validate_json_object(self.content, name="content")
         validate_json_object(self.metadata, name="metadata")
         _validate_datetime(self.created_at, name="created_at")
@@ -75,60 +74,6 @@ class Memory:
         _validate_datetime(self.expires_at, name="expires_at")
 
 
-def validate_json_object(
-    value: object,
-    *,
-    name: str = "value",
-) -> None:
-    """Raise error if value is not a valid JSON object."""
-    if not isinstance(value, dict):
-        raise TypeError(f"{name} must be a dictionary.")
-
-    active_containers: set[int] = set()
-    _validate_json_value(value, name, active_containers)
-
-
-def _validate_json_value(
-    value: object,
-    path: str,
-    active_containers: set[int],
-) -> None:
-    if value is None or isinstance(value, (str, bool, int)):
-        return
-
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            raise ValueError(f"{path} must not contain NaN or infinity.")
-        return
-
-    if not isinstance(value, (list, dict)):
-        value_type = type(value).__name__
-        raise TypeError(f"{path} contains an unsupported JSON type: {value_type}.")
-
-    container_id = id(value)
-    if container_id in active_containers:
-        raise ValueError(f"{path} contains a circular reference.")
-
-    active_containers.add(container_id)
-
-    try:
-        if isinstance(value, list):
-            for index, item in enumerate(value):
-                item_path = f"{path}[{index}]"
-                _validate_json_value(item, item_path, active_containers)
-        else:
-            for key, item in value.items():
-                if not isinstance(key, str):
-                    error = f"{path} contains a dictionary key that is not a string."
-                    raise TypeError(error)
-
-                item_path = f"{path}[{key!r}]"
-                _validate_json_value(item, item_path, active_containers)
-
-    finally:
-        active_containers.remove(container_id)
-
-
 def _validate_id(
     id: object,
 ) -> None:
@@ -144,12 +89,32 @@ def _validate_identifier(
         raise TypeError(f"{name} must be a string or None.")
     if identifier is not None and identifier.strip() == "":
         raise ValueError(f"{name} must not be an empty string.")
+    if identifier is None:
+        return
+    sanitized_identifier = sanitize_content(identifier)
+    if sanitized_identifier != identifier:
+        raise ValueError(f"{name} contains prohibited characters.")
 
 
 def _validate_namespace(
-    namespace: object,
+    namespace: str,
 ) -> None:
     _validate_string(namespace, "namespace")
+    sanitized_namespace = sanitize_content(namespace)
+    if sanitized_namespace != namespace:
+        raise ValueError("namespace contains prohibited characters.")
+
+
+def _validate_kind(
+    value: object,
+) -> None:
+    if not isinstance(value, str):
+        raise TypeError("kind must be a string.")
+    if not value.strip():
+        raise ValueError("kind must not be an empty string.")
+    sanitized_kind = sanitize_content(value)
+    if sanitized_kind != value:
+        raise ValueError("kind contains prohibited characters.")
 
 
 def _validate_string(

@@ -11,6 +11,8 @@ import requests
 from fastembed import TextEmbedding
 from qdrant_client import QdrantClient, models
 
+from metisa_common.utilities.type_models import sanitize_content
+
 _DOCUMENT_COLLECTION = "document_chunks"
 _MANIFEST_COLLECTION = "document_manifests"
 _INGESTION_LOCK = Lock()
@@ -35,6 +37,10 @@ def get_matching_chunks_from_document(
 ) -> list[str]:
     if not filename:
         raise ValueError("Filename is required.")
+
+    sanitized_prompt = sanitize_content(prompt)
+    if not sanitized_prompt.strip():
+        raise ValueError("Prompt is required.")
 
     model_name = metisa_json.get("embedding_model", None)
     if model_name is None:
@@ -64,7 +70,7 @@ def get_matching_chunks_from_document(
 
     hits = _query_matching_chunks(
         filename=filename,
-        prompt=prompt,
+        prompt=sanitized_prompt,
         embedding_model=embedding_model,
         model_name=model_name,
         limit=5,
@@ -80,7 +86,11 @@ def get_matching_chunks_from_document(
         if not isinstance(chunk_text, str):
             raise RuntimeError("Matching point has no valid chunk text.")
 
-        matching_chunks.append(chunk_text)
+        sanitized_chunk_text = sanitize_content(chunk_text)
+        if not sanitized_chunk_text.strip():
+            continue
+
+        matching_chunks.append(sanitized_chunk_text)
 
     return matching_chunks
 
@@ -188,8 +198,6 @@ def _get_all_chunks(
         if not content:
             raise RuntimeError("Docling did not return any content.")
     except Exception as error:
-        if content:
-            raise RuntimeError(f"Docling returned an error: {content}") from error
         raise RuntimeError(f"Docling returned an error: {error}") from error
 
     try:
@@ -206,11 +214,18 @@ def _get_all_chunks(
         raise RuntimeError("Docling JSON response did not include 'chunks'.")
     if not isinstance(chunks, list):
         raise RuntimeError("Docling JSON 'chunks' was not a list.")
+
+    sanitized_chunks: list[str] = []
+
     for chunk in chunks:
         if not isinstance(chunk, str):
             raise RuntimeError("Docling JSON 'chunks' list contained non-string items.")
+        sanitized_chunk = sanitize_content(chunk)
+        if not sanitized_chunk.strip():
+            continue
+        sanitized_chunks.append(sanitized_chunk)
 
-    return chunks
+    return sanitized_chunks
 
 
 def _embed_chunks(

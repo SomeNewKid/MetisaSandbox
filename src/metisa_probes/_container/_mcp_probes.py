@@ -22,10 +22,12 @@ if TYPE_CHECKING:
 _MCP_SERVER_ALIAS = "metisa-mcp-server"
 _MCP_SERVER_PORT = 8000
 _MCP_SERVER_URL = f"http://{_MCP_SERVER_ALIAS}:{_MCP_SERVER_PORT}/mcp"
-_TIMEOUT_SECONDS = 5
+_TIMEOUT_SECONDS = 30
 _JINA_READER_TIMEOUT_SECONDS = 75
 _PROMPT_GUARD_TIMEOUT_SECONDS = 240
 _ENTITY_GUARD_TIMEOUT_SECONDS = 240
+# Successful tool calls and resource reads include Prompt Guard result screening.
+_SCREENED_RESPONSE_TIMEOUT_SECONDS = _PROMPT_GUARD_TIMEOUT_SECONDS + _TIMEOUT_SECONDS
 
 
 def mcp_server_alias_resolves(probe_context: ProbeContext) -> ProbeResult:
@@ -96,7 +98,10 @@ def test_greeting_1_returns_expected_greeting(
         return None
 
     return _run_mcp_probe(
-        probe_context, "test_greeting_1_returns_expected_greeting", _operation
+        probe_context,
+        "test_greeting_1_returns_expected_greeting",
+        _operation,
+        timeout_seconds=_SCREENED_RESPONSE_TIMEOUT_SECONDS,
     )
 
 
@@ -166,10 +171,7 @@ def test_greeting_2_returns_expected_greetings(
             try:
                 await client.call_tool(tool_name, {"name": "Susan"})
             except MCPError as error:
-                if (
-                    error.code == -32602
-                    and error.message == f"Unknown tool: {tool_name}"
-                ):
+                if error.code == -32602 and error.message == "Unknown tool.":
                     return None
                 raise
             return f"MCP server allowed a call to undeclared tool {tool_name}."
@@ -190,7 +192,10 @@ def test_greeting_2_returns_expected_greetings(
         return None
 
     return _run_mcp_probe(
-        probe_context, "test_greeting_2_returns_expected_greetings", _operation
+        probe_context,
+        "test_greeting_2_returns_expected_greetings",
+        _operation,
+        timeout_seconds=2 * _PROMPT_GUARD_TIMEOUT_SECONDS + _TIMEOUT_SECONDS,
     )
 
 
@@ -212,10 +217,7 @@ def test_greeting_3_validates_name(probe_context: ProbeContext) -> ProbeResult:
             try:
                 await client.call_tool(tool_name, {"name": "Susan"})
             except MCPError as error:
-                if (
-                    error.code == -32602
-                    and error.message == f"Unknown tool: {tool_name}"
-                ):
+                if error.code == -32602 and error.message == "Unknown tool.":
                     return None
                 raise
             return f"MCP server allowed a call to undeclared tool {tool_name}."
@@ -239,7 +241,12 @@ def test_greeting_3_validates_name(probe_context: ProbeContext) -> ProbeResult:
             )
         return None
 
-    return _run_mcp_probe(probe_context, "test_greeting_3_validates_name", _operation)
+    return _run_mcp_probe(
+        probe_context,
+        "test_greeting_3_validates_name",
+        _operation,
+        timeout_seconds=_SCREENED_RESPONSE_TIMEOUT_SECONDS,
+    )
 
 
 def test_greeting_2_rejects_non_string_name(probe_context: ProbeContext) -> ProbeResult:
@@ -262,7 +269,7 @@ def test_greeting_2_rejects_non_string_name(probe_context: ProbeContext) -> Prob
         try:
             response = await client.call_tool(tool_name, {"name": 42})
         except MCPError as error:
-            if error.message == f"Unknown tool: {tool_name}":
+            if error.message == "Unknown tool.":
                 raise
             return None
         if not response.is_error:
@@ -296,7 +303,7 @@ def test_greeting_2_rejects_additional_arguments(
                 tool_name, {"name": "Susan", "unexpected": "extra"}
             )
         except MCPError as error:
-            if error.message == f"Unknown tool: {tool_name}":
+            if error.message == "Unknown tool.":
                 raise
             return None
         if not response.is_error:
@@ -326,7 +333,7 @@ def test_greeting_3_rejects_non_string_name(probe_context: ProbeContext) -> Prob
         try:
             response = await client.call_tool(tool_name, {"name": 42})
         except MCPError as error:
-            if error.message == f"Unknown tool: {tool_name}":
+            if error.message == "Unknown tool.":
                 raise
             return None
         if not response.is_error:
@@ -360,7 +367,7 @@ def test_greeting_3_rejects_additional_arguments(
                 tool_name, {"name": "Susan", "unexpected": "extra"}
             )
         except MCPError as error:
-            if error.message == f"Unknown tool: {tool_name}":
+            if error.message == "Unknown tool.":
                 raise
             return None
         if not response.is_error:
@@ -396,7 +403,7 @@ def read_content_from_url_returns_expected_content(
         probe_context,
         probe_name,
         _operation,
-        timeout_seconds=_JINA_READER_TIMEOUT_SECONDS,
+        timeout_seconds=_JINA_READER_TIMEOUT_SECONDS + _PROMPT_GUARD_TIMEOUT_SECONDS,
     )
 
 
@@ -533,7 +540,12 @@ def execute_starlark_code_returns_expected_result(
             )
         return None
 
-    return _run_mcp_probe(probe_context, probe_name, _operation)
+    return _run_mcp_probe(
+        probe_context,
+        probe_name,
+        _operation,
+        timeout_seconds=_SCREENED_RESPONSE_TIMEOUT_SECONDS,
+    )
 
 
 def execute_starlark_code_rejects_missing_main(
@@ -609,7 +621,10 @@ def test_resource_1_returns_expected_greeting(
         return None
 
     return _run_mcp_probe(
-        probe_context, "test_resource_1_returns_expected_greeting", _operation
+        probe_context,
+        "test_resource_1_returns_expected_greeting",
+        _operation,
+        timeout_seconds=_SCREENED_RESPONSE_TIMEOUT_SECONDS,
     )
 
 
@@ -670,7 +685,10 @@ def test_resource_2_matches_declaration(probe_context: ProbeContext) -> ProbeRes
         return None
 
     return _run_mcp_probe(
-        probe_context, "test_resource_2_matches_declaration", _operation
+        probe_context,
+        "test_resource_2_matches_declaration",
+        _operation,
+        timeout_seconds=_SCREENED_RESPONSE_TIMEOUT_SECONDS,
     )
 
 
@@ -731,7 +749,10 @@ def test_resource_3_matches_declaration(probe_context: ProbeContext) -> ProbeRes
         return None
 
     return _run_mcp_probe(
-        probe_context, "test_resource_3_matches_declaration", _operation
+        probe_context,
+        "test_resource_3_matches_declaration",
+        _operation,
+        timeout_seconds=_SCREENED_RESPONSE_TIMEOUT_SECONDS,
     )
 
 
@@ -763,9 +784,10 @@ def _run_input_screening_probe(
             return f"{tool_name} returned no reasons for rejected text."
         return None
 
-    # Screening can call classification, moderation, and anonymization in sequence.
+    # Input screening calls classification, moderation, and anonymization in sequence.
+    # The MCP server then classifies the tool result before returning it.
     timeout_seconds = (
-        2 * _PROMPT_GUARD_TIMEOUT_SECONDS
+        3 * _PROMPT_GUARD_TIMEOUT_SECONDS
         + _ENTITY_GUARD_TIMEOUT_SECONDS
         + _TIMEOUT_SECONDS
     )
@@ -800,11 +822,7 @@ def _run_classification_probe(
         if not isinstance(indicators, list):
             return f"{tool_name} did not return an indicators array."
         for indicator in indicators:
-            if (
-                not isinstance(indicator, dict)
-                or not isinstance(indicator.get("check_id"), str)
-                or not isinstance(indicator.get("explanation"), str)
-            ):
+            if not isinstance(indicator, str) or not indicator.strip():
                 return f"{tool_name} returned an invalid indicator entry."
         if expect_indicators and not indicators:
             return f"{tool_name} returned no indicators for clearly unsafe text."
@@ -816,7 +834,8 @@ def _run_classification_probe(
         probe_context,
         name,
         _operation,
-        timeout_seconds=_PROMPT_GUARD_TIMEOUT_SECONDS,
+        timeout_seconds=_PROMPT_GUARD_TIMEOUT_SECONDS
+        + _SCREENED_RESPONSE_TIMEOUT_SECONDS,
     )
 
 
@@ -857,7 +876,8 @@ def _run_moderation_probe(
         probe_context,
         name,
         _operation,
-        timeout_seconds=_PROMPT_GUARD_TIMEOUT_SECONDS,
+        timeout_seconds=_PROMPT_GUARD_TIMEOUT_SECONDS
+        + _SCREENED_RESPONSE_TIMEOUT_SECONDS,
     )
 
 
@@ -896,7 +916,8 @@ def _run_anonymization_probe(
         probe_context,
         name,
         _operation,
-        timeout_seconds=_ENTITY_GUARD_TIMEOUT_SECONDS,
+        timeout_seconds=_ENTITY_GUARD_TIMEOUT_SECONDS
+        + _SCREENED_RESPONSE_TIMEOUT_SECONDS,
     )
 
 

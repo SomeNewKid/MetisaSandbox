@@ -242,8 +242,6 @@ def _save_episode(
         if not content:
             raise RuntimeError("Agent memory did not return any content.")
     except Exception as error:
-        if content:
-            raise RuntimeError(f"Agent memory returned an error: {content}") from error
         raise RuntimeError(f"Agent memory returned an error: {error}") from error
 
     try:
@@ -299,8 +297,6 @@ def _get_episode(
         if not content:
             raise RuntimeError("Agent memory did not return any content.")
     except Exception as error:
-        if content:
-            raise RuntimeError(f"Agent memory returned an error: {content}") from error
         raise RuntimeError(f"Agent memory returned an error: {error}") from error
 
     try:
@@ -420,8 +416,6 @@ def _save_memory(
         if not content:
             raise RuntimeError("Agent memory did not return any content.")
     except Exception as error:
-        if content:
-            raise RuntimeError(f"Agent memory returned an error: {content}") from error
         raise RuntimeError(f"Agent memory returned an error: {error}") from error
 
     try:
@@ -485,8 +479,6 @@ def _update_memory(
         if not content:
             raise RuntimeError("Agent memory did not return any content.")
     except Exception as error:
-        if content:
-            raise RuntimeError(f"Agent memory returned an error: {content}") from error
         raise RuntimeError(f"Agent memory returned an error: {error}") from error
 
     try:
@@ -542,8 +534,6 @@ def _get_memory(
         if not content:
             raise RuntimeError("Agent memory did not return any content.")
     except Exception as error:
-        if content:
-            raise RuntimeError(f"Agent memory returned an error: {content}") from error
         raise RuntimeError(f"Agent memory returned an error: {error}") from error
 
     try:

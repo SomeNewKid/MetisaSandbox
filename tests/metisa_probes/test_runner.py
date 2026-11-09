@@ -59,11 +59,11 @@ def test_main_aggregates_all_groups(
     )
     log = tmp_path / "result.jsonl"
     monkeypatch.setattr(runner, "_get_log_path", lambda context: log)
-    run_group = Mock(side_effect=[not failure] + [True] * 20)
+    run_group = Mock(side_effect=[not failure] + [True] * 21)
     monkeypatch.setattr(runner, "_run_probe_group", run_group)
     assert runner.main([str(specification)]) == (1 if failure else 0)
-    assert run_group.call_count == 21
-    assert len({call.args[0].name for call in run_group.call_args_list}) == 21
+    assert run_group.call_count == 22
+    assert len({call.args[0].name for call in run_group.call_args_list}) == 22
 
 
 def test_log_directory_and_append(probe_context: ProbeContext) -> None:

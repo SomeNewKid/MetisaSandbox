@@ -9,7 +9,7 @@ from jsonschema import ValidationError, validate
 from pydantic import Field
 
 from .._helper import with_output_schema
-from .._validation import validate_filename_argument, validate_text_result
+from .._validation import validate_filename_argument
 
 _TOOL_RESULT_SCHEMA = {
     "type": "object",
@@ -80,9 +80,7 @@ def _execute_tool(
                 raise RuntimeError("Embeddings did not return JSON content")
             return content
     except Exception as error:
-        if content:
-            raise RuntimeError(f"Embeddings returned an error: {content}") from error
-        raise RuntimeError(f"Embeddings returned an error: {error}") from error
+        raise RuntimeError("Embeddings returned an error.") from error
 
 
 def _validate_result(
@@ -93,15 +91,3 @@ def _validate_result(
     except ValidationError as error:
         message = "Embeddings returned content in an unexpected format."
         raise RuntimeError(message) from error
-
-    chunks = result.get("chunks", None)
-    if chunks is None:
-        raise RuntimeError("Embeddings response in unexpected format.")
-    if not isinstance(chunks, list):
-        raise RuntimeError("Embeddings chunks in unexpected format.")
-    for chunk in chunks:
-        if not isinstance(chunk, str):
-            raise RuntimeError("Embeddings chunk in unexpected format.")
-
-    for chunk in chunks:
-        validate_text_result(chunk)

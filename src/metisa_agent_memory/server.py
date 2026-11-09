@@ -18,10 +18,12 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from psycopg.conninfo import make_conninfo
 
+from metisa_common.screening import screen_content
 from metisa_common.secrets_helper import load_secrets
 
 from ._authentication import get_user_sid
 from ._models import Episode, JsonObject, Memory
+from ._sanitization import sanitize_episode, sanitize_memory
 from ._store import MemoryStore
 
 _MAX_REQUEST_BYTES = 1024 * 1024  # 1 MiB
@@ -207,9 +209,11 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
             if collection == "episodes":
                 episode = _episode_from_payload(payload, namespace)
+                _screen_episode(episode)
                 created = store.create_episode(episode)
             else:
                 memory = _memory_from_payload(payload, namespace)
+                _screen_memory(memory)
                 created = store.create_memory(memory)
 
             location = f"/{collection}/{created.id}"
@@ -224,10 +228,28 @@ class _RequestHandler(BaseHTTPRequestHandler):
             raise RuntimeError("An item route requires an identifier.")
 
         if self.command == "GET":
-            if collection == "episodes":
-                record = store.get_episode(identifier)
-            else:
-                record = store.get_memory(identifier)
+            try:
+                if collection == "episodes":
+                    record = store.get_episode(identifier)
+
+                    if record is not None:
+                        _screen_episode(record)
+                        sanitize_episode(record)
+                        record.validate()
+                        _screen_episode(record)
+                else:
+                    record = store.get_memory(identifier)
+                    if record is not None:
+                        _screen_memory(record)
+                        sanitize_memory(record)
+                        record.validate()
+                        _screen_memory(record)
+
+            except (TypeError, ValueError, RecursionError) as error:
+                raise _RequestError(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    "Stored record could not be prepared for retrieval.",
+                ) from error
 
             if record is None:
                 raise _RequestError(HTTPStatus.NOT_FOUND, "Record not found.")
@@ -241,6 +263,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
                 namespace,
                 identifier=identifier,
             )
+            _screen_memory(memory)
 
             try:
                 updated = store.update_memory(memory)
@@ -476,6 +499,8 @@ def _episode_from_payload(
             ),
         )
         episode.validate()
+        sanitize_episode(episode)
+        episode.validate()
 
     except (TypeError, ValueError, RecursionError) as error:
         raise _RequestError(
@@ -511,6 +536,8 @@ def _memory_from_payload(
                 "expires_at",
             ),
         )
+        memory.validate()
+        sanitize_memory(memory)
         memory.validate()
 
     except (TypeError, ValueError, RecursionError) as error:
@@ -576,6 +603,36 @@ def _encode_json_value(value: object) -> str:
         return value.isoformat()
 
     raise TypeError(f"Cannot encode {type(value).__name__} as JSON.")
+
+
+def _screen_episode(
+    episode: Episode,
+) -> None:
+    screen_content(
+        {
+            "kind": episode.kind,
+            "content": episode.content,
+            "metadata": episode.metadata,
+        }
+    )
+
+
+def _screen_memory(
+    memory: Memory,
+) -> None:
+    screen_content(
+        {
+            "subject": memory.subject,
+            "content": memory.content,
+            "metadata": memory.metadata,
+        }
+    )
+    screen_content(
+        {
+            "subject": memory.subject,
+            "text": memory.text,
+        }
+    )
 
 
 if __name__ == "__main__":

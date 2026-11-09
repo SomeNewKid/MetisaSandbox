@@ -7,17 +7,22 @@ from typing import Annotated
 from jsonschema import ValidationError, validate
 from pydantic import Field
 
-from .._clients._entity_guard_client import (
+from metisa_common.clients.entity_guard_client import (
     ENTITY_GUARD_ANONYMIZE_SCHEMA,
     anonymize_text,
 )
-from .._clients._prompt_guard_client import (
+from metisa_common.clients.prompt_guard_client import (
     PROMPT_GUARD_CLASSIFICATION_SCHEMA,
     PROMPT_GUARD_MODERATION_SCHEMA,
     classify_text,
     moderate_text,
 )
+from metisa_common.utilities.type_models import (
+    sanitize_content,
+)
+
 from .._helper import with_output_schema
+from .._validation import validate_text_result
 
 _TOOL_RESULT_SCHEMA = {
     "type": "object",
@@ -55,23 +60,25 @@ def _validate_arguments(
 def _execute_tool(
     text: str,
 ) -> dict[str, object]:
-    reasons: list[str] = []
-    if not text.strip():
+    sanitized_text = sanitize_content(text)
+    if not sanitized_text.strip():
         return {
-            "accept": True,
-            "text": text,
-            "reasons": reasons,
+            "accept": False,
+            "text": "",
+            "reasons": ["empty_input"],
         }
+    
+    reasons: list[str] = []
 
-    if _has_indicators(text):
+    if _has_indicators(sanitized_text):
         reasons.append("prompt_guard_indicators")
 
-    if _has_labels(text):
+    if _has_labels(sanitized_text):
         reasons.append("prompt_guard_labels")
 
     anonymized_text = ""
     try:
-        anonymized_text = _anonymize_text(text)
+        anonymized_text = _anonymize_text(sanitized_text)
     except Exception:
         reasons.append("entity_guard_anonymize_failed")
 
@@ -129,5 +136,38 @@ def _validate_result(
     try:
         validate(result, _TOOL_RESULT_SCHEMA)
     except ValidationError as error:
-        message = "Screen user input tool returned content in an unexpected format."
-        raise RuntimeError(message) from error
+        error_message = "Screen user input tool returned an unexpected response."
+        raise RuntimeError(error_message) from error
+
+    texts = _get_texts_to_validate(result)
+    for text in texts:
+        validate_text_result(text)
+
+
+def _get_texts_to_validate(
+    result: dict[str, object],
+) -> set[str]:
+    texts_to_validate: list[str] = []
+
+    text = result.get("text", None)
+    if text is None:
+        raise RuntimeError("Screen user input response in unexpected format.")
+    if not isinstance(text, str):
+        raise RuntimeError("Screen user input text in unexpected format.")
+
+    if text.strip():
+        texts_to_validate.append(text)
+
+    reasons = result.get("reasons", None)
+    if reasons is None:
+        raise RuntimeError("Screen user input response in unexpected format.")
+    if not isinstance(reasons, list):
+        raise RuntimeError("Screen user input reasons in unexpected format.")
+
+    for reason in reasons:
+        if not isinstance(reason, str):
+            raise RuntimeError("Screen user input reason in unexpected format.")
+        if reason.strip():
+            texts_to_validate.append(reason)
+
+    return set(texts_to_validate)

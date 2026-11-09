@@ -12,15 +12,7 @@ PROMPT_GUARD_CLASSIFICATION_SCHEMA = {
     "properties": {
         "indicators": {
             "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "check_id": {"type": "string"},
-                    "explanation": {"type": "string"},
-                },
-                "required": ["check_id", "explanation"],
-                "additionalProperties": False,
-            },
+            "items": {"type": "string"},
         },
     },
     "required": ["indicators"],

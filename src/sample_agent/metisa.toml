@@ -2,7 +2,7 @@ agent_name = "sample_agent"
 capabilities = [
     "network",
     "internet",
-    # "interactive",
+    "interactive",
     "localnet",
     "mcp_server",
     "prompt_guard",

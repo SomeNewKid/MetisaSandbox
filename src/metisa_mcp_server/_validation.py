@@ -6,7 +6,9 @@ import re
 from ipaddress import IPv4Address, IPv6Address, ip_address
 from urllib.parse import urlsplit
 
-from ._clients._prompt_guard_client import classify_text
+from metisa_common.clients.prompt_guard_client import (
+    classify_text,
+)
 
 
 # This is a pre-emptive guard to ensure that filename arguments are valid and safe.

@@ -9,7 +9,7 @@ from jsonschema import ValidationError, validate
 from pydantic import Field
 
 from .._helper import with_output_schema
-from .._validation import validate_filename_argument, validate_text_result
+from .._validation import validate_filename_argument
 
 _TOOL_RESULT_SCHEMA = {
     "type": "object",
@@ -68,9 +68,7 @@ def _execute_tool(
             "content": content,
         }
     except Exception as error:
-        if content:
-            raise RuntimeError(f"Documents returned an error: {content}") from error
-        raise RuntimeError(f"Documents returned an error: {error}") from error
+        raise RuntimeError("Documents returned an error.") from error
 
 
 def _validate_result(
@@ -81,11 +79,3 @@ def _validate_result(
     except ValidationError as error:
         message = "Documents returned content in an unexpected format."
         raise RuntimeError(message) from error
-
-    content = result.get("content", None)
-    if content is None:
-        raise RuntimeError("Documents response in unexpected format.")
-    if not isinstance(content, str):
-        raise RuntimeError("Documents content in unexpected format.")
-
-    validate_text_result(content)

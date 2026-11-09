@@ -91,7 +91,7 @@ def _execute_tool() -> dict[str, object]:
         )
         return _get_active_items_from_database(maria_db_host)
     except Exception as error:
-        raise RuntimeError(f"Database connection error: {error}") from error
+        raise RuntimeError("Database connection error.") from error
 
 
 def _validate_result(
@@ -100,8 +100,31 @@ def _validate_result(
     try:
         validate(result, _TOOL_RESULT_SCHEMA)
     except ValidationError as error:
-        message = "Database returned content in an unexpected format."
-        raise RuntimeError(message) from error
+        error_message = "Database returned content in an unexpected format."
+        raise RuntimeError(error_message) from error
+
+    items = result.get("items", None)
+    if items is None:
+        raise RuntimeError("Database returned content without items.")
+    if not isinstance(items, list):
+        raise RuntimeError("Database returned an invalid items list.")
+
+    if items:
+        for item in items:
+            for field_name in ("created_at", "updated_at"):
+                if field_name not in item:
+                    continue
+
+                value = item[field_name]
+                if not isinstance(value, str):
+                    error_message = f"Database returned an invalid {field_name}."
+                    raise RuntimeError(error_message)
+
+                try:
+                    datetime.fromisoformat(value)
+                except ValueError as error:
+                    error_message = f"Database returned an invalid {field_name}."
+                    raise RuntimeError(error_message) from error
 
 
 def _get_active_items_from_database(

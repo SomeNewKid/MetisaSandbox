@@ -126,15 +126,18 @@ def screen_user_input(
     user_input: str,
 ) -> str:
     """Read user input and screen it for malicious or unsafe content."""
-    # Scope this MCP import to this function and not to this module.
+    # Scope these MCP imports to this function and not to this module.
     # This keeps the `read_user_input` function lighter,
     # because the `read_user_input` function is used by
     # Metisa workload's `sitecustomize.py` file and its
     # `guarded_input` function to disallow calls to `input()`.
-    from .mcp_helper import get_mcp_server_tool_result
+    from .clients.mcp_client import get_mcp_server_tool_result
+    from .utilities.type_models import sanitize_content
+
+    sanitized_user_input = sanitize_content(user_input)
 
     screened_input = get_mcp_server_tool_result(
-        "screen_user_input", params={"text": user_input}
+        "screen_user_input", params={"text": sanitized_user_input}
     )
 
     screened_accept = screened_input.get("accept", None)

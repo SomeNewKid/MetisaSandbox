@@ -1,7 +1,6 @@
 """Server for the Prompt Guard HTTP endpoints."""
 
 import json
-from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ._checker import run_checks
@@ -94,7 +93,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
                 )
                 return
 
-            result = {"indicators": [asdict(item) for item in indicators]}
+            result = {"indicators": [item.check_id for item in indicators]}
             response_payload = json.dumps(result)
         elif self.path == "/moderate":
             try:
@@ -120,6 +119,8 @@ def main() -> None:
     """Run the HTTP server until it is stopped."""
     initialize_llama_classifier()
     initialize_koala_classifier()
+    _ = run_checks("warm up")
+    _ = get_labels("warm up")
 
     with ThreadingHTTPServer(("0.0.0.0", 8000), _RequestHandler) as server:
         server.serve_forever()

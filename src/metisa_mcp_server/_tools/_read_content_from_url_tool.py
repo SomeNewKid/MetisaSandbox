@@ -10,7 +10,7 @@ from jsonschema import ValidationError, validate
 from pydantic import Field
 
 from .._helper import with_output_schema
-from .._validation import validate_text_result, validate_url_argument
+from .._validation import validate_url_argument
 
 _TOOL_RESULT_SCHEMA = {
     "type": "object",
@@ -70,12 +70,10 @@ def _execute_tool(
             "content": content,
         }
     except requests.RequestException as error:
-        error_message = f"Jina Reader could not read the url: {error}"
-        raise RuntimeError(error_message) from error
+        raise RuntimeError("Jina Reader could not read the url.") from error
     except Exception as error:
         traceback.print_exception(error)
-        error_message = f"Jina Reader could not read the url: {error}"
-        raise RuntimeError(error_message) from error
+        raise RuntimeError("Jina Reader could not read the url.") from error
 
 
 def _validate_result(
@@ -86,11 +84,3 @@ def _validate_result(
     except ValidationError as error:
         message = "Jina Reader returned content in an unexpected format."
         raise RuntimeError(message) from error
-
-    content = result.get("content", None)
-    if content is None:
-        raise RuntimeError("Jina Reader response in unexpected format.")
-    if not isinstance(content, str):
-        raise RuntimeError("Jina Reader content in unexpected format.")
-
-    validate_text_result(content)

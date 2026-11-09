@@ -37,8 +37,8 @@ def create_llm_server_definition(
 ) -> SandboxContainer:
     """Return the definition of the LLM Server container for the given model alias."""
     return SandboxContainer(
-        f"LLM Server ({llm_model_alias})",
-        f"llm_server_{llm_model_alias.replace('-', '_')}",
+        f"LLM ({llm_model_alias})",
+        f"llm_{llm_model_alias.replace('-', '_')}",
         log_folder=f"llm-{llm_model_alias}",
         log_files=[],
     )

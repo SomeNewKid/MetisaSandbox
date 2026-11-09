@@ -9,7 +9,7 @@ from jsonschema import ValidationError, validate
 from pydantic import Field
 
 from .._helper import with_output_schema
-from .._validation import validate_filename_argument, validate_text_result
+from .._validation import validate_filename_argument
 
 _DOCLING_RESPONSE_SCHEMA = {
     "type": "object",
@@ -69,9 +69,7 @@ def _execute_tool(
                 raise RuntimeError("Docling did not return JSON content.")
             return content
     except Exception as error:
-        if content:
-            raise RuntimeError(f"Docling returned an error: {content}") from error
-        raise RuntimeError(f"Docling returned an error: {error}") from error
+        raise RuntimeError("Docling returned an error") from error
 
 
 def _validate_result(
@@ -82,11 +80,3 @@ def _validate_result(
     except ValidationError as error:
         message = "Docling returned content in an unexpected format."
         raise RuntimeError(message) from error
-
-    markdown = result.get("markdown", None)
-    if markdown is None:
-        raise RuntimeError("Docling response in unexpected format.")
-    if not isinstance(markdown, str):
-        raise RuntimeError("Docling markdown in unexpected format.")
-
-    validate_text_result(markdown)

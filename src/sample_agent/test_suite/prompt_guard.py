@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from metisa_common.mcp_helper import (
+from metisa_common.clients.mcp_client import (
     get_mcp_server_tool_result,
 )
 from metisa_common.specification_models import (
@@ -95,8 +95,10 @@ def _get_classification_from_tool_result(
         raise RuntimeError("No indicators returned.")
     if not isinstance(indicators, list):
         raise RuntimeError("Returned indicators was not a list.")
-    explanations = [indicator.get("explanation", "") for indicator in indicators]
-    return "\n".join(explanations)
+    for indicator in indicators:
+        if not isinstance(indicator, str) or not indicator.strip():
+            raise RuntimeError("Invalid indicator entry.")
+    return "\n".join(indicators)
 
 
 def _get_moderation_from_tool_result(

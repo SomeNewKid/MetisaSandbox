@@ -20,6 +20,8 @@ from docling_core.types.doc.document import DoclingDocument
 from docling_core.types.io import DocumentStream
 from transformers import AutoTokenizer
 
+from metisa_common.utilities.type_models import sanitize_content
+
 
 def convert_document_to_markdown(
     filename: str,
@@ -32,7 +34,10 @@ def convert_document_to_markdown(
 
     document = _convert_pdf_stream_to_docling_document(stream)
 
-    return document.export_to_markdown()
+    markdown = document.export_to_markdown()
+    sanitized_markdown = sanitize_content(markdown)
+
+    return sanitized_markdown
 
 
 def get_chunks_from_document(
@@ -64,7 +69,12 @@ def get_chunks_from_document(
     chunks: list[str] = []
     for chunk in chunker.chunk(dl_doc=document):
         chunk_text = chunker.contextualize(chunk=chunk)
-        chunks.append(chunk_text)
+        sanitized_chunk_text = sanitize_content(chunk_text)
+
+        if not sanitized_chunk_text.strip():
+            continue
+
+        chunks.append(sanitized_chunk_text)
 
     return chunks
 
@@ -165,7 +175,9 @@ def DISABLED_fetch_to_markdown(
     source = DocumentStream(name=url, stream=buffer)
     converter = DocumentConverter()
     result = converter.convert(source)
-    return result.document.export_to_markdown()
+    markdown = result.document.export_to_markdown()
+    sanitized_markdown = sanitize_content(markdown)
+    return sanitized_markdown
 
 
 def _fetch_online_content(url: str) -> str:
@@ -177,4 +189,6 @@ def _fetch_online_content(url: str) -> str:
 
     response = requests.get(url)
     response.raise_for_status()
-    return response.text
+    response_text = response.text
+    sanitized_response_text = sanitize_content(response_text)
+    return sanitized_response_text

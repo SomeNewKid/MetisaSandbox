@@ -7,10 +7,11 @@ from typing import Annotated
 from jsonschema import ValidationError, validate
 from pydantic import Field
 
-from .._clients._entity_guard_client import (
+from metisa_common.clients.entity_guard_client import (
     ENTITY_GUARD_ANONYMIZE_SCHEMA,
     anonymize_text,
 )
+
 from .._helper import with_output_schema
 
 
@@ -47,5 +48,5 @@ def _validate_result(
     try:
         validate(result, ENTITY_GUARD_ANONYMIZE_SCHEMA)
     except ValidationError as error:
-        message = "Entity Guard returned content in an unexpected format."
-        raise RuntimeError(message) from error
+        error_message = "Entity Guard returned content in an unexpected format."
+        raise RuntimeError(error_message) from error

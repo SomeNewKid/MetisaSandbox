@@ -8,6 +8,7 @@ from pathlib import Path
 
 from metisa_common.specification_helper import load_specification
 
+from ._container._agent_memory_probes import AGENT_MEMORY_PROBES
 from ._container._browser_probes import BROWSER_PROBES
 from ._container._docker_probes import DOCKER_PROBES
 from ._container._environment_probes import ENVIRONMENT_PROBES
@@ -67,6 +68,7 @@ def main(
         IDENTITY_PROBES,
         NETWORK_PROBES,
         MCP_PROBES,
+        AGENT_MEMORY_PROBES,
         LLM_PROBES,
         SYSTEM_COMMAND_PROBES,
         SYSTEM_PACKAGE_PROBES,

@@ -17,12 +17,25 @@ from mcp.server.transport_security import TransportSecuritySettings
 from mcp.shared.exceptions import MCPError
 from opentelemetry.context import Context, attach, detach
 from opentelemetry.propagate import extract
+from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 
+from metisa_common.screening import (
+    ScreeningError,
+    screen_content,
+)
+from metisa_common.utilities.type_models import (
+    sanitize_content,
+    sanitize_json_object,
+)
+
 from ._authentication import (
     RunTokenMiddleware,
+)
+from ._errors import (
+    KnownSafeError,
 )
 from ._helper import (
     create_declared_resource,
@@ -216,7 +229,9 @@ async def _call_tool(
             requested_tool = tool
             break
     if not requested_tool:
-        raise MCPError(-32602, f"Unknown tool: {tool_name}")
+        error_message = "Unknown tool"
+        tool_error = RuntimeError(-32602, f"{error_message} {tool_name}.")
+        raise MCPError(-32602, f"{error_message}.") from tool_error
 
     tool_arguments = params.arguments or {}
 
@@ -229,12 +244,20 @@ async def _call_tool(
             schema=tool_input_schema,
         )
     except ValidationError as error:
-        raise MCPError(-32602, error.message) from error
+        error_message = "Tool input validation failed."
+        validation_error = RuntimeError(-32602, f"{error_message} {error.message}")
+        raise MCPError(-32602, error_message) from validation_error
 
     try:
         tool_result = requested_tool.function(**tool_arguments)
-    except RuntimeError as error:
+    except KnownSafeError as error:
         content = types.TextContent(text=str(error))
+        return types.CallToolResult(
+            content=[content],
+            is_error=True,
+        )
+    except Exception:
+        content = types.TextContent(text="Tool execution failed.")
         return types.CallToolResult(
             content=[content],
             is_error=True,
@@ -249,17 +272,59 @@ async def _call_tool(
             schema=tool_output_schema,
         )
     except ValidationError as error:
-        raise MCPError(-32602, error.message) from error
+        error_message = "Tool output validation failed."
+        validation_error = RuntimeError(-32602, f"{error_message} {error.message}")
+        raise MCPError(-32602, error_message) from validation_error
 
     if not isinstance(tool_result, dict):
         raise MCPError(-32602, f"Tool returned a non-JSON result: {tool_name}")
 
-    serialized_result = json.dumps(tool_result, allow_nan=False)
+    try:
+        sanitized_result = sanitize_json_object(tool_result)
+    except (TypeError, ValueError, RecursionError):
+        content = types.TextContent(text="Tool  result could not be sanitized.")
+        return types.CallToolResult(
+            content=[content],
+            is_error=True,
+        )
+
+    try:
+        validate(
+            instance=sanitized_result,
+            schema=tool_output_schema,
+        )
+    except ValidationError:
+        content = types.TextContent(
+            text="Sanitized tool result failed output validation."
+        )
+        return types.CallToolResult(
+            content=[content],
+            is_error=True,
+        )
+
+    try:
+        await run_in_threadpool(screen_content, sanitized_result)
+    except ScreeningError as error:
+        content = types.TextContent(text=str(error))
+        return types.CallToolResult(
+            content=[content],
+            is_error=True,
+        )
+
+    try:
+        serialized_result = json.dumps(sanitized_result, allow_nan=False)
+    except (TypeError, ValueError, RecursionError):
+        content = types.TextContent(text="Tool returned invalid JSON")
+        return types.CallToolResult(
+            content=[content],
+            is_error=True,
+        )
+
     text_content = types.TextContent(text=serialized_result)
 
     return types.CallToolResult(
         content=[text_content],
-        structured_content=tool_result,
+        structured_content=sanitized_result,
     )
 
 
@@ -300,21 +365,46 @@ async def _read_resource(
             break
 
     if not requested_resource:
-        raise MCPError(-32002, f"Resource not found: {params.uri}")
+        error_message = "Resource not found"
+        not_found = RuntimeError(f"{error_message}: {params.uri}.")
+        raise MCPError(-32002, f"{error_message}.") from not_found
 
-    resource_contents = requested_resource.function()
+    try:
+        resource_contents = requested_resource.function()
+    except Exception as error:
+        raise MCPError(
+            -32603,
+            "Resource read failed.",
+        ) from error
 
-    if requested_resource.definition.mime_type == "text/plain":
-        if not isinstance(resource_contents, str):
-            raise MCPError(-32002, f"Resource returned unexpected type: {params.uri}")
-    else:
-        raise MCPError(-32002, f"Resource returned unsupported type: {params.uri}")
+    if requested_resource.definition.mime_type != "text/plain":
+        raise MCPError(
+            -32603,
+            "Resource returned an unsupported content type.",
+        )
+
+    if not isinstance(resource_contents, str):
+        raise MCPError(
+            -32603,
+            "Resource returned an unexpected value.",
+        )
+
+    sanitized_contents = sanitize_content(resource_contents)
+
+    try:
+        await run_in_threadpool(screen_content, sanitized_contents)
+    except ScreeningError as error:
+        raise MCPError(
+            -32603,
+            str(error),
+        ) from error
 
     content = types.TextResourceContents(
-        uri=params.uri,
+        uri=requested_resource.definition.uri,
         mime_type="text/plain",
-        text=resource_contents,
+        text=sanitized_contents,
     )
+
     return types.ReadResourceResult(contents=[content])
 
 

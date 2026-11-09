@@ -26,7 +26,7 @@ def has_attempt_to_ignore_instructions_in_normalized_words(
     sequenced_words: Sequence[str],
 ) -> Indicator | None:
     """Check normalized words for an attempt to ignore instructions."""
-    check_id = "instruction_overrides__has_attempt_to_ignore_instructions"
+    check_id = "prompt_guard_check_001"
     explanation = "The text contains an attempt to ignore previous instructions."
 
     # create mutable list
@@ -61,7 +61,7 @@ def has_attempt_to_change_authority_in_normalized_words(
     sequenced_words: Sequence[str],
 ) -> Indicator | None:
     """Check normalized words for an attempt to change authority."""
-    check_id = "instruction_overrides__has_attempt_to_change_authority"
+    check_id = "prompt_guard_check_002"
     explanation = "The text contains an attempt to change authority."
 
     # create mutable list
@@ -105,7 +105,7 @@ def has_attempt_to_reveal_system_prompt_in_normalized_words(
     sequenced_words: Sequence[str],
 ) -> Indicator | None:
     """Check text for an attempt to reveal the system prompt."""
-    check_id = "instruction_overrides__has_attempt_to_reveal_system_prompt"
+    check_id = "prompt_guard_check_001"
     explanation = "The text contains an attempt to reveal the system prompt."
 
     # create mutable list

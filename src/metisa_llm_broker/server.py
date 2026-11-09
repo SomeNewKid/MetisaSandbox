@@ -12,7 +12,9 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.routing import Route
 
+from metisa_common.clients.prompt_guard_client import classify_text
 from metisa_common.secrets_helper import load_secrets
+from metisa_common.utilities.type_models import sanitize_content
 
 root_directory = Path(__file__).parent
 metisa_json_file = root_directory.with_name("metisa.json")
@@ -266,9 +268,24 @@ async def _v1_chat_completions(
         if not isinstance(message.get("content"), str):
             return _chat_error("Message content must be text.", 400)
 
-    payload["stream"] = False
+    for message in messages:
+        content = message["content"]
+        sanitized_content = sanitize_content(content)
+        message["content"] = sanitized_content
 
-    # Request inspection and permitted transformations
+        try:
+            classification = await run_in_threadpool(classify_text, sanitized_content)
+        except RuntimeError:
+            return _chat_error(
+                "Prompt Guard classification could not be completed.",
+                503,
+            )
+
+        indicators = classification["indicators"]
+        if indicators:
+            return _chat_error("Prompt Guard returned indicators.", 400)
+
+    payload["stream"] = False
 
     try:
         serialized_payload = json.dumps(payload, allow_nan=False)
@@ -330,7 +347,45 @@ def _get_downstream_chat_completion_response(
         if not isinstance(choices, list) or not choices:
             return _chat_error("Model response has no completion choices.", 502)
 
-        # Inspect the complete response and apply permitted transformations.
+        for choice in choices:
+            if not isinstance(choice, dict):
+                return _chat_error("Invalid completion choice", 502)
+
+            message = choice.get("message")
+            if not isinstance(message, dict):
+                return _chat_error("Invalid completion message", 502)
+
+            for field_name in ("content", "reasoning_content", "refusal"):
+                content = message.get(field_name)
+                if content is None:
+                    continue
+
+                if not isinstance(content, str):
+                    return _chat_error(
+                        f"Unsupported completion field: {field_name}",
+                        502,
+                    )
+
+                sanitized_content = sanitize_content(content)
+                message[field_name] = sanitized_content
+
+                if not sanitized_content.strip():
+                    continue
+
+                try:
+                    classification = classify_text(sanitized_content)
+                except RuntimeError:
+                    return _chat_error(
+                        "Prompt Guard classification could not be completed.",
+                        503,
+                    )
+
+                indicators = classification["indicators"]
+                if indicators:
+                    return _chat_error(
+                        "Prompt Guard returned indicators for model output.",
+                        502,
+                    )
 
         payload["model"] = model_alias
         return JSONResponse(payload, status_code=200)
@@ -404,7 +459,44 @@ async def _v1_responses(request: Request) -> JSONResponse:
     payload["stream"] = False
     payload["store"] = False
 
-    # Inspect input, instructions, and other permitted request fields
+    texts_to_inspect: list[str] = []
+
+    if "instructions" in payload:
+        instructions = payload["instructions"]
+        sanitized_instructions = sanitize_content(instructions)
+        payload["instructions"] = sanitized_instructions
+        texts_to_inspect.append(sanitized_instructions)
+
+    response_input = payload["input"]
+    if isinstance(response_input, str):
+        sanitized_input = sanitize_content(response_input)
+        payload["input"] = sanitized_input
+        texts_to_inspect.append(sanitized_input)
+    else:
+        for message in response_input:
+            content = message["content"]
+            sanitized_content = sanitize_content(content)
+            message["content"] = sanitized_content
+            texts_to_inspect.append(sanitized_content)
+
+    for text in texts_to_inspect:
+        if not text.strip():
+            continue
+
+        try:
+            classification = await run_in_threadpool(classify_text, text)
+        except RuntimeError:
+            return _chat_error(
+                "Prompt Guard classification could not be completed.",
+                503,
+            )
+
+        indicators = classification["indicators"]
+        if indicators:
+            return _chat_error(
+                "Prompt Guard returned indicators for request content.",
+                400,
+            )
 
     try:
         serialized_payload = json.dumps(payload, allow_nan=False)
@@ -468,7 +560,80 @@ def _get_downstream_responses_response(
         if payload.get("status") not in ("completed", "incomplete", "failed"):
             return _chat_error("Unexpected model response status.", 502)
 
-        # Inspect all output items before releasing the response.
+        texts_to_inspect: list[str] = []
+
+        for item in payload["output"]:
+            if not isinstance(item, dict):
+                return _chat_error("Invalid response output item.", 502)
+
+            item_type = item.get("type")
+
+            if item_type == "message":
+                content_groups = [item.get("content")]
+
+            elif item_type == "reasoning":
+                if item.get("encrypted_content"):
+                    return _chat_error(
+                        "Encrypted reasoning cannot be inspected.",
+                        502,
+                    )
+
+                content_groups = [item.get("summary", [])]
+
+                reasoning_content = item.get("content")
+                if reasoning_content is not None:
+                    content_groups.append(reasoning_content)
+
+            else:
+                return _chat_error("Unsupported response output item.", 502)
+
+            for parts in content_groups:
+                if not isinstance(parts, list):
+                    return _chat_error("Invalid response content array.", 502)
+
+                for part in parts:
+                    if not isinstance(part, dict):
+                        return _chat_error("Invalid response content part.", 502)
+
+                    part_type = part.get("type")
+
+                    if part_type in (
+                        "output_text",
+                        "summary_text",
+                        "reasoning_text",
+                    ):
+                        field_name = "text"
+                    elif part_type == "refusal":
+                        field_name = "refusal"
+                    else:
+                        return _chat_error("Unsupported response content type.", 502)
+
+                    text = part.get(field_name)
+
+                    if not isinstance(text, str):
+                        return _chat_error("Response content must be text.", 502)
+
+                    sanitized_text = sanitize_content(text)
+                    part[field_name] = sanitized_text
+
+                    if sanitized_text.strip():
+                        texts_to_inspect.append(sanitized_text)
+
+        for text in texts_to_inspect:
+            try:
+                classification = classify_text(text)
+            except RuntimeError:
+                return _chat_error(
+                    "Prompt Guard classification could not be completed.",
+                    503,
+                )
+
+            indicators = classification["indicators"]
+            if indicators:
+                return _chat_error(
+                    "Prompt Guard returned indicators for model output.",
+                    502,
+                )
 
         payload["model"] = model_alias
         return JSONResponse(payload, status_code=200)

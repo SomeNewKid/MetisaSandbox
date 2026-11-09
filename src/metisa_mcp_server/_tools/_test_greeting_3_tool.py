@@ -54,5 +54,5 @@ def _validate_result(
     try:
         validate(result, _TOOL_RESULT_SCHEMA)
     except ValidationError as error:
-        message = "Jina Reader returned content in an unexpected format."
-        raise RuntimeError(message) from error
+        error_message = "Test greeting 3 tool returned content in an unexpected format."
+        raise RuntimeError(error_message) from error

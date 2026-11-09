@@ -83,7 +83,7 @@ def test_input_denial_requires_exception_before_reading(
 
     monkeypatch.setattr("builtins.input", guarded_input)
     monkeypatch.setattr(
-        "metisa_common.mcp_helper.get_mcp_server_tool_result",
+        "metisa_common.clients.mcp_client.get_mcp_server_tool_result",
         lambda *args, **kwargs: {"accept": True, "text": "safe"},
     )
     original_stdin = sys.stdin
@@ -139,7 +139,7 @@ def test_screened_input_probes_use_real_reader(
     if mode == "service_error":
         tool.side_effect = RuntimeError("MCP unavailable")
     monkeypatch.setattr(
-        "metisa_common.mcp_helper.get_mcp_server_tool_result",
+        "metisa_common.clients.mcp_client.get_mcp_server_tool_result",
         tool,
     )
     if mode == "denied":
