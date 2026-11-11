@@ -36,51 +36,29 @@ def test_embeddings(specification: MetisaSpecification):
         return
 
     filename = "Employee Handbook.pdf"
-    _get_get_matching_chunks_from_document(filename, "What are our company values?")
+    _get_semantic_chunks_from_document(filename, "What are our company values?")
     print(flush=True)
-    _get_get_matching_chunks_from_document(
+    _get_semantic_chunks_from_document(
         filename, "What is the email of the Compliance Officer?"
     )
 
+    filename = "SQL Injection Prevention Cheat Sheet.md"
+    print(flush=True)
+    _get_keyword_chunks_from_document(filename, "PreparedStatement")
 
-def _get_get_matching_chunks_from_document(filename: str, prompt: str) -> None:
+
+def _get_semantic_chunks_from_document(filename: str, prompt: str) -> None:
     with print_elapsed_time():
         try:
             print_message(prompt)
             tool_result = get_mcp_server_tool_result(
-                tool_name="get_matching_chunks_from_document",
+                tool_name="get_semantic_chunks_from_document",
                 params={"filename": filename, "prompt": prompt},
             )
 
             chunks = tool_result.get("chunks", None)
-            if chunks is None:
-                print_failure("JSON response did not return chunks.")
-                return
-            if not isinstance(chunks, list):
-                print_failure("JSON response did not return a list of chunks.")
-                return
 
-            any_valid = False
-
-            separator = ""
-
-            for chunk in chunks:
-                if not isinstance(chunk, str):
-                    print_failure("Received payload data item was not a string.")
-                    return
-
-                if not chunk:
-                    continue
-
-                if separator:
-                    print(separator, flush=True)
-                text = chunk[0:200].strip() + "..." if len(chunk) > 200 else chunk
-                print_success(text)
-                any_valid = True
-                separator = "---"
-
-            if not any_valid:
-                print_failure("Received payload data had no non-empty items.")
+            _present_chunks(chunks)
 
         except Exception as error:
             print_failure(
@@ -88,3 +66,57 @@ def _get_get_matching_chunks_from_document(filename: str, prompt: str) -> None:
                 type(error).__name__,
                 str(error),
             )
+
+
+def _get_keyword_chunks_from_document(filename: str, query: str) -> None:
+    with print_elapsed_time():
+        try:
+            print_message(query)
+            tool_result = get_mcp_server_tool_result(
+                tool_name="get_keyword_chunks_from_document",
+                params={"filename": filename, "query": query, "all_words": True},
+            )
+
+            chunks = tool_result.get("chunks", None)
+
+            _present_chunks(chunks)
+
+        except Exception as error:
+            print_failure(
+                "Retrieve Embeddings sample error:",
+                type(error).__name__,
+                str(error),
+            )
+
+
+def _present_chunks(
+    chunks: object,
+) -> None:
+    if chunks is None:
+        print_failure("JSON response did not return chunks.")
+        return
+    if not isinstance(chunks, list):
+        print_failure("JSON response did not return a list of chunks.")
+        return
+
+    any_valid = False
+
+    separator = ""
+
+    for chunk in chunks:
+        if not isinstance(chunk, str):
+            print_failure("Received payload data item was not a string.")
+            return
+
+        if not chunk:
+            continue
+
+        if separator:
+            print(separator, flush=True)
+        text = chunk[0:200].strip() + "..." if len(chunk) > 200 else chunk
+        print_success(text)
+        any_valid = True
+        separator = "---"
+
+    if not any_valid:
+        print_failure("Received payload data had no non-empty items.")

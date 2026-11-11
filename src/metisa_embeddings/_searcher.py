@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from threading import Lock
 from uuid import NAMESPACE_URL, uuid5
@@ -22,6 +23,9 @@ _INGESTION_LOCK = Lock()
 # considered minimum score, or perhaps a document-specific minimum scores.
 _MINIMUM_SCORE: float | None = 0.6
 
+_KEYWORD_PAGE_SIZE = 100
+_MAX_KEYWORD_LENGTH = 256
+
 
 @dataclass(frozen=True)
 class ChunkEmbedding:
@@ -30,17 +34,81 @@ class ChunkEmbedding:
     vector: list[float]
 
 
-def get_matching_chunks_from_document(
+def get_keyword_chunks_from_document(
+    filename: str,
+    query: str,
+    all_words: bool,
+    metisa_json: dict[str, object],
+) -> list[str]:
+    sanitized_query = sanitize_content(query)
+    if not sanitized_query.strip():
+        raise ValueError("Query is required.")
+
+    words = re.findall(r"[^\W_]+", sanitized_query)
+    if not words:
+        raise ValueError("Query must contain at least one searchable word.")
+
+    for word in words:
+        if len(word) > _MAX_KEYWORD_LENGTH:
+            raise ValueError(
+                f"Query words must not exceed {_MAX_KEYWORD_LENGTH} characters."
+            )
+
+    prepared = _prepare_document_index(filename, metisa_json)
+    if prepared is None:
+        return []
+
+    model_name, _ = prepared
+
+    return _query_keyword_chunks(
+        filename=filename,
+        words=words,
+        all_words=all_words,
+        model_name=model_name,
+    )
+
+
+def get_semantic_chunks_from_document(
     filename: str,
     prompt: str,
     metisa_json: dict[str, object],
 ) -> list[str]:
-    if not filename:
-        raise ValueError("Filename is required.")
-
     sanitized_prompt = sanitize_content(prompt)
     if not sanitized_prompt.strip():
         raise ValueError("Prompt is required.")
+
+    prepared = _prepare_document_index(filename, metisa_json)
+    if prepared is None:
+        return []
+
+    model_name, embedding_model = prepared
+
+    matching_chunks: list[str] = []
+
+    hits = _query_matching_chunks(
+        filename=filename,
+        prompt=sanitized_prompt,
+        embedding_model=embedding_model,
+        model_name=model_name,
+        limit=5,
+        score_threshold=_MINIMUM_SCORE,
+    )
+
+    for hit in hits:
+        text = _get_chunk_text(hit.payload)
+        if text.strip():
+            matching_chunks.append(text)
+
+    return matching_chunks
+
+
+def _prepare_document_index(
+    filename: str,
+    metisa_json: dict[str, object],
+) -> tuple[str, TextEmbedding] | None:
+    """Prepare the shared document index, or return None for no chunks."""
+    if not filename:
+        raise ValueError("Filename is required.")
 
     model_name = metisa_json.get("embedding_model", None)
     if model_name is None:
@@ -50,8 +118,6 @@ def get_matching_chunks_from_document(
     model_name = model_name.strip()
     if not model_name:
         raise ValueError("Metisa JSON file provided an empty embedding model.")
-
-    matching_chunks: list[str] = []
 
     embedding_model = TextEmbedding(
         model_name=model_name,
@@ -66,33 +132,9 @@ def get_matching_chunks_from_document(
         embedding_model=embedding_model,
     )
     if not indexed:
-        return []
+        return None
 
-    hits = _query_matching_chunks(
-        filename=filename,
-        prompt=sanitized_prompt,
-        embedding_model=embedding_model,
-        model_name=model_name,
-        limit=5,
-        score_threshold=_MINIMUM_SCORE,
-    )
-
-    for hit in hits:
-        payload = hit.payload
-        if payload is None:
-            raise RuntimeError("Matching point has no payload.")
-
-        chunk_text = payload.get("text")
-        if not isinstance(chunk_text, str):
-            raise RuntimeError("Matching point has no valid chunk text.")
-
-        sanitized_chunk_text = sanitize_content(chunk_text)
-        if not sanitized_chunk_text.strip():
-            continue
-
-        matching_chunks.append(sanitized_chunk_text)
-
-    return matching_chunks
+    return model_name, embedding_model
 
 
 def _ensure_document_indexed(
@@ -138,6 +180,7 @@ def _ensure_document_indexed(
             if records:
                 payload = records[0].payload or {}
                 if payload.get("status") == "complete":
+                    _ensure_full_text_index(client)
                     return True
 
             chunks = _get_all_chunks(filename)
@@ -146,6 +189,7 @@ def _ensure_document_indexed(
 
             embeddings = _embed_chunks(chunks, embedding_model)
             _save_embeddings(filename, model_name, embeddings)
+            _ensure_full_text_index(client)
 
             manifest_payload = {
                 "filename": filename,
@@ -167,6 +211,54 @@ def _ensure_document_indexed(
             return True
         finally:
             client.close()
+
+
+def _ensure_full_text_index(
+    client: QdrantClient,
+) -> None:
+    """Ensure chunk text has the expected full-text payload index."""
+    collection = client.get_collection(
+        collection_name=_DOCUMENT_COLLECTION,
+    )
+    existing_index = collection.payload_schema.get("text")
+
+    if existing_index is not None:
+        if existing_index.data_type != models.PayloadSchemaType.TEXT:
+            raise ValueError("Chunk text has an incompatible payload index.")
+
+        parameters = existing_index.params
+        if not isinstance(parameters, models.TextIndexParams):
+            raise ValueError("Chunk text index has no valid text parameters.")
+
+        compatible = (
+            parameters.tokenizer == models.TokenizerType.WORD
+            and parameters.lowercase is True
+            and parameters.min_token_len == 1
+            and parameters.max_token_len == _MAX_KEYWORD_LENGTH
+            and parameters.stemmer is None
+            and parameters.stopwords is None
+        )
+        if not compatible:
+            raise ValueError(
+                "Chunk text index configuration does not match keyword search."
+            )
+
+        return
+
+    parameters = models.TextIndexParams(
+        type=models.TextIndexType.TEXT,
+        tokenizer=models.TokenizerType.WORD,
+        lowercase=True,
+        min_token_len=1,
+        max_token_len=_MAX_KEYWORD_LENGTH,
+    )
+
+    client.create_payload_index(
+        collection_name=_DOCUMENT_COLLECTION,
+        field_name="text",
+        field_schema=parameters,
+        wait=True,
+    )
 
 
 def _get_all_chunks(
@@ -383,3 +475,109 @@ def _query_matching_chunks(
         return response.points
     finally:
         client.close()
+
+
+def _query_keyword_chunks(
+    filename: str,
+    words: list[str],
+    all_words: bool,
+    model_name: str,
+) -> list[str]:
+    """Fetch every keyword-matching chunk from Qdrant."""
+    if not words:
+        raise ValueError("At least one keyword is required.")
+
+    filename_condition = models.FieldCondition(
+        key="filename",
+        match=models.MatchValue(value=filename),
+    )
+    model_condition = models.FieldCondition(
+        key="embedding_model",
+        match=models.MatchValue(value=model_name),
+    )
+
+    word_conditions: list[models.Condition] = []
+
+    for word in words:
+        condition = models.FieldCondition(
+            key="text",
+            match=models.MatchText(text=word),
+        )
+        word_conditions.append(condition)
+
+    if all_words:
+        word_filter = models.Filter(must=word_conditions)
+    else:
+        word_filter = models.Filter(should=word_conditions)
+
+    document_filter = models.Filter(
+        must=[
+            filename_condition,
+            model_condition,
+            word_filter,
+        ],
+    )
+
+    client = QdrantClient(
+        url="http://metisa-qdrant:6333",
+        prefer_grpc=False,
+        timeout=30,
+        trust_env=False,
+    )
+
+    matching_chunks: list[tuple[int, str]] = []
+    offset = None
+
+    try:
+        while True:
+            records, next_offset = client.scroll(
+                collection_name=_DOCUMENT_COLLECTION,
+                scroll_filter=document_filter,
+                limit=_KEYWORD_PAGE_SIZE,
+                offset=offset,
+                with_payload=["chunk_index", "text"],
+                with_vectors=False,
+            )
+
+            for record in records:
+                payload = record.payload
+                text = _get_chunk_text(payload)
+
+                if not text.strip():
+                    continue
+
+                # _get_chunk_text() already rejects a missing payload.
+                if payload is None:
+                    raise RuntimeError("Matching point has no payload.")
+
+                chunk_index = payload.get("chunk_index")
+                if not isinstance(chunk_index, int):
+                    raise RuntimeError("Matching point has no valid chunk index.")
+
+                matching_chunks.append((chunk_index, text))
+
+            if next_offset is None:
+                break
+
+            offset = next_offset
+    finally:
+        client.close()
+
+    # Scroll pages arrive in point-ID order, not document order.
+    matching_chunks.sort(key=lambda item: item[0])
+
+    return [text for _, text in matching_chunks]
+
+
+def _get_chunk_text(
+    payload: dict[str, object] | None,
+) -> str:
+    """Extract and sanitize chunk text from a Qdrant payload."""
+    if payload is None:
+        raise RuntimeError("Matching point has no payload.")
+
+    text = payload.get("text")
+    if not isinstance(text, str):
+        raise RuntimeError("Matching point has no valid chunk text.")
+
+    return sanitize_content(text)

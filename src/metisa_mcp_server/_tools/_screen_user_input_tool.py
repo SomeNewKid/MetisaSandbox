@@ -67,7 +67,7 @@ def _execute_tool(
             "text": "",
             "reasons": ["empty_input"],
         }
-    
+
     reasons: list[str] = []
 
     if _has_indicators(sanitized_text):

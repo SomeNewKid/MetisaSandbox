@@ -1,4 +1,4 @@
-"""Provide the tool which gets matching chunks from a document."""
+"""Provide the tool which uses keyword search to get chunks from a document."""
 
 from __future__ import annotations
 
@@ -25,14 +25,21 @@ _TOOL_RESULT_SCHEMA = {
 
 
 @with_output_schema(_TOOL_RESULT_SCHEMA)
-def get_matching_chunks_from_document(
+def get_keyword_chunks_from_document(
     filename: Annotated[str, Field(description="The filename of the document.")],
-    prompt: Annotated[str, Field(description="The user's prompt.")],
+    query: Annotated[str, Field(description="The search query.")],
+    all_words: Annotated[
+        bool,
+        Field(
+            description="A flag whether to match on all words. "
+            "If false, matches on any words."
+        ),
+    ],
 ) -> dict[str, object]:
-    """Return the data from the specified filename."""
-    _validate_arguments(filename, prompt)
+    """Return the chunks from the specified file."""
+    _validate_arguments(filename, query)
 
-    result = _execute_tool(filename, prompt)
+    result = _execute_tool(filename, query, all_words)
 
     _validate_result(result)
 
@@ -41,16 +48,17 @@ def get_matching_chunks_from_document(
 
 def _validate_arguments(
     filename: str,
-    prompt: str,
+    query: str,
 ) -> None:
     validate_filename_argument(filename)
-    if not prompt:
-        raise ValueError("Prompt must be provided.")
+    if not query:
+        raise ValueError("Query must be provided.")
 
 
 def _execute_tool(
     filename: str,
-    prompt: str,
+    query: str,
+    all_words: bool,
 ) -> dict[str, object]:
     embeddings_endpoint = "http://metisa-embeddings:8000/search"
     headers = {
@@ -58,7 +66,8 @@ def _execute_tool(
     }
     payload = {
         "filename": filename,
-        "prompt": prompt,
+        "query": query,
+        "all_words": all_words,
     }
 
     content: str | None = None

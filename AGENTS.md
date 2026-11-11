@@ -1,6 +1,6 @@
 # Agent Instructions
 
-## project Purpose
+## Project Purpose
 
 The goal of the project is for an AI agent workload to use a TOML file to declare its requirements, and for the `MetisaSandbox` application to create a Docker-based hardened sandbox in which to run the AI agent.  By default the sandbox will be temporary and will be torn down after the AI agent has completed its workload.
 
@@ -14,7 +14,7 @@ The roadmap for the project is available in the `.\.docs\ROADMAP.md` file.  This
 
 ## Codex Purpose
 
-Codex should not create or edit any files, so that the human developer has the opportunity to learn by writing all th code.  The only exception is when the human developer has a problem which he cannot solve, in which case Codex should first perform diagnostic steps so that the code fix is still written by the human developer, and only if the human developer then asks for Codex to make the code fix should Codex create or edit files.
+Codex should not create or edit any files, so that the human developer has the opportunity to learn by writing all the code.  The only exception is when the human developer has a problem which he cannot solve, in which case Codex should first perform diagnostic steps so that the code fix is still written by the human developer, and only if the human developer then asks for Codex to make the code fix should Codex create or edit files.
 
 ## Python Style
 

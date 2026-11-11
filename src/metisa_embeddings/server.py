@@ -4,7 +4,10 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from ._searcher import get_matching_chunks_from_document
+from ._searcher import (
+    get_keyword_chunks_from_document,
+    get_semantic_chunks_from_document,
+)
 
 _MAX_REQUEST_BYTES = 1024 * 1024  # 1 MiB
 _CODE_200_OK = 200
@@ -95,13 +98,59 @@ class _RequestHandler(BaseHTTPRequestHandler):
             self.send_error(_CODE_400_BAD_REQUEST, "'filename' must be a string")
             return
 
-        prompt = request_payload.get("prompt")
-        if not isinstance(prompt, str):
-            self.send_error(_CODE_400_BAD_REQUEST, "'prompt' must be a string")
+        prompt: str | None = request_payload.get("prompt")
+        if prompt is not None:
+            if not isinstance(prompt, str):
+                self.send_error(_CODE_400_BAD_REQUEST, "'prompt' must be a string.")
+                return
+            if not prompt.strip():
+                self.send_error(_CODE_400_BAD_REQUEST, "'prompt' must not be empty.")
+                return
+            prompt = prompt.strip()
+
+        query = request_payload.get("query")
+        if query is not None:
+            if not isinstance(query, str):
+                self.send_error(_CODE_400_BAD_REQUEST, "'query' must be a string.")
+                return
+            if not query.strip():
+                self.send_error(_CODE_400_BAD_REQUEST, "'query' must not be empty.")
+                return
+            query = query.strip()
+
+        if not prompt and not query:
+            self.send_error(
+                _CODE_400_BAD_REQUEST, "'prompt' or 'query' must be provided."
+            )
+            return
+        if prompt and query:
+            self.send_error(
+                _CODE_400_BAD_REQUEST, "'prompt' or 'query' must be provided, not both."
+            )
             return
 
+        all_words = request_payload.get("all_words")
+
         try:
-            chunks = get_matching_chunks_from_document(filename, prompt, metisa_json)
+            if prompt:
+                chunks = get_semantic_chunks_from_document(
+                    filename, prompt, metisa_json
+                )
+            elif query:
+                if not isinstance(all_words, bool):
+                    error_message = "'all_words' must be a boolean."
+                    self.send_error(_CODE_400_BAD_REQUEST, error_message)
+                    return
+                chunks = get_keyword_chunks_from_document(
+                    filename, query, all_words, metisa_json
+                )
+
+            else:
+                self.send_error(
+                    _CODE_400_BAD_REQUEST, "'prompt' or 'query' must be provided."
+                )
+                return
+
             data = [chunk for chunk in chunks]
         except Exception as error:
             self.send_error(

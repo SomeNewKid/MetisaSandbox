@@ -32,7 +32,7 @@ def convert_document_to_markdown(
 
     stream = _get_document_stream(filename)
 
-    document = _convert_pdf_stream_to_docling_document(stream)
+    document = _convert_stream_to_docling_document(stream)
 
     markdown = document.export_to_markdown()
     sanitized_markdown = sanitize_content(markdown)
@@ -49,7 +49,7 @@ def get_chunks_from_document(
 
     stream = _get_document_stream(filename)
 
-    document = _convert_pdf_stream_to_docling_document(stream)
+    document = _convert_stream_to_docling_document(stream)
 
     hf_tokenizer = AutoTokenizer.from_pretrained(
         "/models/embedding",
@@ -79,7 +79,7 @@ def get_chunks_from_document(
     return chunks
 
 
-def _convert_pdf_stream_to_docling_document(
+def _convert_stream_to_docling_document(
     document_source: DocumentStream,
 ) -> DoclingDocument:
     pipeline_options = PdfPipelineOptions(
@@ -96,7 +96,11 @@ def _convert_pdf_stream_to_docling_document(
     )
 
     converter = DocumentConverter(
-        allowed_formats=[InputFormat.PDF], format_options={InputFormat.PDF: pdf_options}
+        allowed_formats=[
+            InputFormat.PDF,
+            InputFormat.MD,
+        ],
+        format_options={InputFormat.PDF: pdf_options},
     )
 
     result = converter.convert(document_source)

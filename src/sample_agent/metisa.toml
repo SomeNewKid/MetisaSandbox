@@ -73,7 +73,8 @@ tools = [
     "anonymize_entities_in_text",
     "convert_document_to_markdown",
     "retrieve_content_from_document",
-    "get_matching_chunks_from_document",
+    "get_semantic_chunks_from_document",
+    "get_keyword_chunks_from_document",
 ]
 resources = []
 

@@ -64,11 +64,14 @@ from ._tools._get_active_items_from_database_tool import (
 from ._tools._get_classification_indicators_tool import (
     get_classification_indicators,
 )
-from ._tools._get_matching_chunks_from_document_tool import (
-    get_matching_chunks_from_document,
+from ._tools._get_keyword_chunks_from_document_tool import (
+    get_keyword_chunks_from_document,
 )
 from ._tools._get_moderation_labels_tool import (
     get_moderation_labels,
+)
+from ._tools._get_semantic_chunks_from_document_tool import (
+    get_semantic_chunks_from_document,
 )
 from ._tools._get_title_from_url_tool import (
     get_title_from_url,
@@ -172,7 +175,8 @@ TOOL_REGISTRY = _create_tool_registry(
         execute_starlark_code,
         get_active_items_from_database,
         get_classification_indicators,
-        get_matching_chunks_from_document,
+        get_keyword_chunks_from_document,
+        get_semantic_chunks_from_document,
         get_moderation_labels,
         get_title_from_url,
         read_content_from_url,
