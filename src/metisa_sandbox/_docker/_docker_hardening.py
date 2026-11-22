@@ -220,6 +220,7 @@ def configure_http_proxy(
             "metisa-squid",
             "metisa-mcp-server",
             "metisa-llm-broker",
+            "metisa-playwright-chromium",
         ]
     )
     environs.extend(
@@ -266,5 +267,7 @@ def _get_uid_gid(
             return (10011, 10011)
         case "elephant":
             return (10012, 10012)
+        case "browser":
+            return (10013, 10013)
         case _:
             raise ValueError(f"Unknown username: {username}")

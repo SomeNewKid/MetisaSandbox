@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from metisa_common.specification_models import Capability
+
 from .._probe_models import ProbeContext, ProbeGroup, ProbeResult
 
 _EXPECTED_MEMORY_LIMIT_BYTES = 128 * 1024 * 1024
+_EXPECTED_MEMORY_LIMIT_BYTES_PLAYWRIGHT_CHROMIUM = 256 * 1024 * 1024
 
 
 def process_limit_is_configured(
@@ -64,7 +67,7 @@ def process_limit_is_configured(
 def memory_limit_is_configured(
     probe_context: ProbeContext,
 ) -> ProbeResult:
-    """Verify the container memory limit is 128 MiB."""
+    """Verify the container memory limit is 128mb, or 256mb for Playwright Chromium."""
     probe_name = "kernel__resources__memory_limit_is_configured"
     memory_limit_paths = (
         Path("/sys/fs/cgroup/memory.max"),
@@ -89,9 +92,15 @@ def memory_limit_is_configured(
     if error_result is not None:
         return error_result
 
-    if actual_memory_limit != _EXPECTED_MEMORY_LIMIT_BYTES:
+    expected_memory_limit = (
+        _EXPECTED_MEMORY_LIMIT_BYTES_PLAYWRIGHT_CHROMIUM
+        if Capability.PLAYWRIGHT_CHROMIUM in probe_context.specification.capabilities
+        else _EXPECTED_MEMORY_LIMIT_BYTES
+    )
+
+    if actual_memory_limit != expected_memory_limit:
         message = (
-            f"Expected memory limit {_EXPECTED_MEMORY_LIMIT_BYTES} bytes, "
+            f"Expected memory limit {expected_memory_limit} bytes, "
             f"got {actual_memory_limit} bytes."
         )
         return ProbeResult.failure(probe_name, message)

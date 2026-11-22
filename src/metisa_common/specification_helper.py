@@ -29,6 +29,7 @@ from .specification_models import (
     McpServerSpecification,
     MetisaSpecification,
     OpenTelemetrySpecification,
+    PlaywrightChromiumSpecification,
     PostgreSqlSpecification,
     QdrantSpecification,
     SpecificationValidationError,
@@ -385,6 +386,7 @@ def _create_metisa_specification(
             "otel_collector",
             "postgres",
             "agent_memory",
+            "playwright_chromium",
         }
     )
 
@@ -411,6 +413,7 @@ def _create_metisa_specification(
     otel_collector = _get_otel_collector_specification(toml)
     postgres = _get_postgres_specification(toml)
     agent_memory = _get_agent_memory_specification(toml)
+    playwright_chromium = _get_playwright_chromium_specification(toml)
 
     specification = MetisaSpecification(
         agent_name=agent_name,
@@ -433,6 +436,7 @@ def _create_metisa_specification(
         otel_collector=otel_collector,
         postgres=postgres,
         agent_memory=agent_memory,
+        playwright_chromium=playwright_chromium,
     )
 
     validate_specification(specification)
@@ -1196,6 +1200,33 @@ def _get_embeddings_specification(
     )
 
 
+def _get_playwright_chromium_specification(
+    toml: dict[str, object],
+) -> PlaywrightChromiumSpecification | None:
+    playwright_chromium = toml.get("playwright_chromium")
+    if not playwright_chromium:
+        return None
+
+    if not isinstance(playwright_chromium, dict):
+        raise SpecificationValidationError(
+            "TOML specification playwright_chromium must be a table."
+        )
+
+    PLAY_CHROMIUM_KEYS = frozenset(
+        {
+            "environs",
+        }
+    )
+
+    _validate_known_keys(playwright_chromium, "playwright_chromium", PLAY_CHROMIUM_KEYS)
+
+    environs = _get_environs(playwright_chromium, "PostgreSql environs")
+
+    return PlaywrightChromiumSpecification(
+        environs=environs,
+    )
+
+
 def _validate_known_keys(
     table: dict[str, object],
     table_name: str,
@@ -1281,6 +1312,7 @@ def _environ_name_is_reserved(
         "METISA_RUNTIME_ROLE",
         "SANDBOX_OUTPUT_DIR",
         "METISA_INTERACTIVE",
+        "METISA_PLAYWRIGHT_CHROMIUM",
     )
     if name in reserved_by_metisa:
         return True

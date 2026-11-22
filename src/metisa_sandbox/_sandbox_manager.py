@@ -100,6 +100,10 @@ from .otel_collector_sidecar.otel_collector_manager import (
     create_otel_collector_container,
     create_otel_collector_definition,
 )
+from .playwright_chromium_sidecar.playwright_chromium_manager import (
+    create_playwright_chromium_container,
+    create_playwright_chromium_definition,
+)
 from .postgres_sidecar.postgres_manager import (
     create_postgres_container,
     create_postgres_definition,
@@ -162,6 +166,7 @@ def run_metisa_container_workload_in_sandbox(
     otel_collector_container = create_otel_collector_definition()
     postgres_container = create_postgres_definition()
     agent_memory_container = create_agent_memory_definition()
+    playwright_chromium_container = create_playwright_chromium_definition()
 
     all_containers = [
         metisa_workload_container,
@@ -180,6 +185,7 @@ def run_metisa_container_workload_in_sandbox(
         otel_collector_container,
         postgres_container,
         agent_memory_container,
+        playwright_chromium_container,
     ]
 
     try:
@@ -366,6 +372,16 @@ def run_metisa_container_workload_in_sandbox(
                     agent_memory_container.instance_name,
                     agent_memory_container.secrets_key,
                 )
+
+        if sandbox_requirements.is_playwright_chromium_required:
+            _create_playwright_chromium_container(
+                specification,
+                sandbox_requirements,
+                sandbox_context,
+                squid_proxy_container,
+                playwright_chromium_container,
+            )
+            _start_docker_container(playwright_chromium_container)
 
         _create_metisa_workload_container(
             specification,
@@ -950,6 +966,36 @@ def _create_agent_memory_container(
             public_key_pem,
         )
         agent_memory_container.set_created(agent_memory_creation)
+
+
+def _create_playwright_chromium_container(
+    specification: MetisaSpecification,
+    sandbox_requirements: SandboxRequirements,
+    sandbox_context: SandboxContext,
+    squid_proxy_container: SandboxContainer,
+    playwright_chromium_container: SandboxContainer,
+) -> None:
+    with terminal_status(
+        running="Creating Playwright Chromium container...",
+        success="Created Playwright Chromium container.",
+        failure="Could not create Playwright Chromium container.",
+    ):
+        network_names = [sandbox_context.workload_network_name]
+        if sandbox_requirements.is_backend_network_required:
+            network_names.append(sandbox_context.backend_network_name)
+        if (
+            _workload_container_needs_squid_proxy(sandbox_requirements)
+            or not sandbox_requirements.is_backend_network_required
+        ):
+            network_names.append(sandbox_context.workload_network_name)
+        playwright_chromium_creation_context = _create_creation_context(
+            squid_proxy_container=squid_proxy_container,
+            network_names=network_names,
+        )
+        playwright_chromium_creation = create_playwright_chromium_container(
+            specification, sandbox_context, playwright_chromium_creation_context
+        )
+        playwright_chromium_container.set_created(playwright_chromium_creation)
 
 
 def _create_creation_context(

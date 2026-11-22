@@ -10,6 +10,18 @@ from metisa_common.specification_helper import parse_specification
 from metisa_common.specification_models import LlmModel, SpecificationValidationError
 
 
+def test_llm_server_invalid_if_no_network_capability() -> None:
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["mcp_server", "prompt_guard", "entity_guard", "llm_server"]
+
+        [llm_server]
+        environs = []
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
 def test_llm_server_missing_details() -> None:
     """Treat an empty LLM server table as absent."""
     toml = """

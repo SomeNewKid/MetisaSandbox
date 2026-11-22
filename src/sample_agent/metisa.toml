@@ -1,23 +1,24 @@
 agent_name = "sample_agent"
 capabilities = [
     "network",
-    "internet",
-    "interactive",
-    "localnet",
-    "mcp_server",
-    "prompt_guard",
-    "entity_guard",
-    "jina_reader",
-    "code_execution",
-    "llm_server",
-    "llm_broker",
-    "docling",
-    "documents",
-    "qdrant",
-    "embeddings",
-    "otel_collector",
-    "postgres",
-    "agent_memory",
+    # "internet",
+    # "interactive",
+    # "localnet",
+    # "mcp_server",
+    # "prompt_guard",
+    # "entity_guard",
+    # "jina_reader",
+    # "code_execution",
+    # "llm_server",
+    # "llm_broker",
+    # "docling",
+    # "documents",
+    # "qdrant",
+    # "embeddings",
+    # "otel_collector",
+    # "postgres",
+    # "agent_memory",
+    "playwright_chromium",
 ]
 dependencies = [
     "cryptography==48.0.1",
@@ -26,6 +27,7 @@ dependencies = [
     "opentelemetry-api==1.45.1",
     "opentelemetry-sdk==1.45.1",
     "opentelemetry-exporter-otlp-proto-http==1.45.1",
+    "playwright==1.64.1",
     "pyjwt==2.15.1",
 ]
 environs = [
@@ -134,3 +136,6 @@ environs = []
 secrets = [
     "POSTGRES_PASSWORD=${host:METISA_POSTGRES_PASSWORD}",
 ]
+
+[playwright_chromium]
+environs = []

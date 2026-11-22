@@ -23,6 +23,7 @@ than the Docker SDK, Docker Compose, or an orchestration framework.
   through HAProxy.
 - Optional MCP tools, local and online language models, document processing,
   semantic retrieval, text guards, and Starlark execution.
+- Remote browser automation through Playwright and a dedicated Chromium sidecar.
 - Interactive input screening and PostgreSQL-backed agent memory that persists
   across runs, with authenticated MCP and agent memory access.
 - Container hardening, a custom workload seccomp profile, Landlock filesystem
@@ -45,7 +46,8 @@ than the Docker SDK, Docker Compose, or an orchestration framework.
   separately controlled by the workload specification.
 
 Service-heavy workloads require additional memory, disk space, and model files.
-The included sample enables most services and needs preparation described below.
+The sample currently enables offline browser automation. The other service
+integrations require the preparation described below when enabled.
 
 ## Installation
 
@@ -146,9 +148,9 @@ capability list disables workload networking at runtime.
 
 ## Workload configuration
 
-See [the sample specification](src/sample_agent/metisa.toml) for a configuration
-that enables most services. The parser and validation rules are implemented in
-[`metisa_common`](src/metisa_common).
+See [the sample specification](src/sample_agent/metisa.toml) for the browser
+configuration and examples of other service settings. The parser and validation
+rules are implemented in [`metisa_common`](src/metisa_common).
 
 ### Top-level fields
 
@@ -188,6 +190,7 @@ references for credentials rather than committing credential values in TOML.
 | `prompt_guard` | Provides prompt injection checks and text moderation. Started alongside MCP or the LLM broker. |
 | `entity_guard` | Provides entity detection and anonymization. Started alongside MCP or the LLM broker. |
 | `jina_reader` | Provides web content extraction through Jina Reader. Requires `internet` and `mcp_server`. |
+| `playwright_chromium` | Starts a headless Chromium sidecar and permits the workload's bundled Playwright driver. Requires `network` and a compatible Playwright dependency in the workload. Add `internet` and a Squid allowlist for public websites. |
 | `code_execution` | Provides Starlark execution in a separate Go service. Requires `mcp_server`. |
 | `llm_server` | Runs a llama.cpp container for each model in `[llm_server].models`. Requires `network`; use with the broker for workload access. |
 | `llm_broker` | Routes requests to configured local model aliases and online OpenAI models. Requires `network`, `prompt_guard`, and `entity_guard`. |
@@ -244,15 +247,45 @@ For agent memory, include `network`, `postgres`, and `agent_memory`, and enable
 MCP or the LLM broker with their required guard capabilities so that Prompt
 Guard is started. The validator does not enforce this complete combination.
 
+### Remote Chromium
+
+Declare the Python client in the workload's `metisa.toml`. The sidecar
+currently uses Playwright 1.64.1, and the example pins the client to the same
+version.
+
+```toml
+agent_name = "browser_agent"
+capabilities = ["network", "playwright_chromium"]
+dependencies = ["playwright==1.64.1"]
+```
+
+From the workload, call `playwright.chromium.connect()` with
+`ws://metisa-playwright-chromium:3000/metisa-browser` inside a `sync_playwright()`
+context. The Python client starts its bundled Node driver in the workload.
+Chromium and its own sandbox run in the sidecar. The workload can use the
+normal Playwright page API to navigate, click, and capture screenshots.
+`[playwright_chromium].environs` can supply environment variables to the
+sidecar, such as `DEBUG=pw:browser` for browser diagnostics.
+
+Add `internet` and allow the desired domains or IP addresses in `[squid_proxy]`
+to navigate to public websites. Browser requests originate in the sidecar and
+use Squid. The sample's
+[browser test](src/sample_agent/test_suite/playwright_chromium.py) renders an
+inline page when `internet` is absent and visits `https://example.com/` when it
+is enabled. The sample allowlist includes `.example.com`.
+
 ## Running the sample agent
 
 [`sample_agent`](src/sample_agent) exercises the sandbox services, including
 network access, database queries, text guards, model requests, documents,
-retrieval, interactive input, agent memory, secrets, and tracing. It writes
-`answer.txt` to the run output directory.
+retrieval, interactive input, agent memory, secrets, tracing, and remote browser
+automation. With the browser capability enabled, it saves `chromium.png` in
+the run output directory. The interactivity exercise writes `answer.txt`.
 It is an integration demonstration rather than a complete autonomous agent.
 
-Before running its checked-in configuration:
+The current offline browser configuration references `METISA_PROBE_2` in
+the host environment. For a run that enables the other service integrations,
+prepare the corresponding dependencies below.
 
 1. Review [its TOML file](src/sample_agent/metisa.toml), especially the enabled
    capabilities, local paths, allowed destinations, and credentials.
@@ -292,28 +325,32 @@ The host CLI loads the specification and creates a unique run context. It uses
 explicit Docker commands to build images and create, connect, start, inspect,
 stop, and remove containers.
 
-The networking arrangement is:
+The configured services communicate through these networks:
 
 ```text
 Workload container
-    |
-    +-- internal workload network -- MCP / LLM broker / agent memory / telemetry
-    |                                      |
-    |                              internal backend network
-    |                                      |
-    |                              supporting services
-    |
-    +-- configured proxy access -- Squid / HAProxy -- egress network
+    └─ internal workload network
+       ├─ Playwright Chromium
+       └─ MCP, LLM broker, agent memory, and telemetry
+
+Internal backend network ─ supporting services and proxies
+Egress network ─ Squid and HAProxy routes to external destinations
 ```
 
 Only the networks and services needed for the configured workload are created.
 MCP, the LLM broker, agent memory, and the telemetry collector attach to both
 the workload and backend networks. Agent memory accesses PostgreSQL on the
-backend network. Squid handles permitted internet access; HAProxy handles
-configured local network routes.
-With the LLM broker enabled, the workload is not configured for direct Squid
-access. Services communicate through Docker network aliases rather than
-published host ports.
+backend network. Squid handles permitted internet access, and HAProxy handles
+configured local network routes. Services use Docker network aliases on
+unpublished ports.
+
+The browser sidecar joins the workload network and also joins the backend
+network when one is created. In a run with `internet` and `llm_broker`, the
+workload connects to the browser on the workload network, and the browser
+reaches Squid through the backend network. This preserves the broker
+configuration's restriction on direct Squid access from the workload.
+Metisa waits for the browser sidecar's WebSocket health check before starting
+the workload. See [the network diagram](network.txt) for the full topology.
 
 Inside the workload container, startup follows this sequence:
 
@@ -338,6 +375,9 @@ The implementation combines several controls:
 - CPU, memory, process, file descriptor, and file size limits, with
   service-specific settings.
 - A custom workload seccomp profile and Landlock filesystem allow rules.
+- A separate seccomp profile for Chromium's namespace sandbox. The workload
+  keeps its Landlock rules and has a 256 MiB limit with `playwright_chromium`
+  to accommodate the local driver. The default workload limit is 128 MiB.
 - Isolated Python startup, disabled bytecode writes, and runtime guards for
   selected imports, writable code locations, process spawning, sockets, and
   hardware access.
@@ -356,6 +396,9 @@ The host provisions `METISA_MCP_SERVER_TOKEN` and `METISA_AGENT_MEMORY_TOKEN`
 as workload secrets when their respective services are enabled. The shared MCP
 client supplies its token automatically; direct agent memory HTTP requests must
 send the corresponding token in an `Authorization: Bearer <token>` header.
+
+The Playwright WebSocket grants browser control to clients that can reach it
+on the sidecar's attached networks. It has no application-level authentication.
 
 This is a learning project under development. These controls and their probes
 are not a formal security audit or a guarantee of containment for hostile code.
@@ -416,6 +459,7 @@ provides additional service integration exercises.
 | Path | Contents |
 | --- | --- |
 | `src/metisa_sandbox/` | Host CLI, Docker helpers, lifecycle management, Dockerfiles, and sidecar provisioning. |
+| `src/metisa_sandbox/playwright_chromium_sidecar/` | Browser image, Playwright WebSocket server and health check, and Chromium seccomp profile. |
 | `src/metisa_common/` | Shared specification, terminal, secrets, screening, and client utilities. |
 | `src/metisa_landlock/` | Linux filesystem restrictions and workload bootstrap. |
 | `src/metisa_runner/` | Probe execution and handoff to the workload. |
@@ -445,6 +489,9 @@ configuration explicit so the implementation remains useful for learning.
 | Documents directory not found | Create the configured local directory or change `[documents].local_directory`. |
 | Image build fails | Inspect Docker build output, dependency availability, model download access, and disk space. |
 | Bootstrap or probes fail | Inspect `.runs/<run>/.logs`, kernel support, and the specific failed restriction or service check. |
+| Playwright fails inside `sync_playwright()` | Check `.logs/metisa/stderr.txt` and `state.json` for a driver spawn denial or `OOMKilled`. If the guard changed, ensure the affected workload image was rebuilt. |
+| Playwright cannot connect to Chromium | Check `.logs/playwright-chromium/state.json` for the WebSocket health check result, then verify the browser alias, port, and matching Playwright versions. |
+| Chromium reports `ERR_PROXY_CONNECTION_FAILED` | Check the sidecar and Squid network attachments. With `llm_broker` enabled, they must share the backend network. Check `.logs/squid-proxy/stdout.txt` for the browser's `CONNECT` request. |
 | A service is slow or exits unexpectedly | Inspect its logs and Docker resource allocation; models have different memory and startup requirements. |
 | PostgreSQL container name conflict | Check whether another run is using `metisa-postgres-agent-memory`; runs using PostgreSQL must execute sequentially. |
 | Agent memory cannot connect to PostgreSQL | Check `METISA_POSTGRES_PASSWORD` against the password used to initialize the retained volume, plus the database and agent memory logs. |

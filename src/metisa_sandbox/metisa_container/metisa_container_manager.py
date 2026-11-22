@@ -194,11 +194,16 @@ def create_metisa_workload_container(
     is_interactive_flag = "1" if is_interactive else "0"
     environs.append(f"METISA_INTERACTIVE={is_interactive_flag}")
 
+    playwright_chromium = Capability.PLAYWRIGHT_CHROMIUM in specification.capabilities
+    playwright_chromium_flag = "1" if playwright_chromium else "0"
+    environs.append(f"METISA_PLAYWRIGHT_CHROMIUM={playwright_chromium_flag}")
+
     # Harden the container
     harden_docker_container(
         arguments=arguments,
         environs=environs,
         username="sandbox",
+        memory="256m" if playwright_chromium else "128m",
         interactive=is_interactive,
         seccomp_path=seccomp_path,
         number_user_processes=64,

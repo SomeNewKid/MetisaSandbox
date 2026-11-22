@@ -10,9 +10,12 @@ from enum import StrEnum, unique
 class Capability(StrEnum):
     """Represents the declared capabilities of a Metisa workload."""
 
+    AGENT_MEMORY = "agent_memory"
     CODE_EXECUTION = "code_execution"
     DOCLING = "docling"
     DOCUMENTS = "documents"
+    EMBEDDINGS = "embeddings"
+    ENTITY_GUARD = "entity_guard"
     INTERACTIVE = "interactive"  # Legacy, but helpful with unit testing
     INTERNET = "internet"
     JINA_READER = "jina_reader"
@@ -21,15 +24,11 @@ class Capability(StrEnum):
     LOCALNET = "localnet"
     MCP_SERVER = "mcp_server"
     NETWORK = "network"
-    OPENAI = "openai"
-    PLAYWRIGHT_CHROMIUM = "playwright_chromium"
-    PROMPT_GUARD = "prompt_guard"
-    ENTITY_GUARD = "entity_guard"
-    QDRANT = "qdrant"
-    EMBEDDINGS = "embeddings"
     OTEL_COLLECTOR = "otel_collector"
+    PLAYWRIGHT_CHROMIUM = "playwright_chromium"
     POSTGRES = "postgres"
-    AGENT_MEMORY = "agent_memory"
+    PROMPT_GUARD = "prompt_guard"
+    QDRANT = "qdrant"
 
 
 class SpecificationValidationError(ValueError):
@@ -60,6 +59,7 @@ class MetisaSpecification:
     otel_collector: OpenTelemetrySpecification | None
     postgres: PostgreSqlSpecification | None
     agent_memory: AgentMemorySpecification | None
+    playwright_chromium: PlaywrightChromiumSpecification | None
 
 
 @dataclass(frozen=True)
@@ -189,3 +189,10 @@ class AgentMemorySpecification:
 
     environs: frozenset[str]
     secrets: frozenset[str]
+
+
+@dataclass(frozen=True)
+class PlaywrightChromiumSpecification:
+    """Represents the Playwright Chromium section of the Metisa specification."""
+
+    environs: frozenset[str]

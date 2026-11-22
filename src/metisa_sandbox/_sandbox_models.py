@@ -96,6 +96,11 @@ class SandboxRequirements:
         return Capability.AGENT_MEMORY in self._specification.capabilities
 
     @property
+    def is_playwright_chromium_required(self) -> bool:
+        """Returns a flag indicating if the Playwright Chromium sidecar is required."""
+        return Capability.PLAYWRIGHT_CHROMIUM in self._specification.capabilities
+
+    @property
     def is_internet_access_required(self) -> bool:
         """Returns a flag indicating if internet access is required."""
         return Capability.INTERNET in self._specification.capabilities

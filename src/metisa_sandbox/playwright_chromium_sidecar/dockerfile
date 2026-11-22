@@ -1,0 +1,26 @@
+FROM node:24-bookworm-slim
+
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers \
+    HOME=/tmp \
+    XDG_CACHE_HOME=/tmp/playwright-cache \
+    XDG_CONFIG_HOME=/tmp/playwright-config
+
+WORKDIR /opt/metisa-playwright
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates \
+    && npm install --no-audit --no-fund --save-exact playwright@1.64.1 \
+    && ./node_modules/.bin/playwright install --with-deps --only-shell chromium \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /root/.npm \
+    && groupadd --gid 10013 playwright \
+    && useradd --uid 10013 --gid 10013 --no-create-home \
+        --shell /usr/sbin/nologin playwright
+
+COPY --chown=0:0 --chmod=0444 server.cjs ./server.cjs
+
+USER 10013:10013
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=45s --retries=3 \
+    CMD ["node", "server.cjs", "--healthcheck"]
+
+CMD ["node", "server.cjs"]

@@ -28,6 +28,7 @@ from .test_suite.interactivity import test_interactivity
 from .test_suite.internet import test_internet_access
 from .test_suite.jina_reader import test_jina_reader
 from .test_suite.llm_broker import test_llm_broker
+from .test_suite.playwright_chromium import test_playwright_chromium
 from .test_suite.prompt_guard import test_prompt_guard
 from .test_suite.secrets import test_secrets
 from .test_suite.tracing import test_tracing
@@ -96,6 +97,7 @@ def _run_tests(specification: MetisaSpecification) -> None:
     test_embeddings(specification)
     test_secrets(specification)
     test_agent_memory(specification)
+    test_playwright_chromium(specification)
 
     print()
     print("-" * 30, flush=True)

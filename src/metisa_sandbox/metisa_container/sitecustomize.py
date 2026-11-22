@@ -38,6 +38,7 @@ _VALID_RUNTIME_ROLES = frozenset(
 
 _RUNTIME_ROLE = os.environ.pop("METISA_RUNTIME_ROLE", "")
 _INTERACTIVE_INPUT_ALLOWED = os.environ.get("METISA_INTERACTIVE") == "1"
+_PLAYWRIGHT_CHROMIUM_ALLOWED = os.environ.get("METISA_PLAYWRIGHT_CHROMIUM") == "1"
 
 _ORIGINAL_SOCKET = socket.socket
 _ORIGINAL_SPEC_FROM_FILE_LOCATION = importlib.util.spec_from_file_location
@@ -99,11 +100,13 @@ _ALLOWED_RUNNER_PROCESS_SPAWN_MARKERS = frozenset(
         "/opt/metisa-venv/bin/python -I -B -m metisa_probes",
     }
 )
-_ALLOWED_WORKLOAD_PROCESS_SPAWN_MARKERS = frozenset(
-    {
-        "/ms-playwright/",
-        "/playwright/driver/",
-    }
+_PLAYWRIGHT_DRIVER_DIR = Path(
+    "/opt/metisa-venv/lib/python3.12/site-packages/playwright/driver"
+)
+_PLAYWRIGHT_DRIVER_COMMAND = (
+    str(_PLAYWRIGHT_DRIVER_DIR / "node"),
+    str(_PLAYWRIGHT_DRIVER_DIR / "package" / "cli.js"),
+    "run-driver",
 )
 
 _PROBE_SPAWN_PERMITTED = ContextVar(
@@ -325,7 +328,42 @@ def _apply_process_spawn_guards() -> None:
     class GuardedPopen(_ORIGINAL_SUBPROCESS_POPEN):  # type: ignore[misc]
         def __init__(self, args, *popen_args, **popen_kwargs):  # type: ignore[no-untyped-def]
             _raise_if_process_spawn_denied(args)
-            super().__init__(args, *popen_args, **popen_kwargs)
+
+            if _RUNTIME_ROLE != "workload":
+                super().__init__(args, *popen_args, **popen_kwargs)
+                return
+
+            allowed_options = {
+                "bufsize",
+                "env",
+                "shell",
+                "startupinfo",
+                "stderr",
+                "stdin",
+                "stdout",
+                "universal_newlines",
+            }
+            if popen_args or popen_kwargs.keys() - allowed_options:
+                raise PermissionError("Unsupported Playwright driver process options.")
+
+            if popen_kwargs.get("shell"):
+                raise PermissionError(
+                    "Shell execution is denied for the Playwright driver."
+                )
+
+            super().__init__(
+                _PLAYWRIGHT_DRIVER_COMMAND,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                bufsize=0,
+                cwd="/sandbox-source",
+                env={
+                    "HOME": "/home/sandbox",
+                    "LANG": "C.UTF-8",
+                    "PATH": "/usr/local/bin:/usr/bin:/bin",
+                    "TMPDIR": "/tmp",
+                },
+            )
 
     def guarded_run(args, *run_args, **run_kwargs):  # type: ignore[no-untyped-def]
         _raise_if_process_spawn_denied(args)
@@ -616,7 +654,13 @@ def _is_allowed_runner_command(args: object) -> bool:
 
 
 def _is_allowed_workload_command(args: object) -> bool:
-    return _is_allowed_command(args, _ALLOWED_WORKLOAD_PROCESS_SPAWN_MARKERS)
+    if not _PLAYWRIGHT_CHROMIUM_ALLOWED:
+        return False
+
+    if not isinstance(args, (list, tuple)):
+        return False
+
+    return tuple(args) == _PLAYWRIGHT_DRIVER_COMMAND
 
 
 def _is_allowed_command(args: object, allowed_markers: frozenset[str]) -> bool:

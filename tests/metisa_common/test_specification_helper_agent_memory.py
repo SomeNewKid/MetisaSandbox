@@ -8,6 +8,18 @@ from metisa_common.specification_helper import parse_specification
 from metisa_common.specification_models import SpecificationValidationError
 
 
+def test_agent_memory_invalid_if_no_network_capability() -> None:
+    toml = """
+        agent_name = "sample_agent"
+        capabilities = ["mcp_server", "prompt_guard", "entity_guard", "agent_memory"]
+
+        [agent_memory]
+        environs = []
+    """
+    with pytest.raises(SpecificationValidationError):
+        _ = parse_specification(toml)
+
+
 def test_agent_memory_missing_environs() -> None:
     """Handle omitted environment declarations using the table's defaults."""
     toml = """
