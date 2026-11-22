@@ -948,9 +948,9 @@ def _create_agent_memory_container(
     public_key_pem: bytes,
 ) -> None:
     with terminal_status(
-        running="Creating AgentMemory container...",
-        success="Created AgentMemory container.",
-        failure="Could not create AgentMemory container.",
+        running="Creating Agent Memory container...",
+        success="Created Agent Memory container.",
+        failure="Could not create Agent Memory container.",
     ):
         agent_memory_creation_context = _create_creation_context(
             squid_proxy_container=squid_proxy_container,
